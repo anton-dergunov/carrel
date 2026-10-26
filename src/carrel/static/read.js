@@ -55,9 +55,9 @@ export function createReader({ onPage, onPlace }) {
   stopPageZoom();
   pinchToZoom({ container, viewer, eventBus });
 
-  /** Fits the width again, unless the reader zoomed in or out; not while the split is dragged. */
+  /** Fits the width again, unless the reader zoomed in or out. */
   function refit() {
-    if (document.body.classList.contains('dragging') || !container.clientWidth) return;
+    if (!container.clientWidth) return;
     if (viewer.pagesCount && viewer.currentScaleValue === 'page-width') {
       const page = viewer.currentPageNumber;
       viewer.currentScaleValue = 'page-width';

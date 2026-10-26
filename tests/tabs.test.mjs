@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { clampShare, restoreLayout, shareAt } from '../src/carrel/static/layout.js';
+import { clampShare, restoreLayout, shareAt, shareOf } from '../src/carrel/static/layout.js';
 import {
   CHAT,
   PAPERS,
@@ -101,10 +101,22 @@ test('the address names the paper showing', () => {
 });
 
 test('a remembered layout is checked', () => {
-  assert.deepEqual(restoreLayout(null), { place: 'bottom', hidden: false, share: 0.4 });
-  assert.deepEqual(restoreLayout({ place: 'left', hidden: true, share: 0.99 }), { place: 'left', hidden: true, share: 0.85 });
+  const shares = { bottom: 0.4, top: 0.4, left: 0.4, right: 0.4 };
+  assert.deepEqual(restoreLayout(null), { place: 'bottom', hidden: false, shares });
+  assert.deepEqual(restoreLayout({ place: 'left', hidden: true, shares: { left: 0.99, top: 'x' } }), {
+    place: 'left',
+    hidden: true,
+    shares: { ...shares, left: 0.85 },
+  });
   assert.equal(restoreLayout({ place: 'sideways' }).place, 'bottom');
   assert.equal(clampShare(0), 0.15);
+});
+
+test('each side keeps its own size', () => {
+  const layout = restoreLayout({ place: 'right', shares: { bottom: 0.6, right: 0.3 } });
+  assert.equal(shareOf(layout), 0.3);
+  assert.equal(shareOf({ ...layout, place: 'bottom' }), 0.6);
+  assert.equal(shareOf({ ...layout, place: 'tab' }), 0.4);
 });
 
 test('the split follows the finger', () => {

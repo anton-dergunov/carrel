@@ -1,21 +1,36 @@
 // Where the chat sits: below, above, left or right of the paper, or on a tab of its own; shown
-// or hidden; and how much of the screen it takes, dragged at the split. Each device remembers
-// its own, since a tablet held upright, one held sideways and the laptop want different ones.
+// or hidden; and how much of the screen it takes, dragged at the split, kept for each side, since
+// a chat below wants a share of the height and one beside a share of the width. Each device
+// remembers its own, since a tablet held upright, one held sideways and the laptop want different ones.
 
 export const PLACES = ['bottom', 'top', 'left', 'right', 'tab'];
-export const DEFAULT_LAYOUT = { place: 'bottom', hidden: false, share: 0.4 };
+const SIDES = ['bottom', 'top', 'left', 'right'];
+export const DEFAULT_SHARE = 0.4;
+export const DEFAULT_LAYOUT = {
+  place: 'bottom',
+  hidden: false,
+  shares: Object.fromEntries(SIDES.map((side) => [side, DEFAULT_SHARE])),
+};
 const SHARE_MIN = 0.15;
 const SHARE_MAX = 0.85;
 const LAYOUT_KEY = 'carrel.layout';
 
 /** A remembered layout, checked: whatever does not fit is the default. */
 export function restoreLayout(stored) {
-  const layout = { ...DEFAULT_LAYOUT };
+  const layout = { ...DEFAULT_LAYOUT, shares: { ...DEFAULT_LAYOUT.shares } };
   if (!stored || typeof stored !== 'object') return layout;
   if (PLACES.includes(stored.place)) layout.place = stored.place;
   if (typeof stored.hidden === 'boolean') layout.hidden = stored.hidden;
-  if (typeof stored.share === 'number' && Number.isFinite(stored.share)) layout.share = clampShare(stored.share);
+  for (const side of SIDES) {
+    const share = stored.shares?.[side];
+    if (typeof share === 'number' && Number.isFinite(share)) layout.shares[side] = clampShare(share);
+  }
   return layout;
+}
+
+/** The chat's share of the screen where it sits now. */
+export function shareOf(layout) {
+  return layout.shares[layout.place] ?? DEFAULT_SHARE;
 }
 
 export function clampShare(share) {
@@ -40,9 +55,9 @@ export function shareAt(place, x, y, width, height) {
 
 /**
  * Applies the remembered layout to the page and runs its controls: the split, the Chat button
- * and the layout sheet. `onChange(layout)` follows every change; `onDragEnd` follows a drag.
+ * and the layout sheet. `onChange(layout)` follows every change.
  */
-export function startLayout({ onChange, onDragEnd }) {
+export function startLayout({ onChange }) {
   const body = document.body;
   const divider = document.getElementById('divider');
   const toggle = document.getElementById('chat-toggle');
@@ -53,7 +68,7 @@ export function startLayout({ onChange, onDragEnd }) {
   function apply() {
     for (const place of PLACES) body.classList.toggle(`chat-${place}`, layout.place === place);
     body.classList.toggle('chat-hidden', layout.hidden && layout.place !== 'tab');
-    body.style.setProperty('--chat-share', String(layout.share));
+    body.style.setProperty('--chat-share', String(shareOf(layout)));
     toggle.hidden = layout.place === 'tab';
     toggle.setAttribute('aria-pressed', String(!layout.hidden));
     for (const choice of sheet.querySelectorAll('[data-place]')) {
@@ -62,34 +77,46 @@ export function startLayout({ onChange, onDragEnd }) {
     onChange(layout);
   }
 
-  function set(patch, { keep = true } = {}) {
+  function set(patch) {
     layout = { ...layout, ...patch };
-    if (keep) save(layout);
+    save(layout);
     apply();
   }
 
-  // The split, dragged.
+  // The split, dragged. Only the line follows the finger; the panes take the new size once, when
+  // it lifts. Resizing them at every step lays out the PDF's pages and the whole chat again each
+  // time, which is what made dragging slow.
+  let drag = null;
   divider.addEventListener('pointerdown', (event) => {
     if (layout.place === 'tab') return;
     event.preventDefault();
     divider.setPointerCapture(event.pointerId);
+    const box = divider.getBoundingClientRect();
+    drag = { x: box.left + box.width / 2, y: box.top + box.height / 2, share: shareOf(layout) };
     body.classList.add('dragging');
   });
   divider.addEventListener('pointermove', (event) => {
-    if (!body.classList.contains('dragging')) return;
-    const share = shareAt(layout.place, event.clientX, event.clientY, window.innerWidth, window.innerHeight);
-    if (share != null) set({ share }, { keep: false });
+    if (!drag) return;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    drag.share = shareAt(layout.place, event.clientX, event.clientY, width, height);
+    // Where the split will be, with the share clamped.
+    const at = { bottom: height * (1 - drag.share), top: height * drag.share, left: width * drag.share, right: width * (1 - drag.share) }[layout.place];
+    const vertical = layout.place === 'left' || layout.place === 'right';
+    divider.style.transform = vertical ? `translateX(${at - drag.x}px)` : `translateY(${at - drag.y}px)`;
   });
   const release = () => {
-    if (!body.classList.contains('dragging')) return;
+    if (!drag) return;
+    const { share } = drag;
+    drag = null;
     body.classList.remove('dragging');
-    save(layout);
-    onDragEnd();
+    divider.style.transform = '';
+    set({ shares: { ...layout.shares, [layout.place]: share } });
   };
   divider.addEventListener('pointerup', release);
   divider.addEventListener('pointercancel', release);
   // A double tap on the split puts it back where it started.
-  divider.addEventListener('dblclick', () => set({ share: DEFAULT_LAYOUT.share }));
+  divider.addEventListener('dblclick', () => set({ shares: { ...layout.shares, [layout.place]: DEFAULT_SHARE } }));
 
   toggle.addEventListener('click', () => set({ hidden: !layout.hidden }));
 
@@ -106,7 +133,7 @@ export function startLayout({ onChange, onDragEnd }) {
     });
   }
   document.getElementById('reset-size').addEventListener('click', () => {
-    set({ share: DEFAULT_LAYOUT.share });
+    set({ shares: { ...layout.shares, [layout.place]: DEFAULT_SHARE } });
     openSheet(false);
   });
   document.addEventListener('pointerdown', (event) => {
@@ -121,7 +148,7 @@ function load() {
   try {
     return restoreLayout(JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? 'null'));
   } catch {
-    return { ...DEFAULT_LAYOUT };
+    return restoreLayout(null);
   }
 }
 

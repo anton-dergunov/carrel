@@ -3,7 +3,7 @@
 // is; the address only says which tab is showing, so a reload comes back to it.
 
 import { startChat } from './chat.js';
-import { startLayout, DEFAULT_LAYOUT } from './layout.js';
+import { restoreLayout, shareOf, startLayout } from './layout.js';
 import { sameFile } from './links.js';
 import { startPaperList } from './papers.js';
 import { createReader } from './read.js';
@@ -37,7 +37,7 @@ papersTab.dataset.key = PAPERS;
 chatTab.dataset.key = CHAT;
 
 let state = loadTabs();
-let layout = DEFAULT_LAYOUT;
+let layout = restoreLayout(null);
 // Set once the first tab is shown; before that the parts starting only draw nothing.
 let ready = false;
 // Something happened in the chat while it was out of sight: an answer, or a question for the reader.
@@ -65,7 +65,7 @@ const reader = createReader({
   },
 });
 
-const refitScreen = fitToVisibleArea(() => layout.share);
+const refitScreen = fitToVisibleArea(() => shareOf(layout));
 startLayout({
   onChange(next) {
     const moved = next.place !== layout.place || next.hidden !== layout.hidden;
@@ -75,7 +75,6 @@ startLayout({
     if (state.active === CHAT && layout.place !== 'tab') go(paperInView(state)?.pdf ?? PAPERS, { push: false });
     else render();
   },
-  onDragEnd: () => reader.refit(),
 });
 
 startPaperList({

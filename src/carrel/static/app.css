@@ -135,6 +135,18 @@ body[data-active="chat"] #chat-pane { visibility: visible; }
   border-bottom: 2px solid transparent;
 }
 .tab[hidden], #strip [hidden] { display: none; }
+/* A faint bar between tabs, and between the tabs and the controls after them. */
+.tab:not(#tab-papers), #strip .sep { position: relative; }
+.tab:not(#tab-papers)::before, #strip .sep::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 14px;
+  border-left: 1px solid var(--line);
+  transform: translateY(-50%);
+}
+#strip .sep { flex: none; width: 1px; }
 .tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
 .tab .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; }
 .tab .close { padding: 0 4px; font-size: 18px; line-height: 1; color: var(--muted); }
@@ -178,7 +190,10 @@ body.chat-left #divider::after, body.chat-right #divider::after { inset: 0 -10px
   transform: translate(-50%, -50%);
 }
 body.chat-left #divider::before, body.chat-right #divider::before { width: 5px; height: 36px; }
+/* While dragged, only the line moves (layout.js). */
 body.dragging { cursor: grabbing; user-select: none; -webkit-user-select: none; }
+body.dragging #divider { background: var(--accent); will-change: transform; }
+body.dragging #divider::before { background: var(--accent); opacity: 1; }
 
 /* Where the chat sits, under the Layout button */
 #layout-sheet {

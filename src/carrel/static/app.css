@@ -76,12 +76,17 @@ a { color: var(--accent); }
 
 /* The reading page: the PDF above, the chat below */
 
+/* Pinned to the visible area, which the keyboard shortens (screen.js). */
 body.read {
+  position: fixed;
+  left: 0;
+  width: 100%;
+  top: var(--visible-top, 0px);
+  height: var(--visible-height, 100dvh);
   display: grid;
-  grid-template-rows: 60% 40%;
+  grid-template-rows: minmax(0, 1fr) var(--chat-height, 40%);
   /* A wide table scrolls in its own box instead of widening the page. */
   grid-template-columns: minmax(0, 1fr);
-  height: 100dvh;
   overflow: hidden;
 }
 
@@ -232,19 +237,23 @@ button.plain {
   display: flex;
   gap: 8px;
   align-items: flex-end;
-  padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
+  /* Clear of the home indicator, but not a whole inset below it; the keyboard has none. */
+  padding: 6px 16px max(6px, calc(env(safe-area-inset-bottom) - 8px));
   border-top: 1px solid var(--line);
 }
+.keyboard #ask { padding-bottom: 6px; }
 #question {
   flex: 1;
   resize: none;
-  font: inherit;
-  padding: 8px 10px;
+  /* 16px: Safari zooms into a smaller box when it is focused. */
+  font: 16px/1.35 var(--ui);
+  padding: 5px 10px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--bg);
   color: var(--text);
 }
+#ask button { font-size: 14px; padding: 6px 12px; border-radius: 8px; }
 button {
   font: 15px var(--ui);
   padding: 8px 14px;

@@ -5,6 +5,7 @@ import * as pdfjsLib from './vendor/pdfjs/pdf.min.mjs';
 import { startChat } from './chat.js';
 import { sameFile } from './links.js';
 import { pinchToZoom, stopPageZoom } from './pinch.js';
+import { fitToVisibleArea } from './screen.js';
 
 // The viewer component reads the library from `globalThis.pdfjsLib` when its module is
 // evaluated, so it is imported only after this.
@@ -64,6 +65,7 @@ new ResizeObserver(() => {
 
 stopPageZoom();
 pinchToZoom({ container, viewer, eventBus });
+fitToVisibleArea();
 
 /** A target given in the page's own address: /read/<file>?page=7&dest=table.2 */
 function targetFromLocation() {

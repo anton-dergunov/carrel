@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>$title</title>
+<link rel="stylesheet" href="/static/vendor/pdfjs/pdf_viewer.css">
+<link rel="stylesheet" href="/static/app.css">
+<script type="module" src="/static/read.js"></script>
+</head>
+<body class="read" data-pdf="$pdf" data-pdf-url="$pdf_url">
+<section id="pdf-pane">
+  <div id="viewerContainer"><div id="viewer" class="pdfViewer"></div></div>
+</section>
+<section id="chat-pane">
+  <header class="bar">
+    <a class="back" href="/">Papers</a>
+    <span class="title">$title</span>
+    <span id="page-label"></span>
+  </header>
+  <div id="log" aria-live="polite"></div>
+  <form id="ask">
+    <textarea id="question" rows="1" placeholder="Ask about this paper" enterkeyhint="send"></textarea>
+    <button type="submit" id="send">Ask</button>
+    <button type="button" id="stop" hidden>Stop</button>
+  </form>
+</section>
+</body>
+</html>

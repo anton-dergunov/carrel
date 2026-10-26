@@ -7,7 +7,10 @@ keeps the Host the browser asked for, and says who is asking in `Tailscale-User-
 - its Host is one of ours (a hostile page's own domain pointed here is not: DNS rebinding);
 - it carries the reader's Tailscale login, or, with no login, it is addressed to the
   loopback name itself, which a proxied request never is;
-- for the WebSocket, its Origin is the page's own.
+- for the WebSocket, and for anything but GET and HEAD, its Origin is the page's own.
+
+The one thing a page can change on the laptop is a paper's PDF, with the highlights made in
+it (`PUT /pdf/…`); and a page can write a line to the server's log.
 """
 
 import asyncio
@@ -15,6 +18,8 @@ import contextlib
 import html
 import json
 import logging
+import os
+import shutil
 import time
 from pathlib import Path
 from string import Template
@@ -43,6 +48,11 @@ PACKAGE = Path(__file__).parent
 STATIC = PACKAGE / "static"
 PAGES = PACKAGE / "pages"
 LOOPBACK = {"localhost", "127.0.0.1", "::1"}
+SAFE_METHODS = {"GET", "HEAD"}
+# A paper's PDF as a page saves it; the largest in the library is a few tens of MB.
+MAX_PDF = 256 * 1024 * 1024
+# A line of a page's log, as the page sends it.
+MAX_LOG = 8192
 
 
 def hostname(host_header: str) -> str:
@@ -52,8 +62,9 @@ def hostname(host_header: str) -> str:
     return host.rsplit(":", 1)[0] if ":" in host else host
 
 
-def refusal(headers: Headers, websocket: bool, hosts: set[str], logins: set[str]) -> str | None:
-    """Why a request is refused, or None to admit it."""
+def refusal(headers: Headers, own_page: bool, hosts: set[str], logins: set[str]) -> str | None:
+    """Why a request is refused, or None to admit it. `own_page`: it must come from one of
+    carrel's own pages (the WebSocket, and whatever changes something)."""
     host = hostname(headers.get("host", ""))
     if host not in hosts | LOOPBACK:
         return "This server does not answer to that name."
@@ -64,10 +75,10 @@ def refusal(headers: Headers, websocket: bool, hosts: set[str], logins: set[str]
     elif login.lower() not in logins:
         return f"{login} is not this library's reader."
     if (
-        websocket
+        own_page
         and urlsplit(headers.get("origin", "")).netloc.lower() != headers.get("host", "").lower()
     ):
-        return "The connection did not come from carrel's own page."
+        return "The request did not come from carrel's own page."
     return None
 
 
@@ -79,9 +90,8 @@ class Guard:
 
     async def __call__(self, scope, receive, send):
         if scope["type"] in ("http", "websocket"):
-            reason = refusal(
-                Headers(scope=scope), scope["type"] == "websocket", self.hosts, self.logins
-            )
+            own_page = scope["type"] == "websocket" or scope["method"] not in SAFE_METHODS
+            reason = refusal(Headers(scope=scope), own_page, self.hosts, self.logins)
             if reason:
                 if scope["type"] == "websocket":
                     await WebSocket(scope, receive, send).close(code=1008, reason=reason)
@@ -102,6 +112,36 @@ def csp(request: Request) -> str:
     )
 
 
+def version(path: Path) -> str:
+    """The PDF's version, as its ETag: a save names the version it extends."""
+    stat = path.stat()
+    return f'"{stat.st_mtime_ns}-{stat.st_size}"'
+
+
+def write_pdf(path: Path, data: bytes, base: int, expected: str | None) -> str | None:
+    """Replaces the PDF with `data`, the paper as the page loaded it (its first `base` bytes)
+    and the page's update after them, when the file is still the version the page last saw
+    and begins with those bytes. The new version, or None when the file is not as the page
+    thinks and nothing was written."""
+    if version(path) != expected:
+        return None
+    with open(path, "rb") as file:
+        if file.read(base) != data[:base]:
+            return None
+    partial = path.with_name(f".{path.name}.carrel-{os.getpid()}.tmp")
+    try:
+        with open(partial, "wb") as file:
+            file.write(data)
+            file.flush()
+            os.fsync(file.fileno())
+        shutil.copymode(path, partial)
+        os.replace(partial, path)
+    except BaseException:
+        partial.unlink(missing_ok=True)
+        raise
+    return version(path)
+
+
 def page(request: Request, name: str, **values: str) -> HTMLResponse:
     text = Template((PAGES / name).read_text(encoding="utf-8")).substitute(values)
     return HTMLResponse(text, headers={"Content-Security-Policy": csp(request)})
@@ -116,6 +156,8 @@ def make_app(
     model: str | None = None,
 ):
     sessions = sessions or Sessions(library, extra_folders, model=model)
+    # One PDF written at a time: a save checks the file's version, then replaces it.
+    writing = asyncio.Lock()
 
     def papers() -> str:
         topics: dict[str, list[str]] = {}
@@ -180,8 +222,63 @@ def make_app(
         except LookupError:
             return PlainTextResponse("No such PDF in the library.", status_code=404)
         return FileResponse(
-            path, media_type="application/pdf", headers={"Cache-Control": "no-cache"}
+            path,
+            media_type="application/pdf",
+            headers={"Cache-Control": "no-cache", "ETag": version(path)},
         )
+
+    async def save_pdf(request: Request) -> Response:
+        """The paper's PDF with the highlights made in the page: what PDF.js saved, the
+        bytes it loaded and an incremental update after them. `If-Match` names the version
+        it loaded or last saved, `X-Carrel-Base-Length` how many bytes it loaded."""
+        rel = request.path_params["path"]
+        try:
+            path = library.resolve_pdf(rel)
+        except LookupError:
+            return PlainTextResponse("No such PDF in the library.", status_code=404)
+        try:
+            base = int(request.headers.get("x-carrel-base-length", ""))
+        except ValueError:
+            return PlainTextResponse("Say how many bytes the page loaded.", status_code=400)
+        data = bytearray()
+        async for chunk in request.stream():
+            data += chunk
+            if len(data) > MAX_PDF:
+                return PlainTextResponse("Too large for a paper.", status_code=413)
+        if not data.startswith(b"%PDF-") or not 0 < base <= len(data):
+            return PlainTextResponse("Not a PDF this page loaded.", status_code=400)
+        async with writing:
+            saved = await asyncio.to_thread(
+                write_pdf, path, bytes(data), base, request.headers.get("if-match")
+            )
+        if saved is None:
+            log.info("not saved, changed elsewhere: %s", rel)
+            return PlainTextResponse("The PDF changed since the page loaded it.", status_code=409)
+        log.info("saved %s (%d bytes after the %d loaded)", rel, len(data) - base, base)
+        return Response(status_code=204, headers={"ETag": saved})
+
+    async def page_log(request: Request) -> Response:
+        """A line from a page's console: what goes wrong on the iPad is seen here."""
+        body = await request.body()
+        if len(body) > MAX_LOG:
+            return PlainTextResponse("Too long.", status_code=413)
+        try:
+            entry = json.loads(body)
+        except ValueError:
+            entry = None
+        if not isinstance(entry, dict):
+            return PlainTextResponse("Not a log entry.", status_code=400)
+        level, message, where, stack = (
+            str(entry.get(key) or "") for key in ("level", "message", "where", "stack")
+        )
+        log.warning(
+            "page %s: %s%s%s",
+            level or "log",
+            message,
+            f" ({where})" if where else "",
+            f"\n{stack}" if stack else "",
+        )
+        return Response(status_code=204)
 
     async def session(websocket: WebSocket) -> None:
         """A page attached to a chat: `?chat=<id>` (or `new`), and `after=<seq>&epoch=<e>`
@@ -234,7 +331,9 @@ def make_app(
         routes=[
             Route("/", index),
             Route("/read/{path:path}", read),
-            Route("/pdf/{path:path}", pdf),
+            Route("/pdf/{path:path}", pdf, methods=["GET", "HEAD"]),
+            Route("/pdf/{path:path}", save_pdf, methods=["PUT"]),
+            Route("/api/log", page_log, methods=["POST"]),
             Route("/api/paper/{path:path}", paper),
             Route("/api/chats", chats),
             WebSocketRoute("/ws", session),

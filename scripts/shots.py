@@ -1,12 +1,17 @@
 """Look at the reading page the way the iPad shows it, in WebKit at 820x1180.
 
-    uv run --group shots python scripts/shots.py URL --out DIR [--layout PLACE] [--tabs] [--ask QUESTION]
+    uv run --group shots python scripts/shots.py URL --out DIR [--layout PLACE] [--tabs]
+        [--find QUERY] [--highlight] [--ask QUESTION]
 
 URL is a reading page of a running carrel, e.g. http://127.0.0.1:8517/read/<pdf>. Takes a
 shot once the PDF is drawn. --layout puts the chat below, above, left, right, on a tab, or
 hides it, as this device's choice. With --tabs, it opens the list, a second paper, goes back
 to the first and checks it comes back at the page it was on, closes the second, and reloads
-to see the tabs come back. With --ask, it also types the question, waits for the answer
+to see the tabs come back. --find types QUERY into find a letter at a time and prints what it
+found. --highlight turns the pen on, selects a line on page 1 and checks it is highlighted, saved
+and quoted for the chat; reloads, taps the highlight, recolours it, asks about it, and removes it,
+checking each save. It writes into the served PDF: run it against a carrel serving a throwaway
+library, never the reader's own. With --ask, it also types the question, waits for the answer
 (this runs a real Claude Code turn, which costs; --allow taps Allow on each permission
 request), opens the turn's fold, taps the answer's first citation, reloads the page to see
 the chat come back, and takes a shot after each step. Prints the page the PDF is on at each
@@ -80,6 +85,91 @@ def tabs_pass(page, out: Path) -> None:
     page.screenshot(path=out / "tabs-4-reload.png")
 
 
+def find_pass(page, query: str, out: Path) -> None:
+    """Find, typed as fingers type it: a letter at a time."""
+    page.click("#find-button")
+    page.type("#find-input", query, delay=120)
+    page.wait_for_timeout(1500)
+    print(
+        f"find {query!r}:",
+        page.inner_text("#find-count"),
+        "| marked:",
+        page.locator(".textLayer .highlight").count(),
+    )
+    page.screenshot(path=out / "find.png")
+    page.click("#find-done")
+
+
+def center(page, selector: str) -> tuple[float, float]:
+    box = page.locator(selector).first.bounding_box()
+    return box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+
+
+def saved(page, act) -> str:
+    """Does `act()` and waits for the PDF to be saved; the save's status."""
+    with page.expect_response(lambda r: r.request.method == "PUT", timeout=10_000) as info:
+        act()
+    return str(info.value.status)
+
+
+def highlight_pass(page, out: Path) -> None:
+    """A highlight made with the pen, saved, tapped, recoloured, asked about and removed."""
+    if page.get_attribute("#pen", "aria-pressed") != "true":
+        page.click("#pen")
+    select = """() => {
+      const span = [...document.querySelectorAll('.page[data-page-number="1"] .textLayer span')]
+        .find((each) => each.textContent.length > 40);
+      const range = document.createRange();
+      range.setStart(span.firstChild, 0);
+      range.setEnd(span.firstChild, 40);
+      document.getSelection().removeAllRanges();
+      document.getSelection().addRange(range);
+      return range.toString();
+    }"""
+    status = saved(page, lambda: print("selected:", repr(page.evaluate(select))))
+    page.wait_for_timeout(300)
+    print(
+        "highlighted, saved:",
+        status,
+        "| highlights:",
+        page.locator(".highlightEditor").count(),
+        "| quoted:",
+        repr(page.inner_text("#quote .words")),
+    )
+    page.screenshot(path=out / "highlight-1-made.png")
+    page.reload()
+    page.wait_for_selector(".annotationLayer .highlightAnnotation", timeout=30_000)
+    page.wait_for_timeout(800)
+    print(
+        "after a reload, in the file:",
+        page.locator(".annotationLayer .highlightAnnotation").count(),
+    )
+    page.touchscreen.tap(*center(page, ".annotationLayer .highlightAnnotation"))
+    page.wait_for_timeout(300)
+    print("tapped, panel shown:", page.locator("#mark-panel").is_visible())
+    page.screenshot(path=out / "highlight-2-panel.png")
+    print("recoloured, saved:", saved(page, lambda: page.click('#mark-panel [aria-label="Pink"]')))
+    page.wait_for_timeout(300)
+    page.screenshot(path=out / "highlight-3-pink.png")
+    page.touchscreen.tap(*center(page, ".highlightEditor, .annotationLayer .highlightAnnotation"))
+    page.wait_for_timeout(300)
+    page.click("#mark-ask")
+    page.wait_for_timeout(500)
+    print("asked about it, quoted:", repr(page.inner_text("#quote .words")))
+    page.screenshot(path=out / "highlight-4-ask.png")
+    page.touchscreen.tap(*center(page, ".highlightEditor, .annotationLayer .highlightAnnotation"))
+    page.wait_for_timeout(300)
+    print("removed, saved:", saved(page, lambda: page.click("#mark-remove")))
+    page.click("#pen")  # off again
+    page.reload()
+    page.wait_for_selector(".pdfViewer .page canvas", timeout=30_000)
+    page.wait_for_timeout(1000)
+    print(
+        "after a reload, in the file:",
+        page.locator(".annotationLayer .highlightAnnotation").count(),
+    )
+
+
 def wait_for_answer(page, timeout: int, allow: bool, out: Path) -> None:
     """Waits for the turn's end, printing each permission request (and tapping Allow)."""
     seen = 0
@@ -112,6 +202,10 @@ def main() -> None:
     parser.add_argument("--ask")
     parser.add_argument("--layout", choices=LAYOUTS, help="where the chat sits")
     parser.add_argument("--tabs", action="store_true", help="open, switch and close paper tabs")
+    parser.add_argument("--find", help="find this in the paper, typed a letter at a time")
+    parser.add_argument(
+        "--highlight", action="store_true", help="make, save, change and remove a highlight"
+    )
     parser.add_argument("--browser", default="webkit", choices=["webkit", "chromium"])
     parser.add_argument("--timeout", type=int, default=240, help="seconds to wait for an answer")
     parser.add_argument("--allow", action="store_true", help="tap Allow on each permission request")
@@ -138,6 +232,12 @@ def main() -> None:
 
         if args.tabs:
             tabs_pass(page, args.out)
+
+        if args.find:
+            find_pass(page, args.find, args.out)
+
+        if args.highlight:
+            highlight_pass(page, args.out)
 
         if args.ask:
             page.fill("#question", args.ask)

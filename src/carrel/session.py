@@ -112,19 +112,50 @@ def context_line(paper_text: str | None, page: int | None) -> str:
     return f"[Reading {paper_text}{where}]\n"
 
 
-# The context line; a session list's first prompt has it on one line with the question.
+# The longest passage a question carries.
+LONGEST_SELECTION = 4000
+
+
+def selection_block(text: str, page: int | None, paper_text: str | None = None) -> str:
+    """What the reader selected in a paper, after the context line: the page it is on, and the
+    paper when it is not the one the context line names."""
+    text = text.replace("</selection>", "")
+    attributes = (f' paper="{paper_text}"' if paper_text else "") + (
+        f' page="{page}"' if page else ""
+    )
+    return f"<selection{attributes}>\n{text}\n</selection>\n"
+
+
+# The context line and the selection after it; a session list's first prompt has them on one
+# line with the question.
 _CONTEXT = re.compile(r"^\[Reading (?P<text>[^\n]+?)(?:, page (?P<page>\d+))?\][\n ]")
+_SELECTION = re.compile(
+    r'<selection(?: paper="(?P<paper>[^"]*)")?(?: page="(?P<page>\d+)")?>[\n ]'
+    r"(?P<text>.*?)[\n ]</selection>[\n ]",
+    re.DOTALL,
+)
 
 
 def split_question(prompt: str) -> dict:
-    """A prompt as the reader asked it: the question, and the paper its context line names."""
+    """A prompt as the reader asked it: the question, the paper its context line names, and
+    the passage it quotes."""
+    question = {}
     found = _CONTEXT.match(prompt)
-    if not found:
-        return {"text": prompt}
-    question = {"text": prompt[found.end() :], "paper": Path(found["text"]).stem}
-    if found["page"]:
-        question["page"] = int(found["page"])
-    return question
+    if found:
+        prompt = prompt[found.end() :]
+        question["paper"] = Path(found["text"]).stem
+        if found["page"]:
+            question["page"] = int(found["page"])
+    quoted = _SELECTION.match(prompt)
+    if quoted:
+        prompt = prompt[quoted.end() :]
+        selection = {"text": quoted["text"]}
+        if quoted["page"]:
+            selection["page"] = int(quoted["page"])
+        if quoted["paper"]:
+            selection["paper"] = Path(quoted["paper"]).stem
+        question["selection"] = selection
+    return {"text": prompt, **question}
 
 
 def to_wire(message: Any) -> dict:
@@ -260,7 +291,10 @@ class Session:
         match message.get("type"):
             case "ask":
                 await self.ask(
-                    str(message.get("text") or ""), message.get("paper"), message.get("page")
+                    str(message.get("text") or ""),
+                    message.get("paper"),
+                    message.get("page"),
+                    message.get("selection"),
                 )
             case "permission":
                 self.answer(str(message.get("id")), bool(message.get("allow")))
@@ -270,7 +304,15 @@ class Session:
             case other:
                 await self.emit("Error", {"message": f"unknown message type {other!r}"})
 
-    async def ask(self, text: str, paper: str | None = None, page: int | None = None) -> None:
+    async def ask(
+        self,
+        text: str,
+        paper: str | None = None,
+        page: int | None = None,
+        selection: dict | None = None,
+    ) -> None:
+        """A question about the paper open at `page`, with what the reader selected in a paper:
+        `selection` is {pdf, page, text}."""
         if not text.strip():
             return
         if self.busy:
@@ -288,6 +330,9 @@ class Session:
                     "pdf": found.pdf,
                     **({"page": page} if page else {}),
                 }
+            quote, block = self._selection(selection, found)
+            if quote:
+                question["selection"] = quote
             await self.emit("Question", question)
             await self.emit_state()
             if self.client is None:
@@ -296,10 +341,28 @@ class Session:
             if not self.started:
                 record_session(self.id)
                 self.started = True
-            await self.client.query(context_line(found.text if found else None, page) + text)
+            await self.client.query(
+                context_line(found.text if found else None, page) + block + text
+            )
         except BaseException:
             self.busy = False
             raise
+
+    def _selection(self, selection: object, open_paper: Paper | None) -> tuple[dict | None, str]:
+        """A selection as the question shows it, and as the prompt carries it."""
+        if not isinstance(selection, dict):
+            return None, ""
+        text = " ".join(str(selection.get("text") or "").split())[:LONGEST_SELECTION]
+        found = self._paper(selection.get("pdf"))
+        if not text or not found:
+            return None, ""
+        page = selection.get("page")
+        page = page if isinstance(page, int) and page > 0 else None
+        other = open_paper is None or found.pdf != open_paper.pdf
+        quote = {"text": text, "pdf": found.pdf, **({"page": page} if page else {})}
+        if other:
+            quote["paper"] = found.title
+        return quote, selection_block(text, page, found.text if other else None)
 
     def _paper(self, pdf: str | None) -> Paper | None:
         """The paper whose PDF is open, when it is one of the library's."""

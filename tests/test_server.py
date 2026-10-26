@@ -111,3 +111,75 @@ def test_a_paper_to_open_beside_the_chat(client):
 def test_no_chats_yet(client, monkeypatch, tmp_path):
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))
     assert client.get("/api/chats").json() == []
+
+
+@pytest.fixture
+def pdf_file(library):
+    """The test paper's PDF, put back as it was after a test that saves it."""
+    path = library.resolve_pdf("recsys/Wide & Deep. A Test Paper.pdf")
+    original = path.read_bytes()
+    yield path
+    path.write_bytes(original)
+
+
+def save(client, body, version, base, headers=OWN):
+    return client.put(
+        f"/pdf/{PDF}",
+        content=body,
+        headers={**headers, "If-Match": version, "X-Carrel-Base-Length": str(base)},
+    )
+
+
+def test_highlights_are_saved_into_the_pdf(client, pdf_file):
+    loaded = client.get(f"/pdf/{PDF}")
+    first = loaded.content + b"1 0 obj <</Subtype /Highlight>> endobj\n%%EOF\n"
+    response = save(client, first, loaded.headers["etag"], len(loaded.content))
+    assert response.status_code == 204
+    assert pdf_file.read_bytes() == first
+    assert not list(pdf_file.parent.glob(".*.tmp"))
+    # The next save is the paper as loaded with the update made since, not the last save.
+    second = loaded.content + b"1 0 obj <</Subtype /Highlight /C [1 0 0]>> endobj\n%%EOF\n"
+    response = save(client, second, response.headers["etag"], len(loaded.content))
+    assert response.status_code == 204
+    assert pdf_file.read_bytes() == second
+    assert client.get(f"/pdf/{PDF}").headers["etag"] == response.headers["etag"]
+
+
+def test_a_pdf_changed_elsewhere_is_not_overwritten(client, pdf_file):
+    loaded = client.get(f"/pdf/{PDF}")
+    update = loaded.content + b"%%EOF\n"
+    # Another device's save, or a sync, since this page loaded the paper.
+    elsewhere = loaded.content + b"% another device\n"
+    pdf_file.write_bytes(elsewhere)
+    assert save(client, update, loaded.headers["etag"], len(loaded.content)).status_code == 409
+    # The right version, but not the paper the page loaded.
+    version = client.get(f"/pdf/{PDF}").headers["etag"]
+    other = b"%PDF-1.7\n" + b"1" * len(loaded.content)
+    assert save(client, other, version, len(loaded.content)).status_code == 409
+    assert pdf_file.read_bytes() == elsewhere
+
+
+@pytest.mark.parametrize(
+    ("body", "base", "headers", "status"),
+    [
+        (b"%PDF-1.4 and more", 5, {"Host": "127.0.0.1:8517"}, 403),  # no Origin
+        (b"%PDF-1.4 and more", 5, {**OWN, "Origin": "https://evil.example"}, 403),
+        (b"<html>not a pdf</html>", 5, OWN, 400),
+        (b"%PDF-1.4 and more", 0, OWN, 400),
+        (b"%PDF-1.4 and more", 99, OWN, 400),
+    ],
+)
+def test_what_is_not_saved(client, pdf_file, body, base, headers, status):
+    version = client.get(f"/pdf/{PDF}").headers["etag"]
+    assert save(client, body, version, base, headers).status_code == status
+    assert client.put("/pdf/escape.pdf", content=body, headers=OWN).status_code == 404
+
+
+def test_a_page_writes_to_the_log(client, caplog):
+    entry = {"level": "error", "message": "Unable to get text content for page 1", "where": "/"}
+    assert client.post("/api/log", json=entry, headers=OWN).status_code == 204
+    assert "page error: Unable to get text content for page 1 (/)" in caplog.text
+    assert (
+        client.post("/api/log", json=entry, headers={"Host": "127.0.0.1:8517"}).status_code == 403
+    )
+    assert client.post("/api/log", content=b"[]", headers=OWN).status_code == 400

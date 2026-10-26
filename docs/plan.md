@@ -67,6 +67,8 @@ From the reader, after using it on the iPad. Grouped, in the order the steps bel
 
 14. **A citation goes to the exact spot**, not just the page: the rectangle, highlighted. This is the same technique as in vscode-pdf-viewer; see the engine's [precise-pdf-locations](../../agentic-paper-library/docs/tasks/precise-pdf-locations.md).
 15. **Highlights**, saved into the PDF itself, as vscode-pdf-viewer does.
+19. **The selection goes with the question.** Text selected in the paper is passed to Claude Code with the next question. *(From the second sitting.)*
+20. **Find did not find on the iPad.** "evalua" in ClaimReceipt was "Not found", though the abstract has it. *(From the second sitting.)*
 
 **The library**
 
@@ -105,17 +107,26 @@ Each step ends with a sitting on the iPad, and its findings are added here.
      - Find (for the paper showing) takes the place of the tabs while it is open.
      - Layout opens a sheet with where the chat sits; the reading settings will join it.
      - The chat button draws where the chat is, dashed when it is hidden, and shows and hides it. A dot on it marks an answer or a permission request that came while the chat was out of sight.
-     - The page number is a faint badge in the PDF's corner; a tap opens the paper's contents and a field to go to a page. Highlights (step 6) will be listed there too.
+     - The page number is a faint badge in the PDF's corner; a tap opens the paper's contents and a field to go to a page. Highlights (step 7) will be listed there too.
      - The chat has no header: earlier chats and a new chat are two icons on its status line, which also names the model, and the box says which paper a question is about.
    - **The keyboard, again.** Opening the keyboard sometimes moved the paper up and back down, and closing it down and back up, mostly on a newly opened paper. Safari slides the whole page up to show the box while its keyboard rises, and reports where it went only now and then, so pinning the page to the visible area put it back a moment late. A tap on a box now focuses it without that scroll (as lectern's find does), and while the keyboard comes and goes the page is fitted at every frame. To check at the sitting.
    - **The model.** While carrel is being tried out, chats run on Haiku (`serve --model`, default `haiku`) to spend little.
-3. **Settings** (items 12, 13). The reader's note and the model, kept on the server so every device shares them. The model goes back to Opus here, and the settings replace `serve --model`'s Haiku default.
-4. **The chat as the VS Code panel reads** (the old part 2). Maths with KaTeX, code, and slash commands typed in the box. The skills that suit reading (`/paper-info`, `/overview`) become buttons. A dozen real questions from VS Code sittings should read as well as they did there.
-5. **The library** (items 16–18, the old part 4). Notes and reviews, add and remove, the paper list. Search.
-6. **The PDF** (items 14, 15). Exact spots and highlights, shared with vscode-pdf-viewer.
-7. **Lectern's comforts and the NAS** (the old parts 6–7). Themes, e-ink (no animation, page turns, the stream shown in a few large updates), start at login with launchd, and a Docker image for the NAS.
+3. **The text layer** (items 15, 19, 20). Chosen before settings, as everything on it goes together: find, highlights and the selection.
+   Decided with the reader:
+   - **Highlights go into the paper's PDF**, as ordinary Highlight annotations written the way vscode-pdf-viewer writes them (PDF.js's highlight editor, appended to the file as an incremental update), so both apps and any other PDF app show and edit the same ones. This answers the open question: no notes on highlights yet, and the notes format does not change.
+   - **Saved at once**, with no unsaved state and no Save: iOS may close the app in the background, and what was not saved is gone.
+   - **A pen, as Lectern has.** While it is on, a selection is highlighted once it settles. Nothing is offered beside a selection: iOS puts its Copy / Look Up menu below it near the top of the screen and above it near the bottom, and Android the other way round.
+   Built (2026-10-26), before the sitting:
+   - **Find.** It works in WebKit, at the iPad's size and under Playwright's iPad emulation, typed a letter at a time (1 of 19 for "evalua"). iPadOS 26.6 has every newer JavaScript feature PDF.js's find uses. PDF.js catches an error reading a page's text, writes it to the console and searches an empty page, which would show "Not found"; only the iPad's console can say which error. So a page now sends its errors, rejected promises and console warnings to the server's log (`page error: …`). To read at the sitting.
+   - **Highlights.** The pen sits in the bar, beside find. A tap on a highlight opens a small panel under it (above it near the bottom of the pane): its six colours (vscode-pdf-viewer's), Remove, and Ask. A new highlight takes the colour used last. Each change is sent to the laptop as the paper as loaded plus PDF.js's update. The server writes it only if the file is still the version the page loaded or last saved, and still begins with the bytes the page loaded; it replaces the file in one step. A paper changed elsewhere meanwhile (another device, vscode-pdf-viewer, the sync) is loaded again, and a notice says the last change was not saved. A save that could not reach the laptop leaves a red dot on the pen and is tried again with the next change, when the network is back, and when the app comes back to the screen.
+   - **The selection.** A passage selected in the paper, or just highlighted, or picked with the panel's Ask, shows over the question box with its page; a tap on it goes there, and × drops it. The next question carries it after the context line, as `<selection page="5">…</selection>`, naming the paper too when it is not the one open, and the question's bubble shows it. It is kept by the page rather than read when the question is sent, since tapping the box clears the selection on iOS.
+   - **Checked in WebKit** (`scripts/shots.py --find … --highlight`, on a throwaway library): a highlight is made with the pen, saved, back after a reload, recoloured, quoted with Ask and removed, each saved; the file passes `qpdf --check`, and its original bytes are untouched.
+4. **Settings** (items 12, 13). The reader's note and the model, kept on the server so every device shares them. The model goes back to Opus here, and the settings replace `serve --model`'s Haiku default.
+5. **The chat as the VS Code panel reads** (the old part 2). Maths with KaTeX, code, and slash commands typed in the box. The skills that suit reading (`/paper-info`, `/overview`) become buttons. A dozen real questions from VS Code sittings should read as well as they did there.
+6. **The library** (items 16–18, the old part 4). Notes and reviews, add and remove, the paper list. Search.
+7. **The PDF's exact spots** (item 14), shared with vscode-pdf-viewer, and the paper's highlights listed in its contents.
+8. **Lectern's comforts and the NAS** (the old parts 6–7). Themes, e-ink (no animation, page turns, the stream shown in a few large updates), start at login with launchd, and a Docker image for the NAS.
 
 ## Open questions
 
-- Highlights and notes on the PDF: where do the notes go, and does that change the notes format?
 - Does the PDF fit above a chat on the e-ink tablet, or does e-ink want the chat as a sheet over the page? Step 2's layout choices should answer this.

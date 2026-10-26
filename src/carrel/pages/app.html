@@ -38,6 +38,8 @@
   <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></symbol>
   <symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6" /></symbol>
   <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></symbol>
+  <symbol id="i-highlighter" viewBox="0 0 24 24"><path d="m9 11-6 6v3h9l3-3" /><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4" /></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M10 11v6" /><path d="M14 11v6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></symbol>
 </svg>
 <nav id="strip" class="bar">
   <div id="tabs" role="tablist">
@@ -46,6 +48,7 @@
     <button type="button" role="tab" class="tab icon-tab" id="tab-chat" aria-label="Chat" title="Chat" hidden><svg class="icon"><use href="#i-chat"/></svg></button>
   </div>
   <span class="sep" aria-hidden="true"></span>
+  <button type="button" class="icon-button" id="pen" aria-label="Highlight what I select" title="Highlight what I select" aria-pressed="false"><svg class="icon"><use href="#i-highlighter"/></svg></button>
   <button type="button" class="icon-button" id="find-button" aria-label="Find in this paper" title="Find in this paper"><svg class="icon"><use href="#i-search"/></svg></button>
   <button type="button" class="icon-button" id="view-button" aria-label="Layout" title="Layout" aria-expanded="false" aria-controls="view-sheet"><svg class="icon"><use href="#i-view"/></svg></button>
   <button type="button" class="icon-button" id="chat-toggle" aria-label="Show or hide the chat" title="Show or hide the chat" aria-pressed="true"><svg class="icon"><use href="#i-panel-bottom"/></svg></button>
@@ -77,7 +80,14 @@ $papers
     </form>
     <nav id="outline" aria-label="Contents"></nav>
   </div>
+  <div id="pdf-notice" role="status" hidden></div>
 </section>
+<div id="mark-panel" class="sheet" role="dialog" aria-label="Highlight" hidden>
+  <span id="mark-colors"></span>
+  <span class="sep" aria-hidden="true"></span>
+  <button type="button" class="icon-button" id="mark-remove" aria-label="Remove the highlight" title="Remove the highlight"><svg class="icon"><use href="#i-trash"/></svg></button>
+  <button type="button" class="plain" id="mark-ask">Ask</button>
+</div>
 <div id="divider" role="separator" aria-label="Drag to resize the chat"></div>
 <section id="chat-pane">
   <div id="chat-body">
@@ -88,6 +98,11 @@ $papers
     <div id="status" aria-live="polite"></div>
     <button type="button" class="icon-button" id="chats" aria-label="Earlier chats" title="Earlier chats" aria-expanded="false"><svg class="icon"><use href="#i-history"/></svg></button>
     <button type="button" class="icon-button" id="new-chat" aria-label="New chat" title="New chat"><svg class="icon"><use href="#i-new-chat"/></svg></button>
+  </div>
+  <div id="quote" hidden>
+    <button type="button" class="words" title="Go to it in the paper"></button>
+    <span class="where"></span>
+    <button type="button" class="icon-button drop" aria-label="Ask without this passage" title="Ask without this passage"><svg class="icon"><use href="#i-close"/></svg></button>
   </div>
   <form id="ask">
     <textarea id="question" rows="1" placeholder="Ask about this paper" enterkeyhint="send"></textarea>

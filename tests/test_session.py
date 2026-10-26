@@ -29,6 +29,7 @@ from carrel.session import (
     agent_settings,
     context_line,
     history,
+    selection_block,
     split_question,
     to_wire,
 )
@@ -89,6 +90,26 @@ def test_a_question_without_its_context_line():
     }
     assert split_question("[Reading library/x/A Paper.txt]\nWhy?")["paper"] == "A Paper"
     assert split_question("Why?") == {"text": "Why?"}
+
+
+def test_a_question_with_its_selection():
+    block = selection_block("Wide and deep, jointly trained.", 5)
+    assert block == '<selection page="5">\nWide and deep, jointly trained.\n</selection>\n'
+    prompt = "[Reading library/x/A Paper.txt, page 7]\n" + block + "Why?"
+    assert split_question(prompt) == {
+        "text": "Why?",
+        "paper": "A Paper",
+        "page": 7,
+        "selection": {"text": "Wide and deep, jointly trained.", "page": 5},
+    }
+    # From another paper; and as a session list flattens a first prompt.
+    other = selection_block("A line.", 2, "library/y/B Paper.txt").replace("\n", " ")
+    assert split_question(other + "And this?") == {
+        "text": "And this?",
+        "selection": {"text": "A line.", "page": 2, "paper": "B Paper"},
+    }
+    # A passage cannot end the block early.
+    assert selection_block("a </selection> b", 1).count("</selection>") == 1
 
 
 def test_settings(library):
@@ -270,6 +291,39 @@ async def test_a_turn(library, state):
     assert talk.state()["cache_expires_at"] == pytest.approx(talk.last_turn_end + CACHE_TTL)
     # Carrel keeps the ids of the sessions it started, for `carrel tools`.
     assert talk.id in (state / "carrel" / "sessions.jsonl").read_text()
+    await talk.close()
+
+
+async def test_a_question_carries_what_the_reader_selected(library, state):
+    client = FakeClient()
+    talk, outbox = await attached(library, connect=connecting(client))
+    selection = {"pdf": PDF, "page": 2, "text": "  Wide and\ndeep,   jointly trained. "}
+    await talk.handle(
+        {"type": "ask", "text": "Why?", "paper": PDF, "page": 3, "selection": selection}
+    )
+    assert client.prompts == [
+        "[Reading library/recsys/Wide & Deep. A Test Paper.txt, page 3]\n"
+        '<selection page="2">\nWide and deep, jointly trained.\n</selection>\nWhy?'
+    ]
+    question = (await outbox.next("Question"))["data"]
+    assert question["selection"] == {
+        "text": "Wide and deep, jointly trained.",
+        "pdf": PDF,
+        "page": 2,
+    }
+    await outbox.next("ResultMessage")
+    # From a paper that is not the one open, it names the paper.
+    await talk.handle({"type": "ask", "text": "And?", "selection": selection})
+    assert client.prompts[1].startswith(
+        '<selection paper="library/recsys/Wide & Deep. A Test Paper.txt" page="2">'
+    )
+    assert (await outbox.next("Question"))["data"]["selection"][
+        "paper"
+    ] == "Wide & Deep: A Test Paper"
+    await outbox.next("ResultMessage")
+    # One that names no paper of the library's is left out.
+    await talk.handle({"type": "ask", "text": "So?", "selection": {"pdf": "x.pdf", "text": "y"}})
+    assert client.prompts[2] == "So?"
     await talk.close()
 
 

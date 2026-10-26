@@ -2,7 +2,9 @@
 // (or on a tab of its own). Moving between tabs never reloads the page, so the chat stays as it
 // is; the address only says which tab is showing, so a reload comes back to it.
 
+import './report.js'; // first, so it hears what goes wrong in the others
 import { startChat } from './chat.js';
+import { startHighlights } from './highlight.js';
 import { restoreLayout, shareOf, startLayout } from './layout.js';
 import { sameFile } from './links.js';
 import { startPaperTools } from './paper-tools.js';
@@ -61,8 +63,18 @@ const reader = createReader({
     keepSoon();
   },
   onFound: (found) => tools.showFound(found),
+  onSaved: (saved) => highlights.showSaved(saved),
 });
 const tools = startPaperTools({ reader });
+const highlights = startHighlights({
+  reader,
+  onPassage: (passage) => chat.quote(passage),
+  onAsk() {
+    if (layout.place === 'tab') go(CHAT);
+    else if (layout.hidden) chatToggle.click();
+    chat.focus();
+  },
+});
 
 const refitScreen = fitToVisibleArea(() => shareOf(layout));
 startLayout({
@@ -88,7 +100,7 @@ startPaperList({
   },
 });
 
-startChat({
+const chat = startChat({
   currentPaper: () => paperInView(state)?.pdf ?? null,
   currentPage: () => {
     const paper = paperInView(state);
@@ -124,7 +136,10 @@ function addressOf(paper, target) {
 
 /** Shows a tab: the list, the chat, or a paper, at its remembered place or at `target`. */
 function go(key, { target = null, push = true } = {}) {
-  if (key !== state.active) tools.leave();
+  if (key !== state.active) {
+    tools.leave();
+    highlights.leave();
+  }
   state = show(state, key);
   if (state.active === CHAT && layout.place !== 'tab') state = show(state, paperInView(state)?.pdf ?? PAPERS);
   const paper = shownPaper();
@@ -143,6 +158,7 @@ function go(key, { target = null, push = true } = {}) {
 
 function close(pdf) {
   state = closePaper(state, pdf);
+  if (chat.quoted()?.pdf === pdf) chat.quote(null);
   go(state.active, { push: false });
 }
 

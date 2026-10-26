@@ -20,10 +20,15 @@ const RECONNECT_MAX_MS = 15_000;
 // A chat changed this recently may still be open in VS Code or the terminal.
 const RECENT_S = 300;
 
+// A passage quoted in a question, as its bubble shows it; the agent gets all of it.
+const QUOTE_SHOWN = 280;
+
 /**
  * `currentPaper()` and `currentPage()` say what a question is about; `openTarget` follows a
  * citation; `onActivity()` says an answer ended or a question for the reader came, so a chat out
- * of sight can say so.
+ * of sight can say so. Returns `quote(passage)`, which sets the passage the next question
+ * carries ({pdf, page, text}, or null for none), `quoted()`, the one it would carry, and
+ * `focus()`.
  */
 export function startChat({ currentPaper, currentPage, openTarget, onActivity = () => {} }) {
   const log = document.getElementById('log');
@@ -33,6 +38,7 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
   const stop = document.getElementById('stop');
   const status = document.getElementById('status');
   const sheet = document.getElementById('chats-sheet');
+  const quoteBox = document.getElementById('quote');
 
   let chatId = remembered();
   let epoch = null;
@@ -53,6 +59,8 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
   const permissionRows = new Map();
   let turn = null;
   let lastPaper = null;
+  // The passage the next question carries: {pdf, page, text}.
+  let passage = null;
 
   // The connection.
 
@@ -141,8 +149,18 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
       return confirmExpired(text);
     }
     await whenAttached();
-    socket.send(JSON.stringify({ type: 'ask', text, paper: currentPaper(), page: currentPage() }));
+    socket.send(JSON.stringify({ type: 'ask', text, paper: currentPaper(), page: currentPage(), selection: passage }));
     setBusy(true);
+    quote(null);
+  }
+
+  /** Shows the passage the next question carries over the box, or none. */
+  function quote(next) {
+    passage = next?.text ? next : null;
+    quoteBox.hidden = !passage;
+    if (!passage) return;
+    quoteBox.querySelector('.words').textContent = passage.text;
+    quoteBox.querySelector('.where').textContent = passage.page ? `p. ${passage.page}` : '';
   }
 
   function setBusy(value) {
@@ -237,27 +255,42 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     }
   }
 
-  function startTurn({ text, paper, pdf, page }) {
+  function startTurn({ text, paper, pdf, page, selection }) {
     endTurn();
     streamed.length = 0;
     const bubble = append('div', 'question');
     if (paper && paper !== lastPaper) {
       // Which paper the question was about, when it changed: a tap opens it.
-      const where = bubble.appendChild(document.createElement(pdf ? 'a' : 'div'));
-      where.className = 'about';
-      where.textContent = page ? `${paper} · p. ${page}` : paper;
-      if (pdf) {
-        where.href = '#';
-        where.addEventListener('click', (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          openTarget({ file: pdf, page });
-        });
-      }
+      bubble.append(placeLink('about', page ? `${paper} · p. ${page}` : paper, pdf, page));
     }
     if (paper) lastPaper = paper;
+    if (selection?.text) {
+      // The passage it quotes, and where it is: a tap goes there.
+      const quoted = bubble.appendChild(document.createElement('blockquote'));
+      quoted.className = 'quoted';
+      const words = selection.text.length > QUOTE_SHOWN ? `${selection.text.slice(0, QUOTE_SHOWN - 1).trimEnd()}…` : selection.text;
+      quoted.append(words);
+      const from = [selection.paper, selection.page && `p. ${selection.page}`].filter(Boolean).join(' · ');
+      if (from) quoted.append(placeLink('from', from, selection.pdf ?? pdf, selection.page));
+    }
     bubble.append(text);
     turn = { question: bubble, fold: null, steps: 0, texts: [] };
+  }
+
+  /** A line naming a place in a paper; a tap opens it there when the paper is known. */
+  function placeLink(className, label, pdf, page) {
+    const link = document.createElement(pdf ? 'a' : 'div');
+    link.className = className;
+    link.textContent = label;
+    if (pdf) {
+      link.href = '#';
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openTarget({ file: pdf, page });
+      });
+    }
+    return link;
   }
 
   /** The turn's fold, made when it gets its first step. */
@@ -562,8 +595,19 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
   window.addEventListener('pageshow', reconnectNow);
   window.addEventListener('online', reconnectNow);
 
+  quoteBox.querySelector('.drop').addEventListener('click', () => quote(null));
+  quoteBox.querySelector('.words').addEventListener('click', () => {
+    if (passage) openTarget({ file: passage.pdf, page: passage.page });
+  });
+
   renderStatus();
   connect();
+  return {
+    quote,
+    quoted: () => passage,
+    /** Puts the cursor in the question box. */
+    focus: () => question.focus({ preventScroll: true }),
+  };
 }
 
 function remembered() {

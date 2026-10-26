@@ -182,8 +182,9 @@ body[data-active="chat"] #chat-pane { visibility: visible; }
   align-self: center;
 }
 .icon-button[aria-expanded="true"] { background: var(--question); color: var(--text); }
-/* Find is for the paper showing. */
-body:not([data-active="paper"]) #find-button { display: none; }
+/* Find and the pen are for the paper showing. */
+body:not([data-active="paper"]) :is(#find-button, #pen) { display: none; }
+#pen[aria-pressed="true"] { background: var(--question); color: var(--text); }
 /* Something new in a chat out of sight. */
 .unseen::after {
   content: "";
@@ -196,6 +197,8 @@ body:not([data-active="paper"]) #find-button { display: none; }
   background: var(--accent);
 }
 #tab-chat { position: relative; }
+/* A change to the highlights that has not reached the laptop yet. */
+#pen.unsaved::after { content: ""; position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--error); }
 
 /* Find: it takes the place of the tabs and the buttons while it is open. */
 body.finding #strip > :not(#find) { display: none; }
@@ -295,6 +298,41 @@ body.finding #strip > :not(#find) { display: none; }
 #outline > ul > li > button { font-weight: 500; }
 #outline button:disabled { color: var(--muted); cursor: default; }
 #outline .none { margin: 8px 0 2px; font-size: 14px; color: var(--muted); }
+
+/* A tap on a highlight: its colours, Remove, and Ask (highlight.js places it). */
+#mark-panel { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 999px; }
+#mark-panel[hidden] { display: none; }
+#mark-colors { display: flex; gap: 6px; }
+#mark-panel .swatch {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--swatch);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--line);
+}
+#mark-panel .swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--text); }
+#mark-panel .sep { align-self: stretch; width: 1px; margin: 2px; background: var(--line); }
+#mark-ask { padding: 4px 8px 4px 2px; font-size: 15px; }
+
+/* What saving needs to say, over the top of the paper. */
+#pdf-notice {
+  position: absolute;
+  z-index: 4;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 14px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.15);
+}
+#pdf-notice[hidden] { display: none; }
 
 /* The split, dragged to resize the chat: a line, with room around it for a finger. */
 #divider {
@@ -439,6 +477,16 @@ button.plain {
   text-decoration: none;
   white-space: normal;
 }
+/* A passage the question quotes, and where it is. */
+.question .quoted {
+  margin: 2px 0 6px;
+  padding-left: 8px;
+  border-left: 3px solid var(--line);
+  font: 15px/1.4 var(--reading);
+  color: var(--muted);
+  white-space: normal;
+}
+.question .quoted .from { display: block; margin-top: 2px; font: 12px var(--ui); color: var(--muted); text-decoration: none; }
 
 .answer { margin: 8px 0; }
 .answer > :first-child { margin-top: 0; }
@@ -491,6 +539,35 @@ button.plain {
 }
 .permission .why { color: var(--muted); margin-top: 2px; }
 .permission .buttons { display: flex; gap: 8px; margin-top: 6px; }
+
+/* The passage the next question carries, over the box: a tap goes to it, × drops it. */
+#quote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 16px 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--accent);
+  font-size: 13px;
+  color: var(--muted);
+}
+#quote[hidden] { display: none; }
+#quote .words {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 0;
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+  font: 14px/1.4 var(--reading);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#quote .where { flex: none; font-variant-numeric: tabular-nums; }
+#quote .drop { width: 30px; height: 28px; }
+#quote .drop .icon { width: 15px; height: 15px; }
 
 #ask {
   display: flex;

@@ -167,9 +167,12 @@ class Session:
         extra_folders: tuple[Path, ...] = (),
         limits: dict | None = None,
         clock: Callable[[], float] = time.time,
+        model: str | None = None,
     ):
         self.library = library
         self.id = session_id or str(uuid.uuid4())
+        # A model's name or alias ("haiku", "opus"); None is Claude Code's own default.
+        self.model = model
         # Numbers restart when the server does; a page that saw another epoch draws anew.
         self.epoch = uuid.uuid4().hex[:8]
         # Folders the session reaches beside the library: read freely, written on asking.
@@ -314,6 +317,7 @@ class Session:
     def options(self) -> ClaudeAgentOptions:
         return ClaudeAgentOptions(
             cwd=self.library.root,
+            model=self.model,
             add_dirs=self.folders,
             settings=json.dumps(agent_settings(self.library)),
             can_use_tool=self.can_use_tool,
@@ -421,11 +425,12 @@ class Sessions:
         extra_folders: tuple[Path, ...] = (),
         connect: Callable | None = None,
         clock: Callable[[], float] = time.time,
+        model: str | None = None,
     ):
         self.library = library
         self.chats: dict[str, Session] = {}
         self.limits: dict = {}  # the latest usage limits, shared by every chat
-        self._made = dict(extra_folders=extra_folders, connect=connect, clock=clock)
+        self._made = dict(extra_folders=extra_folders, connect=connect, clock=clock, model=model)
         self._clock = clock
 
     def get(self, session_id: str | None) -> Session:

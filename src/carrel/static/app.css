@@ -53,11 +53,165 @@ a { color: var(--accent); }
   background: var(--surface);
 }
 
+/* The page: the tab strip on top, the tab showing, and the chat on the side the reader chose
+   (layout.js), pinned to the visible area, which the keyboard shortens (screen.js). */
+body {
+  position: fixed;
+  left: 0;
+  width: 100%;
+  top: var(--visible-top, 0px);
+  height: var(--visible-height, 100dvh);
+  display: grid;
+  /* A wide table scrolls in its own box instead of widening the page. */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto var(--chat-height, 40%);
+  grid-template-areas: "strip" "content" "divider" "chat";
+  overflow: hidden;
+}
+body.chat-top {
+  grid-template-rows: auto var(--chat-height, 40%) auto minmax(0, 1fr);
+  grid-template-areas: "strip" "chat" "divider" "content";
+}
+body.chat-left {
+  grid-template-columns: calc(var(--chat-share, 0.4) * 100%) auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "strip strip strip" "chat divider content";
+}
+body.chat-right {
+  grid-template-columns: minmax(0, 1fr) auto calc(var(--chat-share, 0.4) * 100%);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "strip strip strip" "content divider chat";
+}
+body.chat-tab, body.chat-hidden {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "strip" "content";
+}
+#strip { grid-area: strip; }
+.content { grid-area: content; }
+#divider { grid-area: divider; }
+#chat-pane { grid-area: chat; }
+body.chat-tab #chat-pane { grid-area: content; }
+body.chat-tab #divider, body.chat-hidden #divider, body.chat-hidden #chat-pane { display: none; }
+
+/* The tabs that share the content area lie on one another; the one showing is visible. Hidden,
+   not removed, so the PDF keeps its size and its scroll under the list. */
+.content, body.chat-tab #chat-pane { visibility: hidden; }
+body[data-active="papers"] #papers-pane,
+body[data-active="paper"] #pdf-pane,
+body[data-active="chat"] #chat-pane { visibility: visible; }
+
+/* The tab strip. In the Home Screen app the status bar lies over the page: the strip starts below it. */
+#strip {
+  gap: 8px;
+  padding: calc(2px + env(safe-area-inset-top)) 12px 0;
+  font-size: 14px;
+  align-items: stretch;
+}
+#tabs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+#tabs::-webkit-scrollbar { display: none; }
+#paper-tabs { display: contents; }
+.tab, .tab button {
+  font: 14px var(--ui);
+  background: none;
+  color: var(--muted);
+  border-radius: 0;
+  padding: 0;
+}
+.tab {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 240px;
+  padding: 8px 10px 6px;
+  border-bottom: 2px solid transparent;
+}
+.tab[hidden], #strip [hidden] { display: none; }
+.tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+.tab .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; }
+.tab .close { padding: 0 4px; font-size: 18px; line-height: 1; color: var(--muted); }
+#strip > #page-label, #strip > button { align-self: center; }
+#page-label { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+body:not([data-active="paper"]) #page-label { display: none; }
+#chat-toggle[aria-pressed="false"] { color: var(--muted); }
+/* Something new in a chat out of sight. */
+.unseen::after {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+
+/* The split, dragged to resize the chat: a line, with room around it for a finger. */
+#divider {
+  position: relative;
+  z-index: 2;
+  background: var(--line);
+  touch-action: none;
+}
+body:not(.chat-left, .chat-right) #divider { height: 1px; cursor: row-resize; }
+body.chat-left #divider, body.chat-right #divider { width: 1px; cursor: col-resize; }
+#divider::after { content: ""; position: absolute; inset: -10px 0; }
+body.chat-left #divider::after, body.chat-right #divider::after { inset: 0 -10px; }
+#divider::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 36px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--muted);
+  opacity: 0.5;
+  transform: translate(-50%, -50%);
+}
+body.chat-left #divider::before, body.chat-right #divider::before { width: 5px; height: 36px; }
+body.dragging { cursor: grabbing; user-select: none; -webkit-user-select: none; }
+
+/* Where the chat sits, under the Layout button */
+#layout-sheet {
+  position: fixed;
+  z-index: 10;
+  top: calc(44px + env(safe-area-inset-top));
+  right: 12px;
+  width: 280px;
+  padding: 10px 12px 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.15);
+}
+#layout-sheet[hidden] { display: none; }
+#layout-sheet .sheet-header { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+#layout-sheet .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+#layout-sheet .choices button {
+  padding: 6px 4px;
+  font-size: 14px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+#layout-sheet .choices button[aria-checked="true"] { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+#reset-size { margin-top: 8px; }
+
 /* The paper list */
 
-/* In the Home Screen app the status bar lies over the page: the list's bar starts below it. */
-.index .bar { position: sticky; top: 0; z-index: 1; flex-wrap: wrap; padding-top: calc(8px + env(safe-area-inset-top)); }
-.index h1 { margin: 0; font-size: 20px; font-weight: 600; }
+#papers-pane { overflow-y: auto; overscroll-behavior: contain; background: var(--bg); }
+#papers-pane .bar { position: sticky; top: 0; z-index: 1; flex-wrap: wrap; }
+#papers-pane h1 { margin: 0; font-size: 20px; font-weight: 600; }
 #filter {
   flex: 1 1 240px;
   font: inherit;
@@ -74,39 +228,24 @@ a { color: var(--accent); }
 #papers li a { text-decoration: none; color: var(--text); }
 #papers .year { color: var(--muted); font: 14px var(--ui); margin-left: 6px; }
 
-/* The reading page: the PDF above, the chat below */
-
-/* Pinned to the visible area, which the keyboard shortens (screen.js). */
-body.read {
-  position: fixed;
-  left: 0;
-  width: 100%;
-  top: var(--visible-top, 0px);
-  height: var(--visible-height, 100dvh);
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) var(--chat-height, 40%);
-  /* A wide table scrolls in its own box instead of widening the page. */
-  grid-template-columns: minmax(0, 1fr);
-  overflow: hidden;
-}
+/* The PDF */
 
 #pdf-pane { position: relative; background: var(--pdf-bg); min-height: 0; }
 /* PDF.js requires its container to be absolutely positioned. */
 #viewerContainer { position: absolute; inset: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
 .pdfViewer .page { margin: 0 auto 8px; }
 
+/* The chat */
+
 #chat-pane {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-top: 1px solid var(--line);
+  min-width: 0;
   background: var(--surface);
 }
 #chat-pane .bar { padding: 6px 16px; font-size: 14px; }
-.back { text-decoration: none; white-space: nowrap; }
-.back::before { content: "‹ "; }
 .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
-#page-label { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 button.plain {
   padding: 2px 4px;

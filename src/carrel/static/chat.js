@@ -1,4 +1,4 @@
-// The chat under the PDF. A chat lives on the server; this page attaches to it over a WebSocket
+// The chat beside the papers. A chat lives on the server; this page attaches to it over a WebSocket
 // and draws its messages, each {seq, kind, data}, `kind` being the SDK's class name. When the
 // socket drops (a reload, another paper, the tablet asleep), the page attaches again and asks
 // only for the messages after the last it drew.
@@ -20,7 +20,12 @@ const RECONNECT_MAX_MS = 15_000;
 // A chat changed this recently may still be open in VS Code or the terminal.
 const RECENT_S = 300;
 
-export function startChat({ currentPaper, currentPage, openTarget }) {
+/**
+ * `currentPaper()` and `currentPage()` say what a question is about; `openTarget` follows a
+ * citation; `onActivity()` says an answer ended or a question for the reader came, so a chat out
+ * of sight can say so.
+ */
+export function startChat({ currentPaper, currentPage, openTarget, onActivity = () => {} }) {
   const log = document.getElementById('log');
   const form = document.getElementById('ask');
   const question = document.getElementById('question');
@@ -365,6 +370,8 @@ export function startChat({ currentPaper, currentPage, openTarget }) {
     const failed = data.is_error && turn?.fold;
     endTurn(parts.join(' · ') || 'Done');
     if (failed) failed.details.classList.add('failed');
+    // A turn ending while this page watched, not one replayed when it attached.
+    if (busy) onActivity();
   }
 
   function permission({ id, tool, input, title, description, decision_reason, blocked_path }) {
@@ -387,6 +394,7 @@ export function startChat({ currentPaper, currentPage, openTarget }) {
       button.addEventListener('click', () => socket?.send(JSON.stringify({ type: 'permission', id, allow })));
     }
     permissionRows.set(id, buttons);
+    if (busy) onActivity();
   }
 
   function decided({ id, allow }) {

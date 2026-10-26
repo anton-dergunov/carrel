@@ -1,11 +1,9 @@
-// The reading page: the PDF on top, drawn with PDF.js, and the chat underneath. Another paper
-// opens in place, so the chat stays as it is.
+// The PDF, drawn with PDF.js. Every paper tab shares this one viewer: a tab keeps its paper's
+// place, and showing the tab loads the paper again and puts the place back. (A viewer per tab
+// would keep a set of rendered pages per tab, which is what makes iPad Safari drop a page.)
 
 import * as pdfjsLib from './vendor/pdfjs/pdf.min.mjs';
-import { startChat } from './chat.js';
-import { sameFile } from './links.js';
 import { pinchToZoom, stopPageZoom } from './pinch.js';
-import { fitToVisibleArea } from './screen.js';
 
 // The viewer component reads the library from `globalThis.pdfjsLib` when its module is
 // evaluated, so it is imported only after this.
@@ -18,171 +16,150 @@ const DEST_CONTEXT_PX = 72;
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${ASSETS}pdf.worker.min.mjs`;
 
-let pdf = document.body.dataset.pdf;
-const container = document.getElementById('viewerContainer');
-const pageLabel = document.getElementById('page-label');
-const titleLabel = document.querySelector('#chat-pane .title');
+/**
+ * The viewer in `#viewerContainer`. `onPage(number, count)` follows the page in view, and
+ * `onPlace(place)` the place to come back to: {page, scale, left, top}, the scale being
+ * 'page-width' or a percentage, left and top in the page's own coordinates.
+ */
+export function createReader({ onPage, onPlace }) {
+  const container = document.getElementById('viewerContainer');
+  const eventBus = new EventBus();
+  const linkService = new PDFLinkService({ eventBus, externalLinkTarget: LinkTarget.BLANK });
+  const viewer = new PDFViewer({ container, eventBus, linkService, removePageBorders: true });
+  linkService.setViewer(viewer);
+  // Links inside the PDF go through this too.
+  linkService.goToDestination = (dest) => scrollToDestination(dest);
 
-const eventBus = new EventBus();
-const linkService = new PDFLinkService({ eventBus, externalLinkTarget: LinkTarget.BLANK });
-const viewer = new PDFViewer({ container, eventBus, linkService, removePageBorders: true });
-linkService.setViewer(viewer);
-// Links inside the PDF go through this too.
-linkService.goToDestination = (dest) => scrollToDestination(dest);
+  let file = null;
+  let pdfDocument = null;
+  // Where to go once the document's pages are laid out: a place, or a target {page, dest}.
+  let pending = null;
 
-let pdfDocument = null;
-let pendingTarget = targetFromLocation();
-
-const showPage = (pageNumber) => {
-  pageLabel.textContent = `p. ${pageNumber} of ${viewer.pagesCount}`;
-};
-eventBus.on('pagesinit', () => {
-  viewer.currentScaleValue = 'page-width';
-  showPage(viewer.currentPageNumber);
-  if (pendingTarget) {
-    void goTo(pendingTarget);
-    pendingTarget = null;
-  }
-});
-let keepPage = 0;
-eventBus.on('pagechanging', ({ pageNumber }) => {
-  showPage(pageNumber);
-  // The address keeps the page, so a reload comes back to it; once the scrolling settles, since
-  // Safari refuses more than a hundred address changes in ten seconds.
-  clearTimeout(keepPage);
-  keepPage = setTimeout(() => {
-    history.replaceState(history.state, '', readingUrl(pdf, { page: pageNumber > 1 ? pageNumber : undefined }));
-  }, 500);
-});
-new ResizeObserver(() => {
-  // Fit the width again, unless the reader zoomed in or out.
-  if (viewer.pagesCount && viewer.currentScaleValue === 'page-width') {
-    const page = viewer.currentPageNumber;
+  eventBus.on('pagesinit', () => {
     viewer.currentScaleValue = 'page-width';
-    viewer.currentPageNumber = page;
-  }
-}).observe(container);
-
-stopPageZoom();
-pinchToZoom({ container, viewer, eventBus });
-fitToVisibleArea();
-
-/** A target given in the page's own address: /read/<file>?page=7&dest=table.2 */
-function targetFromLocation() {
-  const query = new URLSearchParams(location.search);
-  const page = Number.parseInt(query.get('page') ?? '', 10);
-  const dest = query.get('dest') || undefined;
-  return page > 0 || dest ? { page: page > 0 ? page : undefined, dest } : null;
-}
-
-/** A named destination wins over a page when the PDF has it; the page is the fallback. */
-async function goTo({ page, dest }) {
-  const found = dest ? await scrollToDestination(dest) : false;
-  if (!found && page && page <= viewer.pagesCount) {
-    viewer.currentPageNumber = page;
-  }
-}
-
-async function scrollToDestination(dest) {
-  if (!pdfDocument) {
-    return false;
-  }
-  const explicit = typeof dest === 'string' ? await pdfDocument.getDestination(dest).catch(() => null) : await dest;
-  if (!Array.isArray(explicit)) {
-    return false;
-  }
-  const [ref] = explicit;
-  const pageNumber =
-    ref && typeof ref === 'object'
-      ? (await pdfDocument.getPageIndex(ref)) + 1
-      : Number.isInteger(ref)
-        ? ref + 1
-        : 0;
-  if (!(pageNumber >= 1 && pageNumber <= viewer.pagesCount)) {
-    return false;
-  }
-  viewer.scrollPageIntoView({ pageNumber, destArray: explicit, ignoreDestinationZoom: true });
-  container.scrollTop = Math.max(0, container.scrollTop - DEST_CONTEXT_PX);
-  return true;
-}
-
-/** A citation: this paper moves the viewer, another paper opens in its place. */
-function openTarget(target) {
-  if (sameFile(target.file, pdf)) {
-    void goTo(target);
-  } else {
-    void openPaper(target.file, target);
-  }
-}
-
-function readingUrl(file, target) {
-  const query = new URLSearchParams();
-  if (target?.page) query.set('page', String(target.page));
-  if (target?.dest) query.set('dest', target.dest);
-  const path = file.split('/').map(encodeURIComponent).join('/');
-  return `/read/${path}${query.size ? `?${query}` : ''}`;
-}
-
-/** Another paper in the viewer, with the chat left as it is. */
-async function openPaper(file, target, { push = true } = {}) {
-  const path = file.split('/').map(encodeURIComponent).join('/');
-  let paper;
-  try {
-    const response = await fetch(`/api/paper/${path}`);
-    if (!response.ok) throw new Error(response.statusText);
-    paper = await response.json();
-  } catch {
-    // Not one this page can open; the reading page says why.
-    location.href = readingUrl(file, target);
-    return;
-  }
-  pdf = paper.pdf;
-  document.body.dataset.pdf = pdf;
-  document.title = paper.title;
-  titleLabel.textContent = paper.title;
-  if (push) history.pushState(null, '', readingUrl(pdf, target));
-  pendingTarget = target?.page || target?.dest ? target : null;
-  await load(paper.pdf_url);
-}
-
-window.addEventListener('popstate', () => {
-  const file = decodeURIComponent(location.pathname.replace(/^\/read\//, ''));
-  const target = targetFromLocation();
-  if (sameFile(file, pdf)) {
-    if (target) void goTo(target);
-  } else {
-    void openPaper(file, target, { push: false });
-  }
-});
-
-let loading = 0;
-// The open document's loading task, which is what PDF.js tears a document down through.
-let openTask = null;
-
-async function load(url) {
-  const ticket = ++loading;
-  const task = pdfjsLib.getDocument({
-    url,
-    cMapUrl: `${ASSETS}cmaps/`,
-    cMapPacked: true,
-    standardFontDataUrl: `${ASSETS}standard_fonts/`,
-    wasmUrl: `${ASSETS}wasm/`,
-    iccUrl: `${ASSETS}iccs/`,
+    onPage(viewer.currentPageNumber, viewer.pagesCount);
+    const { place, target } = pending ?? {};
+    pending = null;
+    if (place) restore(place);
+    else if (target) void goTo(target);
   });
-  const loaded = await task.promise;
-  if (ticket !== loading) {
-    // Another paper was asked for meanwhile.
-    void task.destroy();
-    return;
+  eventBus.on('pagechanging', ({ pageNumber }) => onPage(pageNumber, viewer.pagesCount));
+  eventBus.on('updateviewarea', ({ location }) => {
+    if (file && location) {
+      onPlace({ page: location.pageNumber, scale: location.scale, left: Math.round(location.left), top: Math.round(location.top) });
+    }
+  });
+
+  new ResizeObserver(() => refit()).observe(container);
+
+  stopPageZoom();
+  pinchToZoom({ container, viewer, eventBus });
+
+  /** Fits the width again, unless the reader zoomed in or out; not while the split is dragged. */
+  function refit() {
+    if (document.body.classList.contains('dragging') || !container.clientWidth) return;
+    if (viewer.pagesCount && viewer.currentScaleValue === 'page-width') {
+      const page = viewer.currentPageNumber;
+      viewer.currentScaleValue = 'page-width';
+      viewer.currentPageNumber = page;
+    }
   }
-  const previous = openTask;
-  openTask = task;
-  pdfDocument = loaded;
-  viewer.setDocument(loaded);
-  linkService.setDocument(loaded, null);
-  void previous?.destroy();
+
+  function restore({ page, scale, left, top }) {
+    if (!(page >= 1 && page <= viewer.pagesCount)) return;
+    if (typeof scale === 'number' && scale > 0) viewer.currentScale = scale / 100;
+    else viewer.currentScaleValue = 'page-width';
+    viewer.scrollPageIntoView({
+      pageNumber: page,
+      destArray: [null, { name: 'XYZ' }, left ?? null, top ?? null, null],
+      ignoreDestinationZoom: true,
+    });
+  }
+
+  /** A named destination wins over a page when the PDF has it; the page is the fallback. */
+  async function goTo({ page, dest }) {
+    const found = dest ? await scrollToDestination(dest) : false;
+    if (!found && page && page <= viewer.pagesCount) {
+      viewer.currentPageNumber = page;
+    }
+  }
+
+  async function scrollToDestination(dest) {
+    if (!pdfDocument) {
+      return false;
+    }
+    const explicit = typeof dest === 'string' ? await pdfDocument.getDestination(dest).catch(() => null) : await dest;
+    if (!Array.isArray(explicit)) {
+      return false;
+    }
+    const [ref] = explicit;
+    const pageNumber =
+      ref && typeof ref === 'object'
+        ? (await pdfDocument.getPageIndex(ref)) + 1
+        : Number.isInteger(ref)
+          ? ref + 1
+          : 0;
+    if (!(pageNumber >= 1 && pageNumber <= viewer.pagesCount)) {
+      return false;
+    }
+    viewer.scrollPageIntoView({ pageNumber, destArray: explicit, ignoreDestinationZoom: true });
+    container.scrollTop = Math.max(0, container.scrollTop - DEST_CONTEXT_PX);
+    return true;
+  }
+
+  let loading = 0;
+  // The open document's loading task, which is what PDF.js tears a document down through.
+  let openTask = null;
+
+  /**
+   * Shows a paper: `place` puts back where the reader was, `target` ({page, dest}) goes to a
+   * citation. The paper already shown only moves.
+   */
+  async function open(pdf, url, { place, target } = {}) {
+    target = target?.page || target?.dest ? target : null;
+    if (pdf === file) {
+      if (!pdfDocument) pending = { place, target }; // still loading
+      else if (target) await goTo(target);
+      else if (place) restore(place);
+      return;
+    }
+    file = pdf;
+    pdfDocument = null;
+    pending = { place, target };
+    const ticket = ++loading;
+    const task = pdfjsLib.getDocument({
+      url,
+      cMapUrl: `${ASSETS}cmaps/`,
+      cMapPacked: true,
+      standardFontDataUrl: `${ASSETS}standard_fonts/`,
+      wasmUrl: `${ASSETS}wasm/`,
+      iccUrl: `${ASSETS}iccs/`,
+    });
+    let loaded;
+    try {
+      loaded = await task.promise;
+    } catch (error) {
+      if (ticket === loading) file = null; // asking again tries again
+      throw error;
+    }
+    if (ticket !== loading) {
+      // Another paper was asked for meanwhile.
+      void task.destroy();
+      return;
+    }
+    const previous = openTask;
+    openTask = task;
+    pdfDocument = loaded;
+    viewer.setDocument(loaded);
+    linkService.setDocument(loaded, null);
+    void previous?.destroy();
+  }
+
+  return {
+    open,
+    goTo,
+    refit,
+    file: () => file,
+    currentPage: () => (pdfDocument ? viewer.currentPageNumber || null : null),
+  };
 }
-
-startChat({ currentPaper: () => pdf, currentPage: () => viewer.currentPageNumber || null, openTarget });
-
-await load(document.body.dataset.pdfUrl);

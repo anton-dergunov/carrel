@@ -10,6 +10,8 @@ from . import APP_NAME, __version__
 from .engine import CONFIG_NAME, Library, LibraryError
 
 DEFAULT_PORT = 8517
+# Haiku while carrel is being tried out, to spend little; the settings (step 3) choose it later.
+DEFAULT_MODEL = "haiku"
 HTTPS_PORT = 8443
 
 
@@ -46,9 +48,16 @@ def serve(args) -> None:
     for folder in extra:
         if not folder.is_dir():
             raise LibraryError(f"--add-dir {folder}: no such folder")
-    app = make_app(library, hosts={name} if name else set(), logins=logins, extra_folders=extra)
+    app = make_app(
+        library,
+        hosts={name} if name else set(),
+        logins=logins,
+        extra_folders=extra,
+        model=args.model,
+    )
 
     print(f"{APP_NAME} {__version__}: {library.root} (PDFs in {library.pdf_root})")
+    print(f"  chats run on {args.model}")
     for folder in [*library.outside_folders(), *extra]:
         print(f"  the agent also reads {folder}")
     print(f"  on this Mac:   http://127.0.0.1:{args.port}/")
@@ -98,6 +107,12 @@ def main(argv: list[str] | None = None) -> None:
         metavar="FOLDER",
         help="another folder the agent may read (writing asks); repeatable. The folders the "
         "library's config names, such as overview_dir, are included already",
+    )
+    run.add_argument(
+        "--model",
+        default=DEFAULT_MODEL,
+        help=f"the model chats run on, an alias or a full id (default: {DEFAULT_MODEL}, "
+        "while testing)",
     )
     run.set_defaults(func=serve)
 

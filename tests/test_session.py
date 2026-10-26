@@ -106,6 +106,12 @@ def test_a_session_reaches_the_folders_the_library_names(library, tmp_path):
     assert talk.options().add_dirs == [library.overview_dir, tmp_path]
 
 
+def test_every_chat_runs_on_the_model_the_server_was_given(library):
+    assert Session(library).options().model is None
+    talk = Sessions(library, model="haiku").get(None)
+    assert talk.options().model == "haiku"
+
+
 def test_claude_code_keeps_the_chat_under_its_id_and_lists_it(library):
     talk = Session(library)
     options = talk.options()

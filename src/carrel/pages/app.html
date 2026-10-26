@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>$title</title>
+<link rel="stylesheet" href="/static/vendor/pdfjs/pdf_viewer.css">
+<link rel="stylesheet" href="/static/app.css">
+<meta name="theme-color" content="#fffdf6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#24282a" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Carrel">
+<link rel="manifest" href="/static/manifest.webmanifest">
+<link rel="icon" href="/static/icons/icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<script type="module" src="/static/app.js"></script>
+</head>
+<body class="chat-bottom" data-library="$library" data-pdf="$pdf" data-pdf-title="$pdf_title">
+<nav id="strip" class="bar">
+  <div id="tabs" role="tablist">
+    <button type="button" role="tab" class="tab" id="tab-papers">Papers</button>
+    <span id="paper-tabs"></span>
+    <button type="button" role="tab" class="tab" id="tab-chat" hidden>Chat</button>
+  </div>
+  <span id="page-label"></span>
+  <button type="button" id="chat-toggle" class="plain" aria-pressed="true">Chat</button>
+  <button type="button" id="layout-button" class="plain" aria-expanded="false" aria-controls="layout-sheet">Layout</button>
+</nav>
+<section id="papers-pane" class="content">
+  <header class="bar">
+    <h1>$library</h1>
+    <input id="filter" type="search" placeholder="Find a paper by title or topic" autocomplete="off" autocapitalize="off" spellcheck="false">
+  </header>
+  <div id="papers">
+$papers
+  </div>
+</section>
+<section id="pdf-pane" class="content">
+  <div id="viewerContainer"><div id="viewer" class="pdfViewer"></div></div>
+</section>
+<div id="divider" role="separator" aria-label="Drag to resize the chat"></div>
+<section id="chat-pane">
+  <header class="bar">
+    <span id="chat-about" class="title"></span>
+    <button type="button" id="chats" class="plain">Chats</button>
+    <button type="button" id="new-chat" class="plain">New chat</button>
+  </header>
+  <div id="chat-body">
+    <div id="log" aria-live="polite"></div>
+    <div id="chats-sheet" hidden></div>
+  </div>
+  <div id="status" aria-live="polite"></div>
+  <form id="ask">
+    <textarea id="question" rows="1" placeholder="Ask about this paper" enterkeyhint="send"></textarea>
+    <button type="submit" id="send">Ask</button>
+    <button type="button" id="stop" hidden>Stop</button>
+  </form>
+</section>
+<div id="layout-sheet" hidden>
+  <div class="sheet-header">The chat</div>
+  <div class="choices" role="radiogroup" aria-label="Where the chat sits">
+    <button type="button" role="radio" data-place="bottom">Below</button>
+    <button type="button" role="radio" data-place="top">Above</button>
+    <button type="button" role="radio" data-place="left">Left</button>
+    <button type="button" role="radio" data-place="right">Right</button>
+    <button type="button" role="radio" data-place="tab">A tab</button>
+  </div>
+  <button type="button" id="reset-size" class="plain">Default size</button>
+</div>
+</body>
+</html>

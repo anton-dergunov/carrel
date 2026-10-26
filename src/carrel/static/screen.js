@@ -5,16 +5,18 @@
 // Instead the page is pinned to the visual viewport, the area above the keyboard: the PDF gets
 // shorter, and the chat keeps enough height to show the answer and what is being typed.
 // (`interactive-widget=resizes-content` would do this in Chrome; Safari does not know it.)
+// Every layout fits this area: above or below the paper, the chat is `--chat-height` tall; beside
+// it or on a tab, it is as tall as the area.
 
-// The chat's share of the screen, and the most of the visible area it takes with the keyboard up.
-const CHAT_SHARE = 0.4;
+// The most of the visible area the chat takes, above or below the paper, with the keyboard up.
 const CHAT_MOST = 0.7;
 // A visible area this much shorter than the window means a keyboard is up.
 const KEYBOARD_PX = 120;
 
-export function fitToVisibleArea() {
+/** `chatShare()` is the chat's share of the screen's height. Returns a function that fits again. */
+export function fitToVisibleArea(chatShare) {
   const visible = window.visualViewport;
-  if (!visible) return;
+  if (!visible) return () => {};
   const root = document.documentElement;
   let frame = 0;
   const fit = () => {
@@ -22,7 +24,7 @@ export function fitToVisibleArea() {
     const height = visible.height;
     root.style.setProperty('--visible-top', `${visible.offsetTop}px`);
     root.style.setProperty('--visible-height', `${height}px`);
-    root.style.setProperty('--chat-height', `${Math.round(Math.min(CHAT_SHARE * window.innerHeight, CHAT_MOST * height))}px`);
+    root.style.setProperty('--chat-height', `${Math.round(Math.min(chatShare() * window.innerHeight, CHAT_MOST * height))}px`);
     root.classList.toggle('keyboard', window.innerHeight - height > KEYBOARD_PX);
   };
   const later = () => {
@@ -32,4 +34,5 @@ export function fitToVisibleArea() {
   visible.addEventListener('scroll', later);
   window.addEventListener('resize', later);
   fit();
+  return later;
 }

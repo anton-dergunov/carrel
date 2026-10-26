@@ -113,21 +113,37 @@ def make_app(
     logins: set[str] = frozenset(),
     extra_folders: tuple[Path, ...] = (),
     sessions: Sessions | None = None,
+    model: str | None = None,
 ):
-    sessions = sessions or Sessions(library, extra_folders)
+    sessions = sessions or Sessions(library, extra_folders, model=model)
 
-    async def index(request: Request) -> Response:
+    def papers() -> str:
         topics: dict[str, list[str]] = {}
         for paper in library.papers():
             year = f' <span class="year">{html.escape(paper.year)}</span>' if paper.year else ""
             topics.setdefault(paper.topic, []).append(
                 f'<li><a href="/read/{quote(paper.pdf)}">{html.escape(paper.title)}</a>{year}</li>'
             )
-        sections = "\n".join(
+        return "\n".join(
             f"<section><h2>{html.escape(topic)}</h2><ul>{''.join(items)}</ul></section>"
             for topic, items in topics.items()
         )
-        return page(request, "index.html", papers=sections, library=html.escape(library.root.name))
+
+    def shell(request: Request, pdf: str = "", title: str = "") -> Response:
+        """The one page: the paper list and the open papers in tabs, and the chat beside them.
+        The address only says which tab is showing."""
+        return page(
+            request,
+            "app.html",
+            library=html.escape(library.root.name),
+            papers=papers(),
+            title=html.escape(title or library.root.name),
+            pdf=html.escape(pdf, quote=True),
+            pdf_title=html.escape(title, quote=True),
+        )
+
+    async def index(request: Request) -> Response:
+        return shell(request)
 
     async def read(request: Request) -> Response:
         rel = request.path_params["path"]
@@ -136,14 +152,7 @@ def make_app(
         except LookupError:
             return PlainTextResponse("No such PDF in the library.", status_code=404)
         paper = library.paper_for_pdf(rel)
-        title = paper.title if paper else Path(rel).stem
-        return page(
-            request,
-            "read.html",
-            title=html.escape(title),
-            pdf=html.escape(rel, quote=True),
-            pdf_url=html.escape("/pdf/" + quote(rel), quote=True),
-        )
+        return shell(request, rel, paper.title if paper else Path(rel).stem)
 
     async def paper(request: Request) -> Response:
         """A paper to open beside the chat without leaving the page."""

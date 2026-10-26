@@ -242,22 +242,24 @@ button.plain {
   border-top: 1px solid var(--line);
 }
 .keyboard #ask { padding-bottom: 6px; }
+/* The box and the button are the same height, so one line of text sits level with the button;
+   a longer question grows the box upwards. */
 #question {
   flex: 1;
   resize: none;
   /* 16px: Safari zooms into a smaller box when it is focused. */
-  font: 16px/1.35 var(--ui);
+  font: 16px/22px var(--ui);
   padding: 5px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--bg);
   color: var(--text);
 }
-#ask button { font-size: 14px; padding: 6px 12px; border-radius: 8px; }
+#ask button { height: 34px; font-size: 14px; padding: 0 12px; border-radius: 8px; }
 /* Not typing: it only says it is there. Typing: the size above. */
 #ask:not(:focus-within) { padding-top: 4px; }
-#ask:not(:focus-within) #question { font-size: 14px; padding: 3px 8px; }
-#ask:not(:focus-within) button { font-size: 13px; padding: 4px 10px; }
+#ask:not(:focus-within) #question { font-size: 14px; line-height: 20px; padding: 3px 8px; }
+#ask:not(:focus-within) button { height: 28px; font-size: 13px; padding: 0 10px; }
 button {
   font: 15px var(--ui);
   padding: 8px 14px;

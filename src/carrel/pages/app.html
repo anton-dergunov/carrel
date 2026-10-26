@@ -95,6 +95,7 @@ $papers
     <div id="chats-sheet" hidden></div>
   </div>
   <div id="chat-foot">
+    <button type="button" class="plain" id="model" aria-label="Chat settings" title="Chat settings" aria-expanded="false" aria-controls="settings-dialog">Model</button>
     <div id="status" aria-live="polite"></div>
     <button type="button" class="icon-button" id="chats" aria-label="Earlier chats" title="Earlier chats" aria-expanded="false"><svg class="icon"><use href="#i-history"/></svg></button>
     <button type="button" class="icon-button" id="new-chat" aria-label="New chat" title="New chat"><svg class="icon"><use href="#i-new-chat"/></svg></button>
@@ -121,5 +122,6 @@ $papers
   </div>
   <button type="button" id="reset-size" class="plain">Default size</button>
 </div>
+<dialog id="settings-dialog" aria-label="Chat settings"></dialog>
 </body>
 </html>

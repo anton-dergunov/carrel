@@ -33,6 +33,7 @@ from carrel.session import (
     split_question,
     to_wire,
 )
+from carrel.settings import Settings
 
 PDF = "recsys/Wide & Deep. A Test Paper.pdf"
 RESULT = ResultMessage(
@@ -127,10 +128,31 @@ def test_a_session_reaches_the_folders_the_library_names(library, tmp_path):
     assert talk.options().add_dirs == [library.overview_dir, tmp_path]
 
 
-def test_every_chat_runs_on_the_model_the_server_was_given(library):
-    assert Session(library).options().model is None
-    talk = Sessions(library, model="haiku").get(None)
-    assert talk.options().model == "haiku"
+def test_a_chat_carries_the_readers_note(library):
+    assert Session(library).options().system_prompt is None
+    talk = Sessions(library, settings=Settings(note=" A reader of papers. ")).get(None)
+    assert talk.options().system_prompt == {
+        "type": "preset",
+        "preset": "claude_code",
+        "append": "# The reader\n\nA reader of papers.",
+    }
+
+
+async def test_a_chat_runs_on_the_model_of_the_page_that_started_it(library):
+    talk = Session(library, connect=connecting(FakeClient()))
+    assert (talk.state()["model"], talk.options().model) == (None, "opus")
+    await talk.handle({"type": "ask", "text": "What is it?", "model": "haiku"})
+    assert (talk.state()["model"], talk.options().model) == ("haiku", "haiku")
+    # Another device asks in the same chat: it keeps the model its process started on.
+    talk.busy = False
+    await talk.handle({"type": "ask", "text": "And?", "model": "sonnet"})
+    assert talk.state()["model"] == "haiku"
+    # Once its process ends, the next question chooses again; a name not ours is the default.
+    await talk.close()
+    assert talk.state()["model"] is None
+    await talk.handle({"type": "ask", "text": "Again?", "model": "gpt"})
+    assert talk.state()["model"] == "opus"
+    await talk.close()
 
 
 def test_claude_code_keeps_the_chat_under_its_id_and_lists_it(library):

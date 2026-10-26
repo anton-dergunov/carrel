@@ -42,6 +42,8 @@ from claude_agent_sdk import (
 )
 
 from .engine import Library, Paper
+from .settings import Settings
+from .settings import model as known_model
 from .usage import record_permission, record_session
 
 # How long a permission request waits for the reader before it is denied.
@@ -158,6 +160,11 @@ def split_question(prompt: str) -> dict:
     return {"text": prompt, **question}
 
 
+def reader_prompt(note: str) -> dict:
+    """Claude Code's own system prompt, with the reader's note after it."""
+    return {"type": "preset", "preset": "claude_code", "append": f"# The reader\n\n{note.strip()}"}
+
+
 def to_wire(message: Any) -> dict:
     """An SDK message as JSON-ready data. The SDK's messages are dataclasses; anything else
     is passed as its repr, so a new message type is shown plainly rather than dropped."""
@@ -198,12 +205,15 @@ class Session:
         extra_folders: tuple[Path, ...] = (),
         limits: dict | None = None,
         clock: Callable[[], float] = time.time,
-        model: str | None = None,
+        settings: Settings | None = None,
     ):
         self.library = library
         self.id = session_id or str(uuid.uuid4())
-        # A model's name or alias ("haiku", "opus"); None is Claude Code's own default.
-        self.model = model
+        # The reader's note, read when Claude Code's process starts.
+        self.settings = settings or Settings()
+        # The model the running process started on, the one the asking page chose; None while
+        # there is no process.
+        self.model: str | None = None
         # Numbers restart when the server does; a page that saw another epoch draws anew.
         self.epoch = uuid.uuid4().hex[:8]
         # Folders the session reaches beside the library: read freely, written on asking.
@@ -295,6 +305,7 @@ class Session:
                     message.get("paper"),
                     message.get("page"),
                     message.get("selection"),
+                    message.get("model"),
                 )
             case "permission":
                 self.answer(str(message.get("id")), bool(message.get("allow")))
@@ -310,9 +321,11 @@ class Session:
         paper: str | None = None,
         page: int | None = None,
         selection: dict | None = None,
+        model: str | None = None,
     ) -> None:
         """A question about the paper open at `page`, with what the reader selected in a paper:
-        `selection` is {pdf, page, text}."""
+        `selection` is {pdf, page, text}. `model` is the asking page's; it is used only when
+        the question starts Claude Code's process."""
         if not text.strip():
             return
         if self.busy:
@@ -336,6 +349,7 @@ class Session:
             await self.emit("Question", question)
             await self.emit_state()
             if self.client is None:
+                self.model = known_model(model)
                 self.client = await self._connect()
                 self._relay = asyncio.create_task(self._relay_messages())
             if not self.started:
@@ -346,6 +360,8 @@ class Session:
             )
         except BaseException:
             self.busy = False
+            if self.client is None:
+                self.model = None
             raise
 
     def _selection(self, selection: object, open_paper: Paper | None) -> tuple[dict | None, str]:
@@ -379,9 +395,16 @@ class Session:
         return client
 
     def options(self) -> ClaudeAgentOptions:
+        settings = self.settings.get()
+        # A resumed chat keeps the system prompt Claude Code recorded when it began, so a note
+        # changed since then reaches only new chats.
+        prompt = (
+            {"system_prompt": reader_prompt(settings["note"])} if settings["note"].strip() else {}
+        )
         return ClaudeAgentOptions(
             cwd=self.library.root,
-            model=self.model,
+            model=self.model or known_model(None),
+            **prompt,
             add_dirs=self.folders,
             settings=json.dumps(agent_settings(self.library)),
             can_use_tool=self.can_use_tool,
@@ -472,6 +495,7 @@ class Session:
             self._relay.cancel()
             self._relay = None
         client, self.client = self.client, None
+        self.model = None
         self.busy = False
         if client:
             try:
@@ -489,12 +513,15 @@ class Sessions:
         extra_folders: tuple[Path, ...] = (),
         connect: Callable | None = None,
         clock: Callable[[], float] = time.time,
-        model: str | None = None,
+        settings: Settings | None = None,
     ):
         self.library = library
         self.chats: dict[str, Session] = {}
         self.limits: dict = {}  # the latest usage limits, shared by every chat
-        self._made = dict(extra_folders=extra_folders, connect=connect, clock=clock, model=model)
+        self.settings = settings or Settings()
+        self._made = dict(
+            extra_folders=extra_folders, connect=connect, clock=clock, settings=self.settings
+        )
         self._clock = clock
 
     def get(self, session_id: str | None) -> Session:

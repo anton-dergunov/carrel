@@ -1,7 +1,7 @@
 """Look at the reading page the way the iPad shows it, in WebKit at 820x1180.
 
     uv run --group shots python scripts/shots.py URL --out DIR [--layout PLACE] [--tabs]
-        [--find QUERY] [--highlight] [--ask QUESTION]
+        [--find QUERY] [--highlight] [--settings] [--note TEXT] [--ask QUESTION] [--model M]
 
 URL is a reading page of a running carrel, e.g. http://127.0.0.1:8517/read/<pdf>. Takes a
 shot once the PDF is drawn. --layout puts the chat below, above, left, right, on a tab, or
@@ -11,7 +11,10 @@ to see the tabs come back. --find types QUERY into find a letter at a time and p
 found. --highlight turns the pen on, selects a line on page 1 and checks it is highlighted, saved
 and quoted for the chat; reloads, taps the highlight, recolours it, asks about it, and removes it,
 checking each save. It writes into the served PDF: run it against a carrel serving a throwaway
-library, never the reader's own. With --ask, it also types the question, waits for the answer
+library, never the reader's own. --settings opens the chat's settings from the model's name and
+takes a shot; --note also types TEXT into the note about the reader and checks it is saved,
+which changes the note every chat carries: serve with XDG_STATE_HOME set to a scratch folder
+for it. The browser's chats run on Haiku (--model), as testing the page needs no more. With --ask, it also types the question, waits for the answer
 (this runs a real Claude Code turn, which costs; --allow taps Allow on each permission
 request), opens the turn's fold, taps the answer's first citation, reloads the page to see
 the chat come back, and takes a shot after each step. Prints the page the PDF is on at each
@@ -170,6 +173,35 @@ def highlight_pass(page, out: Path) -> None:
     )
 
 
+def settings_pass(page, note: str | None, out: Path) -> None:
+    """The chat's settings, opened from the model's name on the status line."""
+    page.click("#model")
+    page.wait_for_selector("#reader-note")
+    page.wait_for_timeout(400)  # the dialog's fade
+    print(
+        "settings: model",
+        page.inner_text('#settings-dialog [aria-checked="true"] .name'),
+        "| note:",
+        repr(page.input_value("#reader-note")),
+    )
+    page.screenshot(path=out / "settings-1-sheet.png")
+    if note is not None:
+        with page.expect_response(
+            lambda r: r.url.endswith("/api/settings") and r.request.method == "PUT"
+        ) as info:
+            page.fill("#reader-note", note)
+        print(
+            "note saved:",
+            info.value.status,
+            "|",
+            page.inner_text("#settings-dialog .note-foot"),
+        )
+        page.screenshot(path=out / "settings-2-note.png")
+    page.click("#settings-dialog .settings-title button")  # Done
+    page.wait_for_timeout(300)
+    print("closed, status line:", page.inner_text("#chat-foot"))
+
+
 def wait_for_answer(page, timeout: int, allow: bool, out: Path) -> None:
     """Waits for the turn's end, printing each permission request (and tapping Allow)."""
     seen = 0
@@ -206,6 +238,11 @@ def main() -> None:
     parser.add_argument(
         "--highlight", action="store_true", help="make, save, change and remove a highlight"
     )
+    parser.add_argument("--settings", action="store_true", help="open the chat's settings")
+    parser.add_argument("--note", help="with --settings, type this note about the reader")
+    parser.add_argument(
+        "--model", default="haiku", help="the model this browser's chats start on (default: haiku)"
+    )
     parser.add_argument("--browser", default="webkit", choices=["webkit", "chromium"])
     parser.add_argument("--timeout", type=int, default=240, help="seconds to wait for an answer")
     parser.add_argument("--allow", action="store_true", help="tap Allow on each permission request")
@@ -222,6 +259,7 @@ def main() -> None:
             ),
         )
         page.on("pageerror", lambda e: print(f"page error: {e}"))
+        page.add_init_script(f"localStorage.setItem('carrel.model', {json.dumps(args.model)});")
         if args.layout:
             page.add_init_script(layout_script(args.layout))
         page.goto(args.url)
@@ -238,6 +276,9 @@ def main() -> None:
 
         if args.highlight:
             highlight_pass(page, args.out)
+
+        if args.settings or args.note is not None:
+            settings_pass(page, args.note, args.out)
 
         if args.ask:
             page.fill("#question", args.ask)

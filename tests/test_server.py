@@ -113,6 +113,30 @@ def test_no_chats_yet(client, monkeypatch, tmp_path):
     assert client.get("/api/chats").json() == []
 
 
+def test_the_note_is_shared_by_every_page(client):
+    settings = client.get("/api/settings").json()
+    assert (settings["note"], settings["default_model"]) == ("", "opus")
+    assert [model["id"] for model in settings["models"]] == ["opus", "sonnet", "haiku"]
+    saved = client.put("/api/settings", json={"note": "Brief."}, headers=OWN)
+    assert saved.json()["note"] == "Brief."
+    assert client.get("/api/settings").json()["note"] == "Brief."
+    client.put("/api/settings", json={"note": ""}, headers=OWN)
+
+
+@pytest.mark.parametrize(
+    "body, headers, status",
+    [
+        ('{"note": 3}', OWN, 400),
+        ("not json", OWN, 400),
+        ('{"note": "x"}', {"Host": "127.0.0.1:8517"}, 403),
+        ('{"note": "x"}', {**OWN, "Origin": "https://evil.example"}, 403),
+    ],
+)
+def test_settings_not_saved(client, body, headers, status):
+    assert client.put("/api/settings", content=body, headers=headers).status_code == status
+    assert client.get("/api/settings").json()["note"] == ""
+
+
 @pytest.fixture
 def pdf_file(library):
     """The test paper's PDF, put back as it was after a test that saves it."""

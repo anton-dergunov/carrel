@@ -428,6 +428,10 @@ button.plain {
   text-overflow: ellipsis;
 }
 #status.warn { color: var(--error); }
+/* The model, first on the status line: what opens the settings */
+#model { padding: 0 6px 0 0; font-size: 12px; line-height: 20px; color: var(--muted); text-decoration: underline dotted; text-underline-offset: 3px; }
+#model[aria-expanded="true"] { color: var(--accent); }
+#model:not(:empty) + #status:not(:empty)::before { content: "· "; }
 
 /* The earlier chats, over the log */
 #chats-sheet {
@@ -439,7 +443,97 @@ button.plain {
   padding: 4px 16px 16px;
 }
 #chats-sheet[hidden] { display: none; }
-#chats-sheet .sheet-header { font-size: 13px; color: var(--muted); padding: 6px 0; }
+#chats-sheet .sheet-header, #settings-dialog .sheet-header { font-size: 13px; color: var(--muted); padding: 6px 0; }
+/* The settings: a dialog over the page, near the top so that the keyboard leaves its note in
+   sight, and never taller than the area above the keyboard (screen.js). A title, then each setting
+   under a heading that says where it is kept; the note takes whatever height is left. */
+#settings-dialog {
+  position: fixed;
+  inset: calc(var(--visible-top, 0px) + max(72px, env(safe-area-inset-top) + 40px)) 0 auto;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(var(--visible-height, 100dvh) - max(72px, env(safe-area-inset-top) + 40px) - 16px);
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 0 18px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgb(0 0 0 / 0.2), 0 1px 4px rgb(0 0 0 / 0.08);
+}
+#settings-dialog[open] { display: flex; flex-direction: column; gap: 14px; animation: settings-in 0.15s ease-out; }
+#settings-dialog::backdrop { background: rgb(20 18 12 / 0.25); }
+@keyframes settings-in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { #settings-dialog[open] { animation: none; } }
+.settings-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 -18px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.settings-title h2 { margin: 0; font: 600 16px var(--ui); color: var(--text); }
+.settings-title .plain { font-size: 15px; font-weight: 600; padding: 2px 0 2px 12px; }
+#settings-dialog .group { display: flex; flex-direction: column; }
+#settings-dialog .group-title { display: block; margin: 0 2px 6px; font: 600 13px var(--ui); color: var(--text); }
+#settings-dialog .scope { margin-left: 4px; font-weight: 400; color: var(--muted); }
+#settings-dialog .hint { margin: 6px 2px 0; font-size: 12px; line-height: 1.35; color: var(--muted); }
+
+/* The models: a radio list */
+.model-choices { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); }
+.model-choices button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  text-align: left;
+  font-size: 15px;
+  color: var(--text);
+  background: none;
+  border-radius: 0;
+}
+.model-choices button + button { border-top: 1px solid var(--line); }
+.model-choices .dot {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
+}
+.model-choices .words { flex: 1; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.model-choices .sub { font-size: 13px; color: var(--muted); }
+.model-choices button[aria-checked="true"] { background: var(--surface); }
+.model-choices button[aria-checked="true"] .dot { border: 5px solid var(--accent); }
+.model-choices button[aria-checked="true"] .name { font-weight: 600; }
+
+/* The note */
+#reader-note {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  font: 16px/1.4 var(--ui); /* 16px: Safari zooms into a smaller box when it is focused */
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  resize: vertical;
+}
+#reader-note:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+#settings-dialog .note-foot { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+#settings-dialog .note-foot .hint { flex: 1; margin: 0 2px; }
+#settings-dialog .note-foot .state { color: var(--accent); }
+#settings-dialog .note-foot .state.warn { color: var(--error); }
+#settings-dialog .note-foot .state:empty { display: none; }
 #chats-sheet ul { list-style: none; margin: 0; padding: 0; }
 #chats-sheet li { border-bottom: 1px solid var(--line); }
 #chats-sheet li button {

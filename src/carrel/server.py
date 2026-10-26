@@ -9,8 +9,9 @@ keeps the Host the browser asked for, and says who is asking in `Tailscale-User-
   loopback name itself, which a proxied request never is;
 - for the WebSocket, and for anything but GET and HEAD, its Origin is the page's own.
 
-The one thing a page can change on the laptop is a paper's PDF, with the highlights made in
-it (`PUT /pdf/…`); and a page can write a line to the server's log.
+What a page can change on the laptop is a paper's PDF, with the highlights made in it
+(`PUT /pdf/…`), and the chats' settings (`PUT /api/settings`); and a page can write a line
+to the server's log.
 """
 
 import asyncio
@@ -41,6 +42,7 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from .engine import Library
 from .session import Session, Sessions
+from .settings import DEFAULT_MODEL, LONGEST_NOTE, MODELS, Settings
 
 log = logging.getLogger("carrel")
 
@@ -53,6 +55,8 @@ SAFE_METHODS = {"GET", "HEAD"}
 MAX_PDF = 256 * 1024 * 1024
 # A line of a page's log, as the page sends it.
 MAX_LOG = 8192
+# The settings as a page sends them: the note and a little more.
+MAX_SETTINGS = 4 * LONGEST_NOTE + 1024
 
 
 def hostname(host_header: str) -> str:
@@ -153,9 +157,9 @@ def make_app(
     logins: set[str] = frozenset(),
     extra_folders: tuple[Path, ...] = (),
     sessions: Sessions | None = None,
-    model: str | None = None,
+    settings: Settings | None = None,
 ):
-    sessions = sessions or Sessions(library, extra_folders, model=model)
+    sessions = sessions or Sessions(library, extra_folders, settings=settings)
     # One PDF written at a time: a save checks the file's version, then replaces it.
     writing = asyncio.Lock()
 
@@ -215,6 +219,31 @@ def make_app(
     async def chats(request: Request) -> Response:
         listing = await asyncio.to_thread(sessions.listing)
         return JSONResponse(listing)
+
+    def settings_reply(values: dict) -> JSONResponse:
+        return JSONResponse(
+            {
+                **values,
+                "models": [{"id": alias, "name": name} for alias, name in MODELS.items()],
+                "default_model": DEFAULT_MODEL,
+                "longest_note": LONGEST_NOTE,
+            }
+        )
+
+    async def get_settings(request: Request) -> Response:
+        return settings_reply(sessions.settings.get())
+
+    async def put_settings(request: Request) -> Response:
+        """The reader's note, for the chats that start from now on."""
+        body = await request.body()
+        if len(body) > MAX_SETTINGS:
+            return PlainTextResponse("Too long.", status_code=413)
+        try:
+            saved = await asyncio.to_thread(sessions.settings.update, json.loads(body))
+        except ValueError as error:
+            return PlainTextResponse(str(error), status_code=400)
+        log.info("settings: a note of %d characters", len(saved["note"]))
+        return settings_reply(saved)
 
     async def pdf(request: Request) -> Response:
         try:
@@ -336,6 +365,8 @@ def make_app(
             Route("/api/log", page_log, methods=["POST"]),
             Route("/api/paper/{path:path}", paper),
             Route("/api/chats", chats),
+            Route("/api/settings", get_settings, methods=["GET", "HEAD"]),
+            Route("/api/settings", put_settings, methods=["PUT"]),
             WebSocketRoute("/ws", session),
             Mount("/static", StaticFiles(directory=STATIC), name="static"),
         ],

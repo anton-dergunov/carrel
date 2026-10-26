@@ -11,6 +11,7 @@
 import { marked } from './vendor/marked/marked.esm.js';
 import DOMPurify from './vendor/dompurify/purify.es.mjs';
 import { parsePaperLink } from './links.js';
+import { startSettings } from './settings.js';
 
 const RESULT_PREVIEW = 4000;
 // System messages that say nothing to the reader.
@@ -39,6 +40,13 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
   const status = document.getElementById('status');
   const sheet = document.getElementById('chats-sheet');
   const quoteBox = document.getElementById('quote');
+  const modelButton = document.getElementById('model');
+  const settings = startSettings({
+    liveModel: () => model,
+    name: modelName,
+    onOpen: () => showSheet(false),
+    onModel: () => renderStatus(),
+  });
 
   let chatId = remembered();
   let epoch = null;
@@ -51,7 +59,7 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
   let busy = false;
   let cacheExpiresAt = null;
   let limits = {};
-  let model = null;
+  let model = null; // the model this chat's process runs on; null while there is none
 
   // Answer blocks drawn from the stream that the complete message has not yet replaced.
   const streamed = [];
@@ -139,7 +147,7 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     setBusy(data.busy);
     cacheExpiresAt = data.cache_expires_at;
     limits = data.limits ?? limits;
-    model = data.model ?? model;
+    model = data.model ?? null;
     renderStatus();
   }
 
@@ -149,7 +157,9 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
       return confirmExpired(text);
     }
     await whenAttached();
-    socket.send(JSON.stringify({ type: 'ask', text, paper: currentPaper(), page: currentPage(), selection: passage }));
+    socket.send(
+      JSON.stringify({ type: 'ask', text, paper: currentPaper(), page: currentPage(), selection: passage, model: settings.model() }),
+    );
     setBusy(true);
     quote(null);
   }
@@ -169,7 +179,8 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     stop.hidden = !value;
   }
 
-  // The status line: the model, the connection, the prompt cache, the usage limits.
+  // The status line: the model (a button that opens the settings), the connection, the prompt
+  // cache, the usage limits.
 
   function expired() {
     return cacheExpiresAt != null && Date.now() / 1000 > cacheExpiresAt;
@@ -177,7 +188,9 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
 
   function renderStatus() {
     const parts = [];
-    if (model) parts.push(modelName(model));
+    // The model this chat runs on, or the one its next question starts on.
+    const shown = model ?? settings.model();
+    modelButton.textContent = shown ? modelName(shown) : 'Model';
     if (!attached) parts.push('reconnecting…');
     if (cacheExpiresAt != null) {
       const left = cacheExpiresAt - Date.now() / 1000;
@@ -497,6 +510,7 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
   const chatsButton = document.getElementById('chats');
 
   function showSheet(open) {
+    if (open) void settings.show(false);
     sheet.hidden = !open;
     chatsButton.setAttribute('aria-expanded', String(open));
   }
@@ -584,6 +598,7 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
   stop.addEventListener('click', () => socket?.send(JSON.stringify({ type: 'stop' })));
   document.getElementById('new-chat').addEventListener('click', () => {
     showSheet(false);
+    void settings.show(false);
     switchChat(null);
   });
   chatsButton.addEventListener('click', () => void showChats());

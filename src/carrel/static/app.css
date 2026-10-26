@@ -55,7 +55,8 @@ a { color: var(--accent); }
 
 /* The paper list */
 
-.index .bar { position: sticky; top: 0; z-index: 1; flex-wrap: wrap; }
+/* In the Home Screen app the status bar lies over the page: the list's bar starts below it. */
+.index .bar { position: sticky; top: 0; z-index: 1; flex-wrap: wrap; padding-top: calc(8px + env(safe-area-inset-top)); }
 .index h1 { margin: 0; font-size: 20px; font-weight: 600; }
 #filter {
   flex: 1 1 240px;

@@ -4,7 +4,8 @@
   "description": "Read a paper with Claude Code beside it",
   "start_url": "/",
   "scope": "/",
-  "display": "standalone",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
   "background_color": "#fdf6e3",
   "theme_color": "#fffdf6",
   "icons": [

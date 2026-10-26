@@ -4,6 +4,7 @@
 import * as pdfjsLib from './vendor/pdfjs/pdf.min.mjs';
 import { startChat } from './chat.js';
 import { sameFile } from './links.js';
+import { pinchToZoom, stopPageZoom } from './pinch.js';
 
 // The viewer component reads the library from `globalThis.pdfjsLib` when its module is
 // evaluated, so it is imported only after this.
@@ -15,9 +16,6 @@ const ASSETS = '/static/vendor/pdfjs/';
 const DEST_CONTEXT_PX = 72;
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${ASSETS}pdf.worker.min.mjs`;
-
-// Pinching scales the PDF after this long without moving, as PDF.js's own viewer does.
-const PINCH_DRAWING_DELAY_MS = 400;
 
 let pdf = document.body.dataset.pdf;
 const container = document.getElementById('viewerContainer');
@@ -45,10 +43,15 @@ eventBus.on('pagesinit', () => {
     pendingTarget = null;
   }
 });
+let keepPage = 0;
 eventBus.on('pagechanging', ({ pageNumber }) => {
   showPage(pageNumber);
-  // The address keeps the page, so a reload comes back to it.
-  history.replaceState(history.state, '', readingUrl(pdf, { page: pageNumber > 1 ? pageNumber : undefined }));
+  // The address keeps the page, so a reload comes back to it; once the scrolling settles, since
+  // Safari refuses more than a hundred address changes in ten seconds.
+  clearTimeout(keepPage);
+  keepPage = setTimeout(() => {
+    history.replaceState(history.state, '', readingUrl(pdf, { page: pageNumber > 1 ? pageNumber : undefined }));
+  }, 500);
 });
 new ResizeObserver(() => {
   // Fit the width again, unless the reader zoomed in or out.
@@ -59,14 +62,8 @@ new ResizeObserver(() => {
   }
 }).observe(container);
 
-// Two fingers zoom the PDF, not the page (the page's own zoom is off in the CSS).
-new pdfjsLib.TouchManager({
-  container,
-  signal: new AbortController().signal,
-  onPinching: (origin, previousDistance, distance) => {
-    viewer.updateScale({ drawingDelay: PINCH_DRAWING_DELAY_MS, scaleFactor: distance / previousDistance, origin });
-  },
-});
+stopPageZoom();
+pinchToZoom({ container, viewer, eventBus });
 
 /** A target given in the page's own address: /read/<file>?page=7&dest=table.2 */
 function targetFromLocation() {

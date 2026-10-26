@@ -18,16 +18,44 @@
 <script type="module" src="/static/app.js"></script>
 </head>
 <body class="chat-bottom" data-library="$library" data-pdf="$pdf" data-pdf-title="$pdf_title">
+<!-- Icons from Lucide 1.55.0 (https://lucide.dev), ISC licence: free to use, copy and modify
+     with the copyright notice, "Copyright (c) 2026 Lucide Icons and Contributors". -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-library" viewBox="0 0 24 24"><rect width="8" height="18" x="3" y="3" rx="1" /><path d="M7 3v18" /><path d="M20.4 18.9c.2.5-.1 1.1-.6 1.3l-1.9.7c-.5.2-1.1-.1-1.3-.6L11.1 5.1c-.2-.5.1-1.1.6-1.3l1.9-.7c.5-.2 1.1.1 1.3.6Z" /></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34" /><circle cx="11" cy="11" r="8" /></symbol>
+  <symbol id="i-view" viewBox="0 0 24 24"><path d="m15 16 2.536-7.328a1.02 1.02 1 0 1 1.928 0L22 16" /><path d="M15.697 14h5.606" /><path d="m2 16 4.039-9.69a.5.5 0 0 1 .923 0L11 16" /><path d="M3.304 13h6.392" /></symbol>
+  <symbol id="i-panel-bottom" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M3 15h18" /></symbol>
+  <symbol id="i-panel-top" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M3 9h18" /></symbol>
+  <symbol id="i-panel-left" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M9 3v18" /></symbol>
+  <symbol id="i-panel-right" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M15 3v18" /></symbol>
+  <symbol id="i-panel-bottom-dashed" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M14 15h1" /><path d="M19 15h2" /><path d="M3 15h2" /><path d="M9 15h1" /></symbol>
+  <symbol id="i-panel-top-dashed" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M14 9h1" /><path d="M19 9h2" /><path d="M3 9h2" /><path d="M9 9h1" /></symbol>
+  <symbol id="i-panel-left-dashed" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M9 14v1" /><path d="M9 19v2" /><path d="M9 3v2" /><path d="M9 9v1" /></symbol>
+  <symbol id="i-panel-right-dashed" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M15 14v1" /><path d="M15 19v2" /><path d="M15 3v2" /><path d="M15 9v1" /></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" /></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></symbol>
+  <symbol id="i-new-chat" viewBox="0 0 24 24"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" /><path d="M12 8v6" /><path d="M9 11h6" /></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6" /></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></symbol>
+</svg>
 <nav id="strip" class="bar">
   <div id="tabs" role="tablist">
-    <button type="button" role="tab" class="tab" id="tab-papers">Papers</button>
+    <button type="button" role="tab" class="tab icon-tab" id="tab-papers" aria-label="Papers" title="Papers"><svg class="icon"><use href="#i-library"/></svg></button>
     <span id="paper-tabs"></span>
-    <button type="button" role="tab" class="tab" id="tab-chat" hidden>Chat</button>
+    <button type="button" role="tab" class="tab icon-tab" id="tab-chat" aria-label="Chat" title="Chat" hidden><svg class="icon"><use href="#i-chat"/></svg></button>
   </div>
   <span class="sep" aria-hidden="true"></span>
-  <span id="page-label"></span>
-  <button type="button" id="chat-toggle" class="plain" aria-pressed="true">Chat</button>
-  <button type="button" id="layout-button" class="plain" aria-expanded="false" aria-controls="layout-sheet">Layout</button>
+  <button type="button" class="icon-button" id="find-button" aria-label="Find in this paper" title="Find in this paper"><svg class="icon"><use href="#i-search"/></svg></button>
+  <button type="button" class="icon-button" id="view-button" aria-label="Layout" title="Layout" aria-expanded="false" aria-controls="view-sheet"><svg class="icon"><use href="#i-view"/></svg></button>
+  <button type="button" class="icon-button" id="chat-toggle" aria-label="Show or hide the chat" title="Show or hide the chat" aria-pressed="true"><svg class="icon"><use href="#i-panel-bottom"/></svg></button>
+  <form id="find" role="search" hidden>
+    <input id="find-input" type="search" placeholder="Find in this paper" aria-label="Find in this paper" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <output id="find-count"></output>
+    <button type="button" class="icon-button" id="find-previous" aria-label="Previous match" title="Previous match"><svg class="icon"><use href="#i-up"/></svg></button>
+    <button type="button" class="icon-button" id="find-next" aria-label="Next match" title="Next match"><svg class="icon"><use href="#i-down"/></svg></button>
+    <button type="button" class="plain" id="find-done">Done</button>
+  </form>
 </nav>
 <section id="papers-pane" class="content">
   <header class="bar">
@@ -40,33 +68,41 @@ $papers
 </section>
 <section id="pdf-pane" class="content">
   <div id="viewerContainer"><div id="viewer" class="pdfViewer"></div></div>
+  <button type="button" id="page-badge" aria-label="Contents and pages" aria-expanded="false" aria-controls="contents-sheet" hidden></button>
+  <div id="contents-sheet" class="sheet" hidden>
+    <form id="go-to-page">
+      <label for="page-number">Page</label>
+      <input id="page-number" type="number" inputmode="numeric" min="1" enterkeyhint="go">
+      <span id="page-count"></span>
+    </form>
+    <nav id="outline" aria-label="Contents"></nav>
+  </div>
 </section>
 <div id="divider" role="separator" aria-label="Drag to resize the chat"></div>
 <section id="chat-pane">
-  <header class="bar">
-    <span id="chat-about" class="title"></span>
-    <button type="button" id="chats" class="plain">Chats</button>
-    <button type="button" id="new-chat" class="plain">New chat</button>
-  </header>
   <div id="chat-body">
     <div id="log" aria-live="polite"></div>
     <div id="chats-sheet" hidden></div>
   </div>
-  <div id="status" aria-live="polite"></div>
+  <div id="chat-foot">
+    <div id="status" aria-live="polite"></div>
+    <button type="button" class="icon-button" id="chats" aria-label="Earlier chats" title="Earlier chats" aria-expanded="false"><svg class="icon"><use href="#i-history"/></svg></button>
+    <button type="button" class="icon-button" id="new-chat" aria-label="New chat" title="New chat"><svg class="icon"><use href="#i-new-chat"/></svg></button>
+  </div>
   <form id="ask">
     <textarea id="question" rows="1" placeholder="Ask about this paper" enterkeyhint="send"></textarea>
     <button type="submit" id="send">Ask</button>
     <button type="button" id="stop" hidden>Stop</button>
   </form>
 </section>
-<div id="layout-sheet" hidden>
-  <div class="sheet-header">The chat</div>
+<div id="view-sheet" class="sheet" hidden>
+  <div class="sheet-header">The chat, on this device</div>
   <div class="choices" role="radiogroup" aria-label="Where the chat sits">
-    <button type="button" role="radio" data-place="bottom">Below</button>
-    <button type="button" role="radio" data-place="top">Above</button>
-    <button type="button" role="radio" data-place="left">Left</button>
-    <button type="button" role="radio" data-place="right">Right</button>
-    <button type="button" role="radio" data-place="tab">A tab</button>
+    <button type="button" role="radio" data-place="bottom"><svg class="icon"><use href="#i-panel-bottom"/></svg>Below</button>
+    <button type="button" role="radio" data-place="top"><svg class="icon"><use href="#i-panel-top"/></svg>Above</button>
+    <button type="button" role="radio" data-place="left"><svg class="icon"><use href="#i-panel-left"/></svg>Left</button>
+    <button type="button" role="radio" data-place="right"><svg class="icon"><use href="#i-panel-right"/></svg>Right</button>
+    <button type="button" role="radio" data-place="tab"><svg class="icon"><use href="#i-chat"/></svg>A tab</button>
   </div>
   <button type="button" id="reset-size" class="plain">Default size</button>
 </div>

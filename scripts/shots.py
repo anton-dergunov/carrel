@@ -36,7 +36,7 @@ def tabs_pass(page, out: Path) -> None:
     first = page.url
     page.locator("#viewerContainer").evaluate("c => c.scrollTop = c.scrollHeight / 3")
     page.wait_for_timeout(1200)
-    kept = page.inner_text("#page-label")
+    kept = page.inner_text("#page-badge")
     print("first paper at:", kept)
     page.click("#tab-papers")
     page.wait_for_timeout(300)
@@ -52,7 +52,7 @@ def tabs_pass(page, out: Path) -> None:
     page.wait_for_timeout(800)
     print(
         "second paper:",
-        page.inner_text("#page-label"),
+        page.inner_text("#page-badge"),
         "| tabs:",
         page.locator(".tab.paper").count(),
     )
@@ -60,7 +60,7 @@ def tabs_pass(page, out: Path) -> None:
     page.locator(".tab.paper .label").first.click()
     page.wait_for_selector(".pdfViewer .page canvas", timeout=30_000)
     page.wait_for_timeout(1200)
-    back = page.inner_text("#page-label")
+    back = page.inner_text("#page-badge")
     print("first again at:", back, "(kept)" if back == kept else f"(was {kept})")
     page.screenshot(path=out / "tabs-3-first-again.png")
     page.locator(".tab.paper .label").nth(1).click()
@@ -75,7 +75,7 @@ def tabs_pass(page, out: Path) -> None:
         "after a reload, tabs:",
         page.locator(".tab.paper").count(),
         "| at:",
-        page.inner_text("#page-label"),
+        page.inner_text("#page-badge"),
     )
     page.screenshot(path=out / "tabs-4-reload.png")
 
@@ -133,7 +133,7 @@ def main() -> None:
         page.goto(args.url)
         page.wait_for_selector(".pdfViewer .page canvas", timeout=30_000)
         page.wait_for_timeout(800)
-        print("opened:", page.inner_text("#page-label"))
+        print("opened:", page.inner_text("#page-badge"))
         page.screenshot(path=args.out / f"1-open{'-' + args.layout if args.layout else ''}.png")
 
         if args.tabs:
@@ -157,7 +157,7 @@ def main() -> None:
                 print("citation:", citation.inner_text(), citation.get_attribute("href"))
                 citation.click()
                 page.wait_for_timeout(1500)
-                print("after the citation:", page.inner_text("#page-label"), "| url:", page.url)
+                print("after the citation:", page.inner_text("#page-badge"), "| url:", page.url)
                 print("questions still shown:", page.locator(".question").count())
                 page.screenshot(path=args.out / "4-citation.png")
             else:

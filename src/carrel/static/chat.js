@@ -45,6 +45,7 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
   let busy = false;
   let cacheExpiresAt = null;
   let limits = {};
+  let model = null;
 
   // Answer blocks drawn from the stream that the complete message has not yet replaced.
   const streamed = [];
@@ -130,6 +131,7 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     setBusy(data.busy);
     cacheExpiresAt = data.cache_expires_at;
     limits = data.limits ?? limits;
+    model = data.model ?? model;
     renderStatus();
   }
 
@@ -149,7 +151,7 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     stop.hidden = !value;
   }
 
-  // The status line: the connection, the prompt cache, the usage limits.
+  // The status line: the model, the connection, the prompt cache, the usage limits.
 
   function expired() {
     return cacheExpiresAt != null && Date.now() / 1000 > cacheExpiresAt;
@@ -157,6 +159,7 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
 
   function renderStatus() {
     const parts = [];
+    if (model) parts.push(modelName(model));
     if (!attached) parts.push('reconnecting…');
     if (cacheExpiresAt != null) {
       const left = cacheExpiresAt - Date.now() / 1000;
@@ -458,13 +461,20 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
 
   // The chats: a new one, or one of the earlier ones.
 
+  const chatsButton = document.getElementById('chats');
+
+  function showSheet(open) {
+    sheet.hidden = !open;
+    chatsButton.setAttribute('aria-expanded', String(open));
+  }
+
   async function showChats() {
     if (!sheet.hidden) {
-      sheet.hidden = true;
+      showSheet(false);
       return;
     }
     sheet.replaceChildren(sheetHeader('Loading…'));
-    sheet.hidden = false;
+    showSheet(true);
     let chats;
     try {
       const response = await fetch('/api/chats');
@@ -488,7 +498,7 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
       const state = chat.busy ? 'answering' : chat.live ? 'open' : now - chat.last_modified < RECENT_S ? 'recent' : '';
       meta.textContent = [chat.paper, ago(now - chat.last_modified), state].filter(Boolean).join(' · ');
       button.addEventListener('click', () => {
-        sheet.hidden = true;
+        showSheet(false);
         if (chat.id !== chatId) switchChat(chat.id);
       });
     }
@@ -540,10 +550,10 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
   question.addEventListener('input', grow);
   stop.addEventListener('click', () => socket?.send(JSON.stringify({ type: 'stop' })));
   document.getElementById('new-chat').addEventListener('click', () => {
-    sheet.hidden = true;
+    showSheet(false);
     switchChat(null);
   });
-  document.getElementById('chats').addEventListener('click', () => void showChats());
+  chatsButton.addEventListener('click', () => void showChats());
 
   // Back from sleep or from another app: attach again now, not at the next back-off.
   document.addEventListener('visibilitychange', () => {
@@ -571,6 +581,13 @@ function remember(id) {
   } catch {
     // Private browsing: the chat is still on the server, in the list of chats.
   }
+}
+
+/** "haiku" → "Haiku", "claude-opus-5-5" → "Opus 5.5". */
+export function modelName(id) {
+  const found = /^claude-([a-z]+)-(\d+)(?:-(\d))?(?:\b|$)/.exec(id);
+  const [name, version] = found ? [found[1], found[3] ? `${found[2]}.${found[3]}` : found[2]] : [id, ''];
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)}${version ? ` ${version}` : ''}`;
 }
 
 const LIMIT_NAMES = { five_hour: '5-h', seven_day: 'week', seven_day_opus: 'week (Opus)', seven_day_sonnet: 'week (Sonnet)' };

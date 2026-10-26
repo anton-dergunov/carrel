@@ -55,22 +55,28 @@ export function shareAt(place, x, y, width, height) {
 
 /**
  * Applies the remembered layout to the page and runs its controls: the split, the Chat button
- * and the layout sheet. `onChange(layout)` follows every change.
+ * and the view sheet. `onChange(layout)` follows every change, `onResize(layout)` the size
+ * while the split is dragged, and `onDragEnd()` the drag's end.
  */
-export function startLayout({ onChange }) {
+export function startLayout({ onChange, onResize, onDragEnd }) {
   const body = document.body;
   const divider = document.getElementById('divider');
   const toggle = document.getElementById('chat-toggle');
-  const button = document.getElementById('layout-button');
-  const sheet = document.getElementById('layout-sheet');
+  const button = document.getElementById('view-button');
+  const sheet = document.getElementById('view-sheet');
   let layout = load();
 
   function apply() {
     for (const place of PLACES) body.classList.toggle(`chat-${place}`, layout.place === place);
     body.classList.toggle('chat-hidden', layout.hidden && layout.place !== 'tab');
     body.style.setProperty('--chat-share', String(shareOf(layout)));
+    // The Chat button draws where the chat sits, outlined when it is hidden. On a tab of its own,
+    // the chat's tab does this button's work.
     toggle.hidden = layout.place === 'tab';
     toggle.setAttribute('aria-pressed', String(!layout.hidden));
+    if (layout.place !== 'tab') {
+      toggle.querySelector('use').setAttribute('href', `#i-panel-${layout.place}${layout.hidden ? '-dashed' : ''}`);
+    }
     for (const choice of sheet.querySelectorAll('[data-place]')) {
       choice.setAttribute('aria-checked', String(choice.dataset.place === layout.place));
     }
@@ -83,35 +89,35 @@ export function startLayout({ onChange }) {
     apply();
   }
 
-  // The split, dragged. Only the line follows the finger; the panes take the new size once, when
-  // it lifts. Resizing them at every step lays out the PDF's pages and the whole chat again each
-  // time, which is what made dragging slow.
+  // The split, dragged: the panes follow the finger, one step a frame, and the size is kept when
+  // it lifts. The PDF keeps its scale meanwhile and fits the new width at the end (read.js).
   let drag = null;
   divider.addEventListener('pointerdown', (event) => {
     if (layout.place === 'tab') return;
     event.preventDefault();
     divider.setPointerCapture(event.pointerId);
-    const box = divider.getBoundingClientRect();
-    drag = { x: box.left + box.width / 2, y: box.top + box.height / 2, share: shareOf(layout) };
+    drag = { share: shareOf(layout), frame: 0 };
     body.classList.add('dragging');
   });
   divider.addEventListener('pointermove', (event) => {
     if (!drag) return;
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    drag.share = shareAt(layout.place, event.clientX, event.clientY, width, height);
-    // Where the split will be, with the share clamped.
-    const at = { bottom: height * (1 - drag.share), top: height * drag.share, left: width * drag.share, right: width * (1 - drag.share) }[layout.place];
-    const vertical = layout.place === 'left' || layout.place === 'right';
-    divider.style.transform = vertical ? `translateX(${at - drag.x}px)` : `translateY(${at - drag.y}px)`;
+    drag.share = shareAt(layout.place, event.clientX, event.clientY, window.innerWidth, window.innerHeight);
+    drag.frame ||= requestAnimationFrame(() => {
+      if (!drag) return;
+      drag.frame = 0;
+      layout = { ...layout, shares: { ...layout.shares, [layout.place]: drag.share } };
+      body.style.setProperty('--chat-share', String(drag.share));
+      onResize(layout);
+    });
   });
   const release = () => {
     if (!drag) return;
+    cancelAnimationFrame(drag.frame);
     const { share } = drag;
     drag = null;
     body.classList.remove('dragging');
-    divider.style.transform = '';
     set({ shares: { ...layout.shares, [layout.place]: share } });
+    onDragEnd();
   };
   divider.addEventListener('pointerup', release);
   divider.addEventListener('pointercancel', release);
@@ -120,7 +126,7 @@ export function startLayout({ onChange }) {
 
   toggle.addEventListener('click', () => set({ hidden: !layout.hidden }));
 
-  // The sheet: where the chat sits.
+  // The sheet: where the chat sits, and later how the paper is shown.
   const openSheet = (open) => {
     sheet.hidden = !open;
     button.setAttribute('aria-expanded', String(open));

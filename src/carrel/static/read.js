@@ -8,7 +8,7 @@ import { pinchToZoom, stopPageZoom } from './pinch.js';
 // The viewer component reads the library from `globalThis.pdfjsLib` when its module is
 // evaluated, so it is imported only after this.
 globalThis.pdfjsLib = pdfjsLib;
-const { EventBus, LinkTarget, PDFLinkService, PDFViewer } = await import('./vendor/pdfjs/pdf_viewer.mjs');
+const { EventBus, FindState, LinkTarget, PDFFindController, PDFLinkService, PDFViewer } = await import('./vendor/pdfjs/pdf_viewer.mjs');
 
 const ASSETS = '/static/vendor/pdfjs/';
 // Room left above a destination: hyperref anchors a float below its caption.
@@ -17,15 +17,17 @@ const DEST_CONTEXT_PX = 72;
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${ASSETS}pdf.worker.min.mjs`;
 
 /**
- * The viewer in `#viewerContainer`. `onPage(number, count)` follows the page in view, and
+ * The viewer in `#viewerContainer`. `onPage(number, count)` follows the page in view,
  * `onPlace(place)` the place to come back to: {page, scale, left, top}, the scale being
- * 'page-width' or a percentage, left and top in the page's own coordinates.
+ * 'page-width' or a percentage, left and top in the page's own coordinates; and
+ * `onFound({current, total, pending})` what a search found.
  */
-export function createReader({ onPage, onPlace }) {
+export function createReader({ onPage, onPlace, onFound }) {
   const container = document.getElementById('viewerContainer');
   const eventBus = new EventBus();
   const linkService = new PDFLinkService({ eventBus, externalLinkTarget: LinkTarget.BLANK });
-  const viewer = new PDFViewer({ container, eventBus, linkService, removePageBorders: true });
+  const findController = new PDFFindController({ eventBus, linkService });
+  const viewer = new PDFViewer({ container, eventBus, linkService, findController, removePageBorders: true });
   linkService.setViewer(viewer);
   // Links inside the PDF go through this too.
   linkService.goToDestination = (dest) => scrollToDestination(dest);
@@ -50,14 +52,29 @@ export function createReader({ onPage, onPlace }) {
     }
   });
 
-  new ResizeObserver(() => refit()).observe(container);
+  eventBus.on('updatefindcontrolstate', ({ state, matchesCount }) => {
+    onFound({ ...matchesCount, pending: state === FindState.PENDING });
+  });
+  eventBus.on('updatefindmatchescount', ({ matchesCount }) => onFound({ ...matchesCount, pending: false }));
+
+  // A change of height alone leaves the scale as it is: setting the page again would move the
+  // scroll to the top of the page.
+  let width = 0;
+  new ResizeObserver(() => {
+    if (container.clientWidth !== width) refit();
+  }).observe(container);
 
   stopPageZoom();
   pinchToZoom({ container, viewer, eventBus });
 
-  /** Fits the width again, unless the reader zoomed in or out. */
+  /**
+   * Fits the width again, unless the reader zoomed in or out. Not while the split is dragged:
+   * drawing every page at a new scale at each step is what makes dragging slow; the drag fits
+   * once at its end.
+   */
   function refit() {
-    if (!container.clientWidth) return;
+    if (!container.clientWidth || document.body.classList.contains('dragging')) return;
+    width = container.clientWidth;
     if (viewer.pagesCount && viewer.currentScaleValue === 'page-width') {
       const page = viewer.currentPageNumber;
       viewer.currentScaleValue = 'page-width';
@@ -155,11 +172,35 @@ export function createReader({ onPage, onPlace }) {
     void previous?.destroy();
   }
 
+  /** Finds `query` in the paper: the next match, or with `previous` the one before. */
+  function find(query, { again = false, previous = false } = {}) {
+    eventBus.dispatch('find', {
+      source: null,
+      type: again ? 'again' : '',
+      query,
+      caseSensitive: false,
+      entireWord: false,
+      highlightAll: true,
+      findPrevious: previous,
+      matchDiacritics: false,
+    });
+  }
+
+  /** The paper's own contents, as PDF.js reads its outline: [{title, dest, items}]. */
+  async function outline() {
+    return (pdfDocument && (await pdfDocument.getOutline().catch(() => null))) ?? [];
+  }
+
   return {
     open,
     goTo,
     refit,
+    find,
+    endFind: () => eventBus.dispatch('findbarclose', { source: null }),
+    outline,
+    goToDestination: (dest) => scrollToDestination(dest),
     file: () => file,
+    pagesCount: () => (pdfDocument ? viewer.pagesCount : 0),
     currentPage: () => (pdfDocument ? viewer.currentPageNumber || null : null),
   };
 }

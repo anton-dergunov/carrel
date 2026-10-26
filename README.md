@@ -1,6 +1,6 @@
 # carrel
 
-Read a paper on a tablet with Claude Code beside it. Tap a paper: its PDF opens with a chat underneath, ready for a question. A citation in the answer moves the PDF to its page, or opens the other paper beside the same chat.
+Read a paper on a tablet with Claude Code beside it. Tap a paper: its PDF opens in a tab with a chat beside it, ready for a question. A citation in the answer moves the PDF to its page, or opens the other paper in its own tab beside the same chat. Put the chat below, above or beside the paper, or on a tab of its own, and drag the split; each device remembers its tabs and its layout. Find words in the paper, or jump through its contents from the page number in its corner.
 
 A chat carries on through reloads and a sleeping tablet. Start a new one, or go back to an earlier one, including the chats you had in VS Code or the terminal in the library. Carrel's chats show up there too. A line under the chat shows how long the chat's prompt cache has left, and your usage limits.
 

@@ -5,6 +5,7 @@
 import { startChat } from './chat.js';
 import { restoreLayout, shareOf, startLayout } from './layout.js';
 import { sameFile } from './links.js';
+import { startPaperTools } from './paper-tools.js';
 import { startPaperList } from './papers.js';
 import { createReader } from './read.js';
 import { fitToVisibleArea } from './screen.js';
@@ -30,8 +31,6 @@ const paperTabs = document.getElementById('paper-tabs');
 const papersTab = document.getElementById('tab-papers');
 const chatTab = document.getElementById('tab-chat');
 const chatToggle = document.getElementById('chat-toggle');
-const pageLabel = document.getElementById('page-label');
-const chatAbout = document.getElementById('chat-about');
 const question = document.getElementById('question');
 papersTab.dataset.key = PAPERS;
 chatTab.dataset.key = CHAT;
@@ -56,14 +55,14 @@ function keepSoon() {
 }
 
 const reader = createReader({
-  onPage(page, count) {
-    pageLabel.textContent = `p. ${page} of ${count}`;
-  },
+  onPage: (page, count) => tools.showPage(page, count),
   onPlace(place) {
     state = withPlace(state, reader.file(), place);
     keepSoon();
   },
+  onFound: (found) => tools.showFound(found),
 });
+const tools = startPaperTools({ reader });
 
 const refitScreen = fitToVisibleArea(() => shareOf(layout));
 startLayout({
@@ -75,6 +74,11 @@ startLayout({
     if (state.active === CHAT && layout.place !== 'tab') go(paperInView(state)?.pdf ?? PAPERS, { push: false });
     else render();
   },
+  onResize(next) {
+    layout = next;
+    refitScreen();
+  },
+  onDragEnd: () => reader.refit(),
 });
 
 startPaperList({
@@ -120,11 +124,12 @@ function addressOf(paper, target) {
 
 /** Shows a tab: the list, the chat, or a paper, at its remembered place or at `target`. */
 function go(key, { target = null, push = true } = {}) {
+  if (key !== state.active) tools.leave();
   state = show(state, key);
   if (state.active === CHAT && layout.place !== 'tab') state = show(state, paperInView(state)?.pdf ?? PAPERS);
   const paper = shownPaper();
   if (paper) {
-    if (paper.pdf !== reader.file()) pageLabel.textContent = '';
+    if (paper.pdf !== reader.file()) tools.showPage(0, 0);
     reader.open(paper.pdf, pdfUrl(paper.pdf), target ? { target } : { place: paper.place }).catch(() => void lost(paper.pdf));
   }
   if (state.active !== CHAT) {
@@ -155,8 +160,7 @@ async function openFile(file, target, { push = true } = {}) {
     if (!response.ok) throw new Error(response.statusText);
     paper = await response.json();
   } catch {
-    pageLabel.textContent = 'That paper is not in the library';
-    return;
+    return; // not a paper of the library's: nothing to open
   }
   state = openPaper(state, { pdf: paper.pdf, title: paper.title });
   go(paper.pdf, { target, push });
@@ -186,13 +190,12 @@ function render() {
       label.type = 'button';
       label.className = 'label';
       label.textContent = title;
-      if (pdf === state.active) {
-        const x = tab.appendChild(document.createElement('button'));
-        x.type = 'button';
-        x.className = 'close';
-        x.setAttribute('aria-label', `Close ${title}`);
-        x.textContent = '×';
-      }
+      // Every tab has its close button, so any tab closes with one tap and showing one moves nothing.
+      const close = tab.appendChild(document.createElement('button'));
+      close.type = 'button';
+      close.className = 'close';
+      close.setAttribute('aria-label', `Close ${title}`);
+      close.append(icon('close'));
       return tab;
     }),
   );
@@ -203,10 +206,22 @@ function render() {
   chatToggle.classList.toggle('unseen', unseen);
   tabStrip.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 
+  // The paper a question is about, said where the question is typed.
   const about = paperInView(state);
-  chatAbout.textContent = about ? about.title : library;
-  question.placeholder = about ? 'Ask about this paper' : 'Ask about the library';
+  question.placeholder = about ? `Ask about “${shorten(about.title, 48)}”` : 'Ask about the library';
   document.title = paper?.title ?? library;
+}
+
+function icon(name) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'icon');
+  const use = svg.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'use'));
+  use.setAttribute('href', `#i-${name}`);
+  return svg;
+}
+
+function shorten(text, length) {
+  return text.length > length ? `${text.slice(0, length - 1).trimEnd()}…` : text;
 }
 
 tabStrip.addEventListener('click', (event) => {

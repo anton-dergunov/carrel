@@ -213,6 +213,7 @@ class Session:
             "epoch": self.epoch,
             "busy": self.busy,
             "live": self.client is not None,
+            "model": self.model,
             "cache_expires_at": expires,
             "limits": self.limits,
         }

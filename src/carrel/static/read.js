@@ -7,6 +7,7 @@
 // nothing that was not. The editors stay in PDF.js's NONE mode, where selecting text does
 // nothing to them; an edit enters HIGHLIGHT mode for as long as it takes.
 
+import './polyfill.js'; // before PDF.js
 import * as pdfjsLib from './vendor/pdfjs/pdf.min.mjs';
 import { HIGHLIGHT_COLORS } from './highlight.js';
 import { pinchToZoom, stopPageZoom } from './pinch.js';

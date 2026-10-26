@@ -57,7 +57,7 @@ export function startSettings({ liveModel, name, onOpen = () => {}, onModel = ()
   // The note about the reader: kept on the server, for every device.
   const note = Object.assign(el('textarea'), {
     id: 'reader-note',
-    rows: 4,
+    rows: 5,
     placeholder: 'Who you are, what you know, how you like answers',
     autocapitalize: 'sentences',
   });

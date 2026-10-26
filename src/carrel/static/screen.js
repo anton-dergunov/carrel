@@ -13,6 +13,9 @@
 // paper went up and came down, and the other way when the keyboard went away. So a tap on a box
 // focuses it without that scroll, as lectern's find does, and while the keyboard comes and goes
 // the page is fitted at every frame rather than at Safari's reports.
+//
+// A dialog (the chat's settings) is fitted to the visible area too (`--area-*`), but while one is
+// open the page under it stays as it was: lifting the chat over the keyboard is no use then.
 
 // The most of the visible area the chat takes, above or below the paper, with the keyboard up.
 const CHAT_MOST = 0.7;
@@ -34,6 +37,10 @@ export function fitToVisibleArea(chatShare) {
   };
   const fit = () => {
     const height = visible.height;
+    set('--area-top', `${visible.offsetTop}px`);
+    set('--area-height', `${height}px`);
+    set('--area-bottom', `${Math.max(0, window.innerHeight - visible.offsetTop - height)}px`);
+    if (document.querySelector('dialog[open]')) return;
     set('--visible-top', `${visible.offsetTop}px`);
     set('--visible-height', `${height}px`);
     set('--chat-height', `${Math.round(Math.min(chatShare() * window.innerHeight, CHAT_MOST * height))}px`);
@@ -55,6 +62,9 @@ export function fitToVisibleArea(chatShare) {
   visible.addEventListener('resize', fit);
   visible.addEventListener('scroll', fit);
   window.addEventListener('resize', fit);
+  // A dialog closed: the page fits the area as it is now. (`close` does not bubble; it is caught
+  // on its way down.)
+  document.addEventListener('close', fit, true);
   document.addEventListener('focusin', (event) => {
     if (event.target.matches?.(FIELDS)) follow();
   });

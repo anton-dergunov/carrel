@@ -238,7 +238,7 @@ button.plain {
   gap: 8px;
   align-items: flex-end;
   /* Clear of the home indicator, but not a whole inset below it; the keyboard has none. */
-  padding: 6px 16px max(6px, calc(env(safe-area-inset-bottom) - 8px));
+  padding: 6px 16px max(4px, calc(env(safe-area-inset-bottom) - 12px));
   border-top: 1px solid var(--line);
 }
 .keyboard #ask { padding-bottom: 6px; }
@@ -254,6 +254,10 @@ button.plain {
   color: var(--text);
 }
 #ask button { font-size: 14px; padding: 6px 12px; border-radius: 8px; }
+/* Not typing: it only says it is there. Typing: the size above. */
+#ask:not(:focus-within) { padding-top: 4px; }
+#ask:not(:focus-within) #question { font-size: 14px; padding: 3px 8px; }
+#ask:not(:focus-within) button { font-size: 13px; padding: 4px 10px; }
 button {
   font: 15px var(--ui);
   padding: 8px 14px;

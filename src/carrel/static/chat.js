@@ -521,6 +521,11 @@ export function startChat({ currentPaper, currentPage, openTarget }) {
     }
   });
   function grow() {
+    // An empty box takes its natural height, which is smaller while it is not being typed in.
+    if (!question.value) {
+      question.style.height = '';
+      return;
+    }
     question.style.height = 'auto';
     question.style.height = `${Math.min(question.scrollHeight, 160)}px`;
   }

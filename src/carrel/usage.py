@@ -1,8 +1,9 @@
 """What the agent used while reading, to decide which tools run without asking.
 
-Claude Code writes each session to ~/.claude/projects/<folder>/<id>.jsonl, every line
-tagged with its `entrypoint`; carrel's sessions are the SDK's ("sdk-py"). Those say which
-tools ran. What the reader was asked, and answered, carrel keeps itself, one line each.
+Claude Code writes each session to ~/.claude/projects/<folder>/<id>.jsonl, tagged with its
+`entrypoint`. Carrel's are tagged "carrel" (so that Claude Code lists them; the earliest are
+the SDK's, "sdk-py"), and carrel also keeps their ids itself. Those say which tools ran.
+What the reader was asked, and answered, carrel keeps too, one line each.
 """
 
 import json
@@ -13,7 +14,8 @@ from collections import Counter
 from pathlib import Path
 from urllib.parse import urlsplit
 
-SDK_ENTRYPOINT = "sdk-py"
+# The tag of carrel's sessions, and of its first ones, which ran as the SDK's.
+OUR_ENTRYPOINTS = {"carrel", "sdk-py"}
 
 
 def state_dir() -> Path:
@@ -22,6 +24,37 @@ def state_dir() -> Path:
 
 def permissions_log() -> Path:
     return state_dir() / "permissions.jsonl"
+
+
+def sessions_log() -> Path:
+    return state_dir() / "sessions.jsonl"
+
+
+def _append(log: Path, entry: dict) -> None:
+    try:
+        log.parent.mkdir(parents=True, exist_ok=True)
+        with open(log, "a", encoding="utf-8") as file:
+            file.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError:
+        pass  # a log that cannot be written must not stop the reading
+
+
+def record_session(session_id: str, log: Path | None = None) -> None:
+    """A Claude Code session carrel started, for `carrel tools` to tell from the reader's own."""
+    _append(log or sessions_log(), {"time": time.strftime("%Y-%m-%dT%H:%M:%S"), "id": session_id})
+
+
+def carrel_sessions(log: Path | None = None) -> set[str]:
+    log = log or sessions_log()
+    if not log.is_file():
+        return set()
+    ids = set()
+    for line in log.read_text(encoding="utf-8").splitlines():
+        try:
+            ids.add(json.loads(line)["id"])
+        except (ValueError, KeyError, TypeError):
+            continue
+    return ids
 
 
 def _gist(tool_input: dict) -> str:
@@ -35,7 +68,6 @@ def _gist(tool_input: dict) -> str:
 def record_permission(
     tool: str, tool_input: dict, allow: bool, log: Path | None = None, by: str = "reader"
 ) -> None:
-    log = log or permissions_log()
     entry = {
         "time": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "tool": tool,
@@ -43,12 +75,7 @@ def record_permission(
         "allow": allow,
         "by": by,
     }
-    try:
-        log.parent.mkdir(parents=True, exist_ok=True)
-        with open(log, "a", encoding="utf-8") as file:
-            file.write(json.dumps(entry, ensure_ascii=False) + "\n")
-    except OSError:
-        pass  # a log that cannot be written must not stop the reading
+    _append(log or permissions_log(), entry)
 
 
 def transcripts_dir(library_root: Path) -> Path:
@@ -66,16 +93,22 @@ def bash_program(command: str) -> str:
     return Path(first[0]).name if first else ""
 
 
-def tally(transcripts: Path, entrypoint: str = SDK_ENTRYPOINT) -> dict[str, Counter]:
+def tally(transcripts: Path, ids: set[str] | None = None) -> dict[str, Counter]:
+    """Counts the tools carrel's sessions used: those whose ids it kept or that carry its
+    tag, and the earliest ones, tagged as the SDK's."""
+    ids = carrel_sessions() if ids is None else ids
     counts = {name: Counter() for name in ("sessions", "tools", "bash", "read", "web")}
     for path in sorted(transcripts.glob("*.jsonl")):
+        known = path.stem in ids
         ours = False
         for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
             try:
                 entry = json.loads(line)
             except ValueError:
                 continue
-            if entry.get("entrypoint") != entrypoint or entry.get("type") != "assistant":
+            if entry.get("type") != "assistant" or not (
+                known or entry.get("entrypoint") in OUR_ENTRYPOINTS
+            ):
                 continue
             ours = True
             for block in (entry.get("message") or {}).get("content") or []:

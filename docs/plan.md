@@ -42,7 +42,7 @@ From the reader, after using it on the iPad. Grouped, in the order the steps bel
 
 4. **Papers in tabs**, one paper per tab.
 5. **The chat stays put when another paper opens.** Today a link to another paper, or a paper from the list, opens it with a new, empty chat. The chat belongs to the sitting, not the paper. Each question still says which paper and page are open.
-6. **The chat must not close after the first question.** Find out why it does on the iPad. Likely causes are the page reloading, or Safari dropping the WebSocket while the tablet sleeps. Then keep sessions on the server: numbered messages, so a reconnect catches up (the old part 5).
+6. **The chat must not close after the first question.** Find out why it does on the iPad. Likely causes are the page reloading, or Safari dropping the WebSocket while the tablet sleeps. Then keep sessions on the server: numbered messages, so a reconnect catches up (the old part 5). *Found: the page reloaded (a citation to another paper, or "Papers"); see step 1.*
 7. **New chat, and the previous chats.**
    - A button to start a new chat.
    - A list of earlier chats to return to, with their first question and how long ago each last ran.
@@ -83,6 +83,12 @@ Each step ends with a sitting on the iPad, and its findings are added here.
    - **Sessions on the server.** Each one has an id and numbered messages, and the browser reconnects and catches up. Sessions are listed with their first question and last turn. There's a new-chat button, resuming, the cache countdown and the expiry warning. An idle session is closed (the old part 5).
    - **The paper beside a chat.** The chat outlives the paper: opening another paper replaces the PDF, not the chat.
    - **The display.** A folded section per turn for everything but the answer, and a usage status line.
+   Built (2026-10-26), before the sitting:
+   - **Why the chat closed.** Opening another paper, from a citation or the list, loaded a new page. Its WebSocket closed, and the server ended the Claude Code session with it. The iPad's transcript shows the answer at 17:50:53 and the process gone at 17:53:38. Safari dropping the socket while the tablet sleeps would have done the same. Now a chat lives on the server, and a page only attaches to it. The page keeps the chat's id, reattaches after a reload, sleep or lost connection, and asks for the messages after the last one it drew. Leaving a page never ends a chat. One log line per attach and leave says what dropped.
+   - **Chats in Claude Code on the laptop.** Carrel's sessions always ran in the library and were saved beside the VS Code ones. Claude Code's lists (VS Code's, `claude --resume`) hide sessions tagged as the SDK's (`sdk-py`, `sdk-ts`, `sdk-cli`). They are now tagged `carrel`. Not `cli`: Claude Code turns that into `sdk-cli` when a program runs it. Under that tag a session also gets what the terminal's get: the Artifact tools, two more skills and the `claude-code-guide` agent. `carrel tools` finds carrel's sessions by the ids carrel keeps in its state folder.
+   - **Earlier chats.** The list is the SDK's `list_sessions` for the library, so it includes the reader's VS Code chats too. Opening one draws its transcript and resumes it on the next question. A resumed session keeps its id.
+   - **The cache.** The countdown runs from the end of the last turn. The server closes a chat's Claude Code process after 60 minutes idle. A question in an expired chat asks first.
+   - **Not done:** no service worker, since iOS opens a Home Screen app full screen without one. Pinch and the Home Screen app are checked only on the iPad.
 2. **Layout and tabs** (items 3, 4, 11). The split can be dragged and placed on any side, collapsed, or put on a tab, and each device remembers it. Papers sit in tabs, and the chat appears on the list page too.
 3. **Settings** (items 12, 13). The reader's note and the model, kept on the server so every device shares them.
 4. **The chat as the VS Code panel reads** (the old part 2). Maths with KaTeX, code, and slash commands typed in the box. The skills that suit reading (`/paper-info`, `/overview`) become buttons. A dozen real questions from VS Code sittings should read as well as they did there.

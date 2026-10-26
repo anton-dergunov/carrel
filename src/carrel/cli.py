@@ -1,6 +1,7 @@
 """carrel serve | carrel tools"""
 
 import argparse
+import logging
 import os
 import sys
 from pathlib import Path
@@ -31,6 +32,9 @@ def serve(args) -> None:
     from .server import make_app
 
     sys.stdout.reconfigure(line_buffering=True)  # the banner reaches a log file at once
+    # Pages attaching to chats and leaving them, to see what drops a connection.
+    logging.basicConfig(format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+    logging.getLogger(APP_NAME).setLevel(logging.INFO)
     from .server import STATIC
 
     if not (STATIC / "vendor" / "pdfjs" / "pdf.min.mjs").is_file():

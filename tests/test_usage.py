@@ -3,7 +3,15 @@ from pathlib import Path
 
 import pytest
 
-from carrel.usage import bash_program, permission_answers, record_permission, tally, transcripts_dir
+from carrel.usage import (
+    bash_program,
+    carrel_sessions,
+    permission_answers,
+    record_permission,
+    record_session,
+    tally,
+    transcripts_dir,
+)
 
 
 @pytest.mark.parametrize(
@@ -49,9 +57,13 @@ def test_tally_counts_only_carrel_sessions(tmp_path):
         )
     )
     (tmp_path / "b.jsonl").write_text(_line("claude-vscode", ("Edit", {"file_path": "x"})))
-    counts = tally(tmp_path)
-    assert counts["sessions"]["sessions"] == 1
-    assert counts["tools"] == {"Bash": 1, "Read": 2, "WebFetch": 1}
+    (tmp_path / "c.jsonl").write_text(_line("carrel", ("Glob", {"pattern": "*"})))
+    # A session whose tag says nothing, but whose id carrel kept.
+    (tmp_path / "d.jsonl").write_text(_line("cli", ("Grep", {"pattern": "x"})))
+    (tmp_path / "e.jsonl").write_text(_line("cli", ("Write", {"file_path": "x"})))
+    counts = tally(tmp_path, ids={"d"})
+    assert counts["sessions"]["sessions"] == 3
+    assert counts["tools"] == {"Bash": 1, "Read": 2, "WebFetch": 1, "Glob": 1, "Grep": 1}
     assert counts["bash"] == {"grep": 1}
     assert counts["read"] == {".txt": 1, ".pdf pages": 1}
     assert counts["web"] == {"arxiv.org": 1}
@@ -73,3 +85,12 @@ def test_permission_answers(tmp_path):
 
 def test_transcripts_dir():
     assert transcripts_dir(Path("/Users/me/.cache/my_lib")).name == "-Users-me--cache-my-lib"
+
+
+def test_carrel_keeps_its_session_ids(tmp_path):
+    log = tmp_path / "sessions.jsonl"
+    assert carrel_sessions(log) == set()
+    record_session("a", log)
+    record_session("b", log)
+    log.write_text(log.read_text() + "not json\n")
+    assert carrel_sessions(log) == {"a", "b"}

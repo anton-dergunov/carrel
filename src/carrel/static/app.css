@@ -38,6 +38,8 @@ html, body {
   color: var(--text);
   font: 17px/1.5 var(--ui);
   -webkit-text-size-adjust: 100%;
+  /* No zooming the page: two fingers zoom the PDF alone (read.js). */
+  touch-action: pan-x pan-y;
 }
 
 a { color: var(--accent); }
@@ -100,7 +102,60 @@ body.read {
 .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 #page-label { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
+button.plain {
+  padding: 2px 4px;
+  background: none;
+  color: var(--accent);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+#chat-body { position: relative; flex: 1; display: flex; min-height: 0; }
 #log { flex: 1; min-width: 0; overflow-x: hidden; overflow-y: auto; padding: 8px 16px; overscroll-behavior: contain; }
+
+#status {
+  padding: 0 16px;
+  font-size: 12px;
+  line-height: 20px;
+  min-height: 20px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#status.warn { color: var(--error); }
+
+/* The earlier chats, over the log */
+#chats-sheet {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--surface);
+  padding: 4px 16px 16px;
+}
+#chats-sheet[hidden] { display: none; }
+#chats-sheet .sheet-header { font-size: 13px; color: var(--muted); padding: 6px 0; }
+#chats-sheet ul { list-style: none; margin: 0; padding: 0; }
+#chats-sheet li { border-bottom: 1px solid var(--line); }
+#chats-sheet li button {
+  display: block;
+  width: 100%;
+  padding: 8px 0;
+  text-align: left;
+  background: none;
+  color: var(--text);
+  border-radius: 0;
+}
+#chats-sheet li.current button { color: var(--accent); }
+#chats-sheet .first {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#chats-sheet .meta { display: block; font-size: 13px; color: var(--muted); }
 
 .question {
   margin: 12px 0 8px auto;
@@ -110,6 +165,14 @@ body.read {
   border-radius: 12px;
   background: var(--question);
   white-space: pre-wrap;
+}
+.question .about {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  white-space: normal;
 }
 
 .answer { margin: 8px 0; }
@@ -143,6 +206,17 @@ body.read {
 .row.failed summary { color: var(--error); }
 .row.error { color: var(--error); }
 .row.result { margin: 6px 0 12px; }
+
+/* A turn's work, folded: tools, thinking, system messages, text between tool calls */
+.work { margin: 4px 0 6px; }
+.work > summary { font-size: 13px; }
+.work.running > summary { animation: working 1.6s ease-in-out infinite; }
+.work.failed > summary { color: var(--error); }
+.work .steps { margin: 2px 0 6px 14px; padding-left: 8px; border-left: 2px solid var(--line); }
+.work .steps .row { margin: 1px 0; font-size: 13px; }
+.work .aside { margin: 4px 0; font-size: 14px; color: var(--muted); }
+@keyframes working { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .work.running > summary { animation: none; } }
 
 .permission {
   padding: 8px 10px;

@@ -1,6 +1,8 @@
 # carrel
 
-Read a paper on a tablet with Claude Code beside it. Tap a paper: its PDF opens with a chat underneath, ready for a question. A citation in the answer moves the PDF to its page.
+Read a paper on a tablet with Claude Code beside it. Tap a paper: its PDF opens with a chat underneath, ready for a question. A citation in the answer moves the PDF to its page, or opens the other paper beside the same chat.
+
+A chat carries on through reloads and a sleeping tablet. Start a new one, or go back to an earlier one, including the chats you had in VS Code or the terminal in the library. Carrel's chats show up there too. A line under the chat shows how long the chat's prompt cache has left, and your usage limits.
 
 The Claude Code session runs on the laptop, where the library, the engine and the PDFs are; the tablet only shows it. The library is an [agentic-paper-library](https://github.com/anton-dergunov/agentic-paper-library) library, read through the engine's own `paperlib.py`.
 
@@ -17,6 +19,6 @@ uv run carrel serve --library ~/papers
 tailscale serve --bg --https=8443 http://127.0.0.1:8517     # once
 ```
 
-Then open `https://<laptop>.<tailnet>.ts.net:8443/` on the tablet. Only your own Tailscale login is let in (`--login` adds another). The agent works with Claude Code's own tools, its Bash in Claude Code's sandbox; anything outside what reading needs is put to you as Allow / Deny. `carrel tools` shows what was used and asked.
+Then open `https://<laptop>.<tailnet>.ts.net:8443/` on the tablet, and add it to the Home Screen to have it full screen. Only your own Tailscale login is let in (`--login` adds another). The agent works with Claude Code's own tools, its Bash in Claude Code's sandbox; anything outside what reading needs is put to you as Allow / Deny. `carrel tools` shows what was used and asked.
 
 The folders your library's `paper-library.yaml` names outside it, such as `pdf_root` and `overview_dir`, are open to the agent; `--add-dir FOLDER` opens another for reading.

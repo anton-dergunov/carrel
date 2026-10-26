@@ -1,4 +1,4 @@
-"""The HTTP server: the paper list, the reading page, the PDFs, and the session's WebSocket.
+"""The HTTP server: the paper list, the reading page, the PDFs, and the chats' WebSocket.
 
 It listens on 127.0.0.1 only. `tailscale serve` publishes it to the tailnet over HTTPS,
 keeps the Host the browser asked for, and says who is asking in `Tailscale-User-Login`
@@ -11,8 +11,11 @@ keeps the Host the browser asked for, and says who is asking in `Tailscale-User-
 """
 
 import asyncio
+import contextlib
 import html
 import json
+import logging
+import time
 from pathlib import Path
 from string import Template
 from urllib.parse import quote, urlsplit
@@ -20,13 +23,21 @@ from urllib.parse import quote, urlsplit
 from starlette.applications import Starlette
 from starlette.datastructures import Headers
 from starlette.requests import Request
-from starlette.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
+from starlette.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    Response,
+)
 from starlette.routing import Mount, Route, WebSocketRoute
 from starlette.staticfiles import StaticFiles
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from .engine import Library
-from .session import Session
+from .session import Session, Sessions
+
+log = logging.getLogger("carrel")
 
 PACKAGE = Path(__file__).parent
 STATIC = PACKAGE / "static"
@@ -101,7 +112,10 @@ def make_app(
     hosts: set[str] = frozenset(),
     logins: set[str] = frozenset(),
     extra_folders: tuple[Path, ...] = (),
+    sessions: Sessions | None = None,
 ):
+    sessions = sessions or Sessions(library, extra_folders)
+
     async def index(request: Request) -> Response:
         topics: dict[str, list[str]] = {}
         for paper in library.papers():
@@ -131,6 +145,26 @@ def make_app(
             pdf_url=html.escape("/pdf/" + quote(rel), quote=True),
         )
 
+    async def paper(request: Request) -> Response:
+        """A paper to open beside the chat without leaving the page."""
+        rel = request.path_params["path"]
+        try:
+            library.resolve_pdf(rel)
+        except LookupError:
+            return JSONResponse({"error": "No such PDF in the library."}, status_code=404)
+        found = library.paper_for_pdf(rel)
+        return JSONResponse(
+            {
+                "pdf": rel,
+                "title": found.title if found else Path(rel).stem,
+                "pdf_url": "/pdf/" + quote(rel),
+            }
+        )
+
+    async def chats(request: Request) -> Response:
+        listing = await asyncio.to_thread(sessions.listing)
+        return JSONResponse(listing)
+
     async def pdf(request: Request) -> Response:
         try:
             path = library.resolve_pdf(request.path_params["path"])
@@ -141,13 +175,24 @@ def make_app(
         )
 
     async def session(websocket: WebSocket) -> None:
+        """A page attached to a chat: `?chat=<id>` (or `new`), and `after=<seq>&epoch=<e>`
+        for the last message it has. Leaving detaches the page; the chat goes on."""
         await websocket.accept()
+        query = websocket.query_params
+        try:
+            after = int(query.get("after", "0"))
+        except ValueError:
+            after = 0
+        talk = sessions.get(None if query.get("chat") in (None, "", "new") else query["chat"])
 
         async def send(message: dict) -> None:
             await websocket.send_text(json.dumps(message, ensure_ascii=False))
 
-        talk = Session(library, send, extra_folders=extra_folders)
+        opened = time.monotonic()
+        log.info("page attached to chat %s (after %d)", talk.id, after)
+        await talk.attach(send, after, query.get("epoch"))
         running: set[asyncio.Task] = set()
+        code = None
         try:
             while True:
                 message = await websocket.receive_json()
@@ -156,19 +201,37 @@ def make_app(
                 task = asyncio.create_task(_handle(talk, message))
                 running.add(task)
                 task.add_done_callback(running.discard)
-        except WebSocketDisconnect:
-            pass
+        except WebSocketDisconnect as gone:
+            code = gone.code
         finally:
-            await talk.close()
+            talk.detach(send)
+            log.info(
+                "page left chat %s after %d s (close code %s)",
+                talk.id,
+                time.monotonic() - opened,
+                code,
+            )
+
+    @contextlib.asynccontextmanager
+    async def lifespan(app):
+        reaper = asyncio.create_task(sessions.reap_forever())
+        try:
+            yield
+        finally:
+            reaper.cancel()
+            await sessions.close()
 
     app = Starlette(
         routes=[
             Route("/", index),
             Route("/read/{path:path}", read),
             Route("/pdf/{path:path}", pdf),
+            Route("/api/paper/{path:path}", paper),
+            Route("/api/chats", chats),
             WebSocketRoute("/ws", session),
             Mount("/static", StaticFiles(directory=STATIC), name="static"),
-        ]
+        ],
+        lifespan=lifespan,
     )
     return Guard(app, set(hosts), set(logins))
 
@@ -179,3 +242,4 @@ async def _handle(talk: Session, message: dict) -> None:
     except Exception as error:
         talk.busy = False
         await talk.emit("Error", {"message": f"{type(error).__name__}: {error}"})
+        await talk.emit_state()

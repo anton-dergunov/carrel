@@ -1,4 +1,5 @@
-// The reading page: the PDF on top, drawn with PDF.js, and the chat underneath.
+// The reading page: the PDF on top, drawn with PDF.js, and the chat underneath. Another paper
+// opens in place, so the chat stays as it is.
 
 import * as pdfjsLib from './vendor/pdfjs/pdf.min.mjs';
 import { startChat } from './chat.js';
@@ -15,9 +16,13 @@ const DEST_CONTEXT_PX = 72;
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${ASSETS}pdf.worker.min.mjs`;
 
-const pdf = document.body.dataset.pdf;
+// Pinching scales the PDF after this long without moving, as PDF.js's own viewer does.
+const PINCH_DRAWING_DELAY_MS = 400;
+
+let pdf = document.body.dataset.pdf;
 const container = document.getElementById('viewerContainer');
 const pageLabel = document.getElementById('page-label');
+const titleLabel = document.querySelector('#chat-pane .title');
 
 const eventBus = new EventBus();
 const linkService = new PDFLinkService({ eventBus, externalLinkTarget: LinkTarget.BLANK });
@@ -40,14 +45,28 @@ eventBus.on('pagesinit', () => {
     pendingTarget = null;
   }
 });
-eventBus.on('pagechanging', ({ pageNumber }) => showPage(pageNumber));
+eventBus.on('pagechanging', ({ pageNumber }) => {
+  showPage(pageNumber);
+  // The address keeps the page, so a reload comes back to it.
+  history.replaceState(history.state, '', readingUrl(pdf, { page: pageNumber > 1 ? pageNumber : undefined }));
+});
 new ResizeObserver(() => {
-  if (viewer.pagesCount) {
+  // Fit the width again, unless the reader zoomed in or out.
+  if (viewer.pagesCount && viewer.currentScaleValue === 'page-width') {
     const page = viewer.currentPageNumber;
     viewer.currentScaleValue = 'page-width';
     viewer.currentPageNumber = page;
   }
 }).observe(container);
+
+// Two fingers zoom the PDF, not the page (the page's own zoom is off in the CSS).
+new pdfjsLib.TouchManager({
+  container,
+  signal: new AbortController().signal,
+  onPinching: (origin, previousDistance, distance) => {
+    viewer.updateScale({ drawingDelay: PINCH_DRAWING_DELAY_MS, scaleFactor: distance / previousDistance, origin });
+  },
+});
 
 /** A target given in the page's own address: /read/<file>?page=7&dest=table.2 */
 function targetFromLocation() {
@@ -92,24 +111,79 @@ async function scrollToDestination(dest) {
 function openTarget(target) {
   if (sameFile(target.file, pdf)) {
     void goTo(target);
-    return;
+  } else {
+    void openPaper(target.file, target);
   }
-  const query = new URLSearchParams();
-  if (target.page) query.set('page', String(target.page));
-  if (target.dest) query.set('dest', target.dest);
-  const path = target.file.split('/').map(encodeURIComponent).join('/');
-  location.href = `/read/${path}${query.size ? `?${query}` : ''}`;
 }
 
-startChat({ pdf, currentPage: () => viewer.currentPageNumber || null, openTarget });
+function readingUrl(file, target) {
+  const query = new URLSearchParams();
+  if (target?.page) query.set('page', String(target.page));
+  if (target?.dest) query.set('dest', target.dest);
+  const path = file.split('/').map(encodeURIComponent).join('/');
+  return `/read/${path}${query.size ? `?${query}` : ''}`;
+}
 
-pdfDocument = await pdfjsLib.getDocument({
-  url: document.body.dataset.pdfUrl,
-  cMapUrl: `${ASSETS}cmaps/`,
-  cMapPacked: true,
-  standardFontDataUrl: `${ASSETS}standard_fonts/`,
-  wasmUrl: `${ASSETS}wasm/`,
-  iccUrl: `${ASSETS}iccs/`,
-}).promise;
-viewer.setDocument(pdfDocument);
-linkService.setDocument(pdfDocument, null);
+/** Another paper in the viewer, with the chat left as it is. */
+async function openPaper(file, target, { push = true } = {}) {
+  const path = file.split('/').map(encodeURIComponent).join('/');
+  let paper;
+  try {
+    const response = await fetch(`/api/paper/${path}`);
+    if (!response.ok) throw new Error(response.statusText);
+    paper = await response.json();
+  } catch {
+    // Not one this page can open; the reading page says why.
+    location.href = readingUrl(file, target);
+    return;
+  }
+  pdf = paper.pdf;
+  document.body.dataset.pdf = pdf;
+  document.title = paper.title;
+  titleLabel.textContent = paper.title;
+  if (push) history.pushState(null, '', readingUrl(pdf, target));
+  pendingTarget = target?.page || target?.dest ? target : null;
+  await load(paper.pdf_url);
+}
+
+window.addEventListener('popstate', () => {
+  const file = decodeURIComponent(location.pathname.replace(/^\/read\//, ''));
+  const target = targetFromLocation();
+  if (sameFile(file, pdf)) {
+    if (target) void goTo(target);
+  } else {
+    void openPaper(file, target, { push: false });
+  }
+});
+
+let loading = 0;
+// The open document's loading task, which is what PDF.js tears a document down through.
+let openTask = null;
+
+async function load(url) {
+  const ticket = ++loading;
+  const task = pdfjsLib.getDocument({
+    url,
+    cMapUrl: `${ASSETS}cmaps/`,
+    cMapPacked: true,
+    standardFontDataUrl: `${ASSETS}standard_fonts/`,
+    wasmUrl: `${ASSETS}wasm/`,
+    iccUrl: `${ASSETS}iccs/`,
+  });
+  const loaded = await task.promise;
+  if (ticket !== loading) {
+    // Another paper was asked for meanwhile.
+    void task.destroy();
+    return;
+  }
+  const previous = openTask;
+  openTask = task;
+  pdfDocument = loaded;
+  viewer.setDocument(loaded);
+  linkService.setDocument(loaded, null);
+  void previous?.destroy();
+}
+
+startChat({ currentPaper: () => pdf, currentPage: () => viewer.currentPageNumber || null, openTarget });
+
+await load(document.body.dataset.pdfUrl);

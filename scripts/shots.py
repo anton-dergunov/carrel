@@ -5,8 +5,9 @@
 URL is a reading page of a running carrel, e.g. http://127.0.0.1:8517/read/<pdf>. Takes a
 shot once the PDF is drawn. With --ask, it also types the question, waits for the answer
 (this runs a real Claude Code turn, which costs; --allow taps Allow on each permission
-request), taps the answer's first citation, and
-takes a shot after each step. Prints the page the PDF is on at each step.
+request), opens the turn's fold, taps the answer's first citation, reloads the page to see
+the chat come back, and takes a shot after each step. Prints the page the PDF is on at each
+step. Each run starts a new chat: the browser remembers none.
 """
 
 import argparse
@@ -22,7 +23,15 @@ def wait_for_answer(page, timeout: int, allow: bool, out: Path) -> None:
     """Waits for the turn's end, printing each permission request (and tapping Allow)."""
     seen = 0
     deadline = time.monotonic() + timeout
-    while not page.locator(".row.result").count():
+
+    def ended() -> bool:
+        return (
+            page.locator("#stop").is_hidden()
+            and not page.locator(".work.running").count()
+            and page.locator(".answer, .row.result").count() > 0
+        )
+
+    while not ended():
         if time.monotonic() > deadline:
             page.screenshot(path=out / "timeout.png")
             raise TimeoutError(f"no answer in {timeout} s (screenshot: {out / 'timeout.png'})")
@@ -67,17 +76,29 @@ def main() -> None:
             page.click("#send")
             wait_for_answer(page, args.timeout, args.allow, args.out)
             page.wait_for_timeout(500)
-            print("answered:", page.inner_text(".row.result"))
+            print("answered:", page.locator(".work > summary, .row.result").last.inner_text())
+            print("status:", page.inner_text("#status"))
             page.screenshot(path=args.out / "2-answer.png")
+            if page.locator(".work").count():
+                page.locator(".work > summary").last.click()
+                page.wait_for_timeout(300)
+                page.screenshot(path=args.out / "3-fold.png")
+                page.locator(".work > summary").last.click()
             citation = page.locator('.answer a[href^="http://pdf.invalid/"]').first
             if citation.count():
                 print("citation:", citation.inner_text(), citation.get_attribute("href"))
                 citation.click()
-                page.wait_for_timeout(1200)
+                page.wait_for_timeout(1500)
                 print("after the citation:", page.inner_text("#page-label"), "| url:", page.url)
-                page.screenshot(path=args.out / "3-citation.png")
+                print("questions still shown:", page.locator(".question").count())
+                page.screenshot(path=args.out / "4-citation.png")
             else:
                 print("no citation in the answer")
+            page.reload()
+            page.wait_for_selector(".question", timeout=15_000)
+            page.wait_for_timeout(1000)
+            print("after a reload, questions shown:", page.locator(".question").count())
+            page.screenshot(path=args.out / "5-reload.png")
         browser.close()
 
 

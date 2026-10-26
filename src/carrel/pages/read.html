@@ -6,6 +6,15 @@
 <title>$title</title>
 <link rel="stylesheet" href="/static/vendor/pdfjs/pdf_viewer.css">
 <link rel="stylesheet" href="/static/app.css">
+<meta name="theme-color" content="#fffdf6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#24282a" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Carrel">
+<link rel="manifest" href="/static/manifest.webmanifest">
+<link rel="icon" href="/static/icons/icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
 <script type="module" src="/static/read.js"></script>
 </head>
 <body class="read" data-pdf="$pdf" data-pdf-url="$pdf_url">
@@ -17,8 +26,14 @@
     <a class="back" href="/">Papers</a>
     <span class="title">$title</span>
     <span id="page-label"></span>
+    <button type="button" id="chats" class="plain">Chats</button>
+    <button type="button" id="new-chat" class="plain">New chat</button>
   </header>
-  <div id="log" aria-live="polite"></div>
+  <div id="chat-body">
+    <div id="log" aria-live="polite"></div>
+    <div id="chats-sheet" hidden></div>
+  </div>
+  <div id="status" aria-live="polite"></div>
   <form id="ask">
     <textarea id="question" rows="1" placeholder="Ask about this paper" enterkeyhint="send"></textarea>
     <button type="submit" id="send">Ask</button>

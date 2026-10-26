@@ -1,7 +1,12 @@
-// The chat under the PDF. The server passes Claude Code's messages through as they are, each
-// as {seq, kind, data}, `kind` being the SDK's class name. The reply is drawn as markdown;
-// everything else is a one-line row that opens on a tap. A kind this page does not know is a
-// plain row with its name, so an SDK update never breaks the chat, it only looks plainer.
+// The chat under the PDF. A chat lives on the server; this page attaches to it over a WebSocket
+// and draws its messages, each {seq, kind, data}, `kind` being the SDK's class name. When the
+// socket drops (a reload, another paper, the tablet asleep), the page attaches again and asks
+// only for the messages after the last it drew.
+//
+// Each question opens a turn: the answer is drawn as markdown, and everything else (tools,
+// thinking, system messages, text written between tool calls) folds into one row per turn. A
+// kind this page does not know is a plain row in that fold, so an SDK update never breaks the
+// chat, it only looks plainer.
 
 import { marked } from './vendor/marked/marked.esm.js';
 import DOMPurify from './vendor/dompurify/purify.es.mjs';
@@ -10,40 +15,127 @@ import { parsePaperLink } from './links.js';
 const RESULT_PREVIEW = 4000;
 // System messages that say nothing to the reader.
 const QUIET_SYSTEM = new Set(['thinking_tokens', 'status']);
+const CHAT_KEY = 'carrel.chat';
+const RECONNECT_MAX_MS = 15_000;
+// A chat changed this recently may still be open in VS Code or the terminal.
+const RECENT_S = 300;
 
-export function startChat({ pdf, currentPage, openTarget }) {
+export function startChat({ currentPaper, currentPage, openTarget }) {
   const log = document.getElementById('log');
   const form = document.getElementById('ask');
   const question = document.getElementById('question');
   const send = document.getElementById('send');
   const stop = document.getElementById('stop');
+  const status = document.getElementById('status');
+  const sheet = document.getElementById('chats-sheet');
 
+  let chatId = remembered();
+  let epoch = null;
+  let lastSeq = 0;
   let socket = null;
+  let attached = false;
+  let waiting = []; // asks waiting for the socket to attach
+  let reconnectDelay = 1000;
+  let reconnectTimer = 0;
   let busy = false;
+  let cacheExpiresAt = null;
+  let limits = {};
+
   // Answer blocks drawn from the stream that the complete message has not yet replaced.
   const streamed = [];
   const toolRows = new Map();
   const permissionRows = new Map();
+  let turn = null;
+  let lastPaper = null;
+
+  // The connection.
 
   function connect() {
+    clearTimeout(reconnectTimer);
+    if (socket) return;
     const scheme = location.protocol === 'https:' ? 'wss://' : 'ws://';
-    socket = new WebSocket(`${scheme}${location.host}/ws`);
-    socket.addEventListener('message', (event) => show(JSON.parse(event.data)));
-    socket.addEventListener('close', (event) => {
-      socket = null;
-      setBusy(false);
-      row('error', `Disconnected${event.reason ? `: ${event.reason}` : ''}. The next question starts a new session.`);
+    const query = new URLSearchParams({ chat: chatId ?? 'new', after: String(lastSeq), epoch: epoch ?? '' });
+    const ws = new WebSocket(`${scheme}${location.host}/ws?${query}`);
+    socket = ws;
+    ws.addEventListener('message', (event) => {
+      if (ws === socket) receive(JSON.parse(event.data));
     });
-    return new Promise((resolve) => socket.addEventListener('open', resolve, { once: true }));
+    ws.addEventListener('close', () => {
+      if (ws !== socket) return;
+      socket = null;
+      attached = false;
+      renderStatus();
+      reconnectTimer = setTimeout(connect, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS);
+    });
   }
 
-  async function ask(text) {
+  function reconnectNow() {
+    if (!socket) {
+      reconnectDelay = 1000;
+      connect();
+    }
+  }
+
+  function whenAttached() {
+    if (attached) return Promise.resolve();
+    connect();
+    return new Promise((resolve) => waiting.push(resolve));
+  }
+
+  /** Leaves this chat for another, or for a new one (null). */
+  function switchChat(id) {
+    chatId = id;
+    remember(id);
+    epoch = null;
+    lastSeq = 0;
+    clearLog();
+    const old = socket;
+    socket = null;
+    attached = false;
+    old?.close();
+    connect();
+  }
+
+  function receive(message) {
+    const { seq, kind, data } = message;
+    if (kind === 'Chat') return chatState(data);
+    if (kind === 'Limits') {
+      limits = data;
+      return renderStatus();
+    }
+    if (seq != null) {
+      if (seq <= lastSeq) return;
+      lastSeq = seq;
+    }
+    show(kind, data);
+  }
+
+  function chatState(data) {
+    if ('replay_from' in data) {
+      // Attached: what follows is the log after `replay_from`.
+      if (data.replay_from === 0) clearLog();
+      chatId = data.id;
+      remember(chatId);
+      epoch = data.epoch;
+      attached = true;
+      reconnectDelay = 1000;
+      for (const resolve of waiting.splice(0)) resolve();
+    }
+    setBusy(data.busy);
+    cacheExpiresAt = data.cache_expires_at;
+    limits = data.limits ?? limits;
+    renderStatus();
+  }
+
+  async function ask(text, { confirmed = false } = {}) {
     if (!text.trim() || busy) return;
-    if (!socket) await connect();
-    const bubble = append('div', 'question');
-    bubble.textContent = text;
+    if (!confirmed && expired() && log.querySelector('.question')) {
+      return confirmExpired(text);
+    }
+    await whenAttached();
+    socket.send(JSON.stringify({ type: 'ask', text, paper: currentPaper(), page: currentPage() }));
     setBusy(true);
-    socket.send(JSON.stringify({ type: 'ask', text, paper: pdf, page: currentPage() }));
   }
 
   function setBusy(value) {
@@ -52,8 +144,66 @@ export function startChat({ pdf, currentPage, openTarget }) {
     stop.hidden = !value;
   }
 
-  function show({ kind, data }) {
+  // The status line: the connection, the prompt cache, the usage limits.
+
+  function expired() {
+    return cacheExpiresAt != null && Date.now() / 1000 > cacheExpiresAt;
+  }
+
+  function renderStatus() {
+    const parts = [];
+    if (!attached) parts.push('reconnecting…');
+    if (cacheExpiresAt != null) {
+      const left = cacheExpiresAt - Date.now() / 1000;
+      parts.push(left > 0 ? `cache ${Math.ceil(left / 60)} min` : 'cache expired');
+    }
+    for (const [type, info] of Object.entries(limits ?? {})) {
+      if (info.utilization == null && info.status === 'allowed') continue;
+      let text = limitName(type);
+      if (info.utilization != null) text += ` ${Math.round(info.utilization * 100)}%`;
+      if (info.status === 'rejected') text += ' reached';
+      if (info.status !== 'allowed' && info.resets_at) text += ` · resets ${clock(info.resets_at)}`;
+      parts.push(text);
+    }
+    status.textContent = parts.join(' · ');
+    status.classList.toggle('warn', Object.values(limits ?? {}).some((info) => info.status === 'rejected'));
+  }
+  setInterval(renderStatus, 30_000);
+
+  function confirmExpired(text) {
+    const box = append('div', 'row permission expired');
+    box.append(
+      `This chat's cache expired ${ago(Date.now() / 1000 - cacheExpiresAt)}: the answer re-reads the whole chat at full price. A new chat may cost less.`,
+    );
+    const buttons = box.appendChild(document.createElement('div'));
+    buttons.className = 'buttons';
+    const choose = (label, action) => {
+      const button = buttons.appendChild(document.createElement('button'));
+      button.type = 'button';
+      button.textContent = label;
+      button.addEventListener('click', () => {
+        box.remove();
+        action();
+      });
+    };
+    choose('Ask anyway', () => void ask(text, { confirmed: true }));
+    choose('New chat', () => {
+      switchChat(null);
+      void ask(text, { confirmed: true });
+    });
+    choose('Cancel', () => {
+      question.value = text;
+      grow();
+    });
+    box.scrollIntoView({ block: 'nearest' });
+  }
+
+  // The messages.
+
+  function show(kind, data) {
     switch (kind) {
+      case 'Question':
+        return startTurn(data);
       case 'StreamEvent':
         return streamEvent(data);
       case 'AssistantMessage':
@@ -61,12 +211,11 @@ export function startChat({ pdf, currentPage, openTarget }) {
       case 'UserMessage':
         return toolResults(data);
       case 'SystemMessage':
-        if (data.subtype === 'init') return row('system', `Session started · ${data.data?.model ?? ''}`);
-        return QUIET_SYSTEM.has(data.subtype) ? undefined : folded('system', data.subtype, data);
+        if (data.subtype === 'init') return step('system', `Session started · ${data.data?.model ?? ''}`);
+        return QUIET_SYSTEM.has(data.subtype) ? undefined : step('system', data.subtype, data);
       case 'HookEventMessage':
-        return undefined; // the reader's own hooks, on every turn
       case 'RateLimitEvent':
-        return rateLimit(data.rate_limit_info ?? {});
+        return undefined; // the reader's own hooks, on every turn; limits are in the status line
       case 'ResultMessage':
         return result(data);
       case 'PermissionRequest':
@@ -74,11 +223,97 @@ export function startChat({ pdf, currentPage, openTarget }) {
       case 'PermissionDecision':
         return decided(data);
       case 'Error':
-        setBusy(false);
         return row('error', data.message);
       default:
-        return folded('unknown', kind, data);
+        return step('unknown', kind, data);
     }
+  }
+
+  function startTurn({ text, paper, pdf, page }) {
+    endTurn();
+    streamed.length = 0;
+    const bubble = append('div', 'question');
+    if (paper && paper !== lastPaper) {
+      // Which paper the question was about, when it changed: a tap opens it.
+      const where = bubble.appendChild(document.createElement(pdf ? 'a' : 'div'));
+      where.className = 'about';
+      where.textContent = page ? `${paper} · p. ${page}` : paper;
+      if (pdf) {
+        where.href = '#';
+        where.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          openTarget({ file: pdf, page });
+        });
+      }
+    }
+    if (paper) lastPaper = paper;
+    bubble.append(text);
+    turn = { question: bubble, fold: null, steps: 0, texts: [] };
+  }
+
+  /** The turn's fold, made when it gets its first step. */
+  function fold() {
+    turn ??= { question: null, fold: null, steps: 0, texts: [] };
+    if (!turn.fold) {
+      const details = document.createElement('details');
+      details.className = 'row work running';
+      details.appendChild(document.createElement('summary'));
+      const body = details.appendChild(document.createElement('div'));
+      body.className = 'steps';
+      if (turn.question) turn.question.after(details);
+      else log.append(details);
+      turn.fold = { details, body };
+    }
+    return turn.fold;
+  }
+
+  function summarize(text) {
+    const { details } = fold();
+    details.querySelector('summary').textContent = text;
+  }
+
+  function step(className, title, body) {
+    const { body: steps } = fold();
+    const stick = nearBottom();
+    let element;
+    if (body === undefined) {
+      element = steps.appendChild(document.createElement('div'));
+      element.className = `row ${className}`;
+      element.textContent = title;
+    } else {
+      element = steps.appendChild(document.createElement('details'));
+      element.className = `row ${className}`;
+      element.appendChild(document.createElement('summary')).textContent = title;
+      const pre = element.appendChild(document.createElement('pre'));
+      pre.textContent = typeof body === 'string' ? body : JSON.stringify(body, null, 1);
+    }
+    turn.steps += 1;
+    summarize(`${turn.steps} ${turn.steps === 1 ? 'step' : 'steps'} · ${title}`);
+    if (stick) log.scrollTop = log.scrollHeight;
+    return element;
+  }
+
+  /** Text the model wrote before a tool call is part of the work, not the answer. */
+  function foldTexts() {
+    if (!turn?.texts.length) return;
+    const { body } = fold();
+    for (const element of turn.texts) {
+      element.classList.add('aside');
+      body.append(element);
+    }
+    turn.texts = [];
+  }
+
+  function endTurn(summary) {
+    if (!turn) return;
+    if (turn.fold) {
+      turn.fold.details.classList.remove('running');
+      summarize(summary ?? `${turn.steps} ${turn.steps === 1 ? 'step' : 'steps'}`);
+    } else if (summary) {
+      row('result', summary);
+    }
+    turn = null;
   }
 
   // The reply as it streams: one block per text block of the model's message.
@@ -99,9 +334,10 @@ export function startChat({ pdf, currentPage, openTarget }) {
         // The complete text replaces what was streamed for it.
         (streamed.shift() ?? answerBlock()).update(block.text);
       } else if ('thinking' in block) {
-        if (block.thinking) folded('thinking', 'Thinking', block.thinking);
+        if (block.thinking) step('thinking', 'Thinking', block.thinking);
       } else if ('name' in block && 'input' in block) {
-        toolRows.set(block.id, folded('tool', describeTool(block.name, block.input), block.input));
+        foldTexts();
+        toolRows.set(block.id, step('tool', describeTool(block.name, block.input), block.input));
       }
     }
   }
@@ -120,20 +356,15 @@ export function startChat({ pdf, currentPage, openTarget }) {
   }
 
   function result(data) {
-    setBusy(false);
     streamed.length = 0;
-    const parts = [data.is_error ? `Stopped: ${data.subtype}` : 'Done'];
-    if (data.total_cost_usd != null) parts.push(`$${data.total_cost_usd.toFixed(2)}`);
+    const parts = [];
+    if (turn?.steps) parts.push(`${turn.steps} ${turn.steps === 1 ? 'step' : 'steps'}`);
+    if (data.is_error) parts.push(`stopped: ${data.subtype}`);
     if (data.duration_ms != null) parts.push(`${Math.round(data.duration_ms / 1000)} s`);
-    row('result', parts.join(' · '));
-  }
-
-  function rateLimit({ status, resets_at, utilization }) {
-    if (status === 'allowed') return;
-    const parts = [status === 'rejected' ? 'Usage limit reached' : 'Close to the usage limit'];
-    if (utilization != null) parts.push(`${Math.round(utilization * 100)}% used`);
-    if (resets_at) parts.push(`resets ${new Date(resets_at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
-    row(status === 'rejected' ? 'error' : 'system', parts.join(' · '));
+    if (data.total_cost_usd != null) parts.push(`$${data.total_cost_usd.toFixed(2)}`);
+    const failed = data.is_error && turn?.fold;
+    endTurn(parts.join(' · ') || 'Done');
+    if (failed) failed.details.classList.add('failed');
   }
 
   function permission({ id, tool, input, title, description, decision_reason, blocked_path }) {
@@ -165,8 +396,12 @@ export function startChat({ pdf, currentPage, openTarget }) {
 
   // Drawing.
 
+  function nearBottom() {
+    return log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  }
+
   function append(tag, className) {
-    const stick = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+    const stick = nearBottom();
     const element = log.appendChild(document.createElement(tag));
     element.className = className;
     if (stick) log.scrollTop = log.scrollHeight;
@@ -177,16 +412,18 @@ export function startChat({ pdf, currentPage, openTarget }) {
     append('div', `row ${className}`).textContent = text;
   }
 
-  function folded(className, title, body) {
-    const details = append('details', `row ${className}`);
-    details.appendChild(document.createElement('summary')).textContent = title;
-    const pre = details.appendChild(document.createElement('pre'));
-    pre.textContent = typeof body === 'string' ? body : JSON.stringify(body, null, 1);
-    return details;
+  function clearLog() {
+    log.replaceChildren();
+    streamed.length = 0;
+    toolRows.clear();
+    permissionRows.clear();
+    turn = null;
+    lastPaper = null;
   }
 
   function answerBlock() {
     const element = append('div', 'answer');
+    turn?.texts.push(element);
     let frame = 0;
     const block = {
       text: '',
@@ -195,7 +432,7 @@ export function startChat({ pdf, currentPage, openTarget }) {
         if (!frame) {
           frame = requestAnimationFrame(() => {
             frame = 0;
-            const stick = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+            const stick = nearBottom();
             element.innerHTML = DOMPurify.sanitize(marked.parse(block.text, { gfm: true }));
             for (const table of element.querySelectorAll('table')) {
               const wrap = document.createElement('div');
@@ -211,10 +448,56 @@ export function startChat({ pdf, currentPage, openTarget }) {
     return block;
   }
 
+  // The chats: a new one, or one of the earlier ones.
+
+  async function showChats() {
+    if (!sheet.hidden) {
+      sheet.hidden = true;
+      return;
+    }
+    sheet.replaceChildren(sheetHeader('Loading…'));
+    sheet.hidden = false;
+    let chats;
+    try {
+      const response = await fetch('/api/chats');
+      chats = await response.json();
+    } catch (error) {
+      sheet.replaceChildren(sheetHeader(`Could not list the chats: ${error}`));
+      return;
+    }
+    const list = document.createElement('ul');
+    const now = Date.now() / 1000;
+    for (const chat of chats) {
+      const item = list.appendChild(document.createElement('li'));
+      if (chat.id === chatId) item.className = 'current';
+      const button = item.appendChild(document.createElement('button'));
+      button.type = 'button';
+      const title = button.appendChild(document.createElement('span'));
+      title.className = 'first';
+      title.textContent = chat.first_question || chat.title || 'An empty chat';
+      const meta = button.appendChild(document.createElement('span'));
+      meta.className = 'meta';
+      const state = chat.busy ? 'answering' : chat.live ? 'open' : now - chat.last_modified < RECENT_S ? 'recent' : '';
+      meta.textContent = [chat.paper, ago(now - chat.last_modified), state].filter(Boolean).join(' · ');
+      button.addEventListener('click', () => {
+        sheet.hidden = true;
+        if (chat.id !== chatId) switchChat(chat.id);
+      });
+    }
+    sheet.replaceChildren(sheetHeader(chats.length ? 'Chats in this library' : 'No chats yet'), list);
+  }
+
+  function sheetHeader(text) {
+    const header = document.createElement('div');
+    header.className = 'sheet-header';
+    header.textContent = text;
+    return header;
+  }
+
   // Citations move the PDF; any other link opens in a new tab.
   log.addEventListener('click', (event) => {
     const link = event.target.closest('a[href]');
-    if (!link) return;
+    if (!link || link.classList.contains('about')) return;
     event.preventDefault();
     const target = parsePaperLink(link.href);
     if (target) {
@@ -243,6 +526,57 @@ export function startChat({ pdf, currentPage, openTarget }) {
   }
   question.addEventListener('input', grow);
   stop.addEventListener('click', () => socket?.send(JSON.stringify({ type: 'stop' })));
+  document.getElementById('new-chat').addEventListener('click', () => {
+    sheet.hidden = true;
+    switchChat(null);
+  });
+  document.getElementById('chats').addEventListener('click', () => void showChats());
+
+  // Back from sleep or from another app: attach again now, not at the next back-off.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') reconnectNow();
+  });
+  window.addEventListener('pageshow', reconnectNow);
+  window.addEventListener('online', reconnectNow);
+
+  renderStatus();
+  connect();
+}
+
+function remembered() {
+  try {
+    return localStorage.getItem(CHAT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function remember(id) {
+  try {
+    if (id) localStorage.setItem(CHAT_KEY, id);
+    else localStorage.removeItem(CHAT_KEY);
+  } catch {
+    // Private browsing: the chat is still on the server, in the list of chats.
+  }
+}
+
+const LIMIT_NAMES = { five_hour: '5-h', seven_day: 'week', seven_day_opus: 'week (Opus)', seven_day_sonnet: 'week (Sonnet)' };
+
+function limitName(type) {
+  return LIMIT_NAMES[type] ?? type.replaceAll('_', ' ');
+}
+
+function clock(seconds) {
+  return new Date(seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+/** "just now", "12 min ago", "3 h ago", "2 days ago". */
+export function ago(seconds) {
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} h ago`;
+  const days = Math.floor(seconds / 86400);
+  return days === 1 ? 'a day ago' : `${days} days ago`;
 }
 
 /** A tool use as one line: "Read Zep.txt, pages 8–9", "Grep 'win rate' in library/". */

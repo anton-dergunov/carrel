@@ -83,7 +83,7 @@ export function startPaperTools({ reader }) {
   function openFind() {
     body.classList.add('finding');
     findForm.hidden = false;
-    findInput.focus();
+    findInput.focus({ preventScroll: true });
     findInput.select();
     if (findInput.value) reader.find(findInput.value);
   }

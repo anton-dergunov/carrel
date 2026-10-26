@@ -15,7 +15,9 @@
 // the page is fitted at every frame rather than at Safari's reports.
 //
 // A dialog (the chat's settings) is fitted to the visible area too (`--area-*`), but while one is
-// open the page under it stays as it was: lifting the chat over the keyboard is no use then.
+// open the page under it stays as it was: lifting the chat over the keyboard is no use then. It
+// stays so until the keyboard the dialog brought has gone, or the page needs it for its own box;
+// fitted as the dialog closed, the chat went up for a moment and came down with the keyboard.
 
 // The most of the visible area the chat takes, above or below the paper, with the keyboard up.
 const CHAT_MOST = 0.7;
@@ -35,16 +37,20 @@ export function fitToVisibleArea(chatShare) {
   const set = (name, value) => {
     if (shown[name] !== value) root.style.setProperty(name, (shown[name] = value));
   };
+  let held = false; // the page is kept as it was under a dialog
   const fit = () => {
     const height = visible.height;
+    const keyboard = window.innerHeight - height > KEYBOARD_PX;
     set('--area-top', `${visible.offsetTop}px`);
     set('--area-height', `${height}px`);
     set('--area-bottom', `${Math.max(0, window.innerHeight - visible.offsetTop - height)}px`);
-    if (document.querySelector('dialog[open]')) return;
+    if (document.querySelector('dialog[open]')) held = true;
+    else if (!keyboard) held = false;
+    if (held) return;
     set('--visible-top', `${visible.offsetTop}px`);
     set('--visible-height', `${height}px`);
     set('--chat-height', `${Math.round(Math.min(chatShare() * window.innerHeight, CHAT_MOST * height))}px`);
-    root.classList.toggle('keyboard', window.innerHeight - height > KEYBOARD_PX);
+    root.classList.toggle('keyboard', keyboard);
   };
 
   // Every frame for a while: the keyboard is coming or going.
@@ -66,7 +72,10 @@ export function fitToVisibleArea(chatShare) {
   // on its way down.)
   document.addEventListener('close', fit, true);
   document.addEventListener('focusin', (event) => {
-    if (event.target.matches?.(FIELDS)) follow();
+    if (!event.target.matches?.(FIELDS)) return;
+    // A box of the page's own, with the keyboard still up from a dialog: the page makes room now.
+    if (!event.target.closest('dialog')) held = false;
+    follow();
   });
   document.addEventListener('focusout', (event) => {
     if (event.target.matches?.(FIELDS)) follow();

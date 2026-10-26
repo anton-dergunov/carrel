@@ -467,6 +467,8 @@ button.plain {
   box-shadow: 0 20px 56px rgb(0 0 0 / 0.2), 0 1px 4px rgb(0 0 0 / 0.08);
 }
 #settings-dialog[open] { display: flex; flex-direction: column; gap: 24px; animation: settings-in 0.15s ease-out; }
+/* Opening it focuses the dialog itself, which needs no ring; its controls have their own. */
+#settings-dialog:focus, #settings-dialog:focus-visible { outline: none; }
 #settings-dialog::backdrop { background: rgb(20 18 12 / 0.25); }
 @keyframes settings-in { from { opacity: 0; transform: translateY(6px); } }
 @media (prefers-reduced-motion: reduce) { #settings-dialog[open] { animation: none; } }

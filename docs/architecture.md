@@ -116,3 +116,42 @@ Find, highlights and the selection all work on PDF.js's text layer.
 - A tap on it goes to the passage in the paper, and × drops it.
 - The next question carries it after the context line, as `<selection page="5">…</selection>`, naming the paper too when it is not the one open. The question's bubble shows it.
 - The page keeps the passage itself, rather than reading the selection when the question is sent, since tapping the box clears the selection on iOS.
+
+## The chat's text
+
+The chat reads as the VS Code panel does: a dozen real VS Code chats from the library, drawn from their transcripts, were the check.
+
+**Maths** comes in the four forms the agent writes: `$…$`, `\(…\)`, `$$…$$` and `\[…\]`.
+- **When it is drawn.** KaTeX draws it after the answer is sanitised, into placeholders that hold the TeX, never through DOMPurify.
+- **Prices stay text.** A `$` follows Pandoc's rule: an opening `$` is not followed by a space, a closing one not preceded by one, and not followed by a digit.
+
+**Code.** A block that names its language is coloured by highlight.js, and every block has a copy button.
+
+**Diagrams.** A ```` ```mermaid ```` block, in an answer or a note, is drawn by Mermaid once the answer is complete.
+- **Lectern's settings**: the page's colours and muted lines.
+- **SVG text**, since WebKit wraps Mermaid's HTML labels too early.
+- **Mermaid loads only when there is a diagram**, and one it cannot draw stays as its source.
+
+**Slash commands run as in the terminal.**
+- **The command goes first**, or Claude Code does not run it. The paper and the passage follow it among its arguments, so `/overview` alone means the paper open.
+- **Typing `/`** lists the commands Claude Code offers in the library, with what each does.
+- **Commands bound to a terminal** are left out once a chat has started. Claude Code names them only then.
+
+## The overview and the properties
+
+**The overview is a button on the chat's status line**, shown while a paper is open. It has two looks: a filled notebook, "Show the overview", when the paper has a note, and a grey one with a pen, "Write an overview", when it has none.
+
+**A note that exists is shown with no model call**, in a sheet over the chat, beside the paper.
+- **Delete** moves it to the Trash, for a note wanted only for one reading.
+- **Left out of the sheet**: Obsidian's properties. A callout shows its title, and a `[[link]]` its text.
+
+**A note that doesn't exist is written by the engine's `/overview`, in a chat about the paper.**
+- **Why that chat.** The skill reads the whole paper into the chat, so the questions after it pay only for a cache read. A chat of its own, left behind, would make the reader's next chat read the paper a second time.
+- **The result.** The note is written once, as a file, and the sheet shows it. A tap on the skill's link to the note opens the sheet too.
+- **Which chat is about the paper.** The open chat counts when it has no questions yet, or when each of its questions was asked with this paper open; otherwise the button starts a new chat, and the other waits in the list.
+- **What a question is about.** The paper open when it was asked, which each question records. A paper only mentioned in a question does not count.
+- **Why the rule exists.** At the first sitting, the button asked in a chat about another paper whose cache had expired, and the reader met the expired-cache question.
+
+**The paper's properties** come from its frontmatter, with no model call: title, authors, year, arXiv, summary, type, topic, the date added, and the overview when there is one. They head the sheet the page badge opens. There is no `/paper-info` button.
+
+**The PDF's links stay under the sheets.** PDF.js gives each link a z-index of its own, and at the first sitting they showed through the sheets over the paper. The viewer is now a stacking context of its own, under them.

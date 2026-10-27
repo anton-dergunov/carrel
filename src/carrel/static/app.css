@@ -402,7 +402,9 @@ body.dragging #divider::before { opacity: 1; }
 
 #pdf-pane { position: relative; background: var(--pdf-bg); min-height: 0; }
 /* PDF.js requires its container to be absolutely positioned. */
-#viewerContainer { position: absolute; inset: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
+/* Isolated: PDF.js gives each link on a page a z-index of its own (50 and up), which would
+   otherwise reach over the sheets laid on the paper. */
+#viewerContainer { position: absolute; inset: 0; overflow: auto; -webkit-overflow-scrolling: touch; isolation: isolate; }
 .pdfViewer .page { margin: 0 auto 8px; }
 
 /* The chat */
@@ -643,6 +645,12 @@ button.plain {
 .answer pre code { font: 13px/1.45 var(--mono); }
 .answer .copy { position: absolute; top: 4px; right: 4px; width: 30px; height: 28px; background: var(--bg); }
 .answer .copy .icon { width: 15px; height: 15px; }
+/* A diagram: its source until Mermaid has drawn it, and still if it could not; a drawing wider
+   than the chat shrinks a little, then scrolls sideways. */
+.answer .diagram { margin: 4px 0 12px; }
+.answer .diagram.drawn { overflow-x: auto; }
+.answer .diagram.drawn > pre { display: none; }
+.answer .diagram > svg { display: block; height: auto; margin: 0 auto; }
 /* Maths: a formula set apart scrolls sideways when it is wider than the chat, as a table does. */
 .answer .maths.display { display: block; overflow-x: auto; overflow-y: hidden; margin: 4px 0 10px; padding: 2px 0; }
 .answer .maths .katex-display { margin: 0; }

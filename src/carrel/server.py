@@ -230,10 +230,16 @@ def make_app(
         return note if note and note.is_file() else None
 
     async def overview(request: Request) -> Response:
-        """The reader's overview note for a paper, as the overview skill wrote it."""
-        note = overview_note(request.path_params["path"])
+        """The reader's overview note for a paper, as the overview skill wrote it; null for a
+        paper that has none, which is no error."""
+        rel = request.path_params["path"]
+        try:
+            library.resolve_pdf(rel)
+        except LookupError:
+            return JSONResponse({"error": "No such PDF in the library."}, status_code=404)
+        note = overview_note(rel)
         if not note:
-            return JSONResponse({"error": "This paper has no overview note."}, status_code=404)
+            return JSONResponse(None)
         text = await asyncio.to_thread(note.read_text, encoding="utf-8")
         return JSONResponse({"name": note.stem, "text": text})
 

@@ -1,7 +1,8 @@
 // The paper's overview: the reader's pre-read note, which the library's /overview skill writes
 // into their notes folder. The button on the chat's status line shows the note when the paper
-// has one, with no model call, and otherwise asks /overview in the chat being read in: the skill
-// reads the paper into that chat, so the questions after it find the paper in its cache.
+// has one, with no model call, and otherwise asks /overview: in the chat being read in when it is
+// only about this paper, else in a new one. The skill reads the paper into that chat, so the
+// questions after it find the paper in its cache.
 //
 // The note opens in a sheet over the chat, beside the paper. Delete moves it to the Trash, for a
 // note wanted only for this reading.
@@ -11,7 +12,8 @@ import { drawMarkdown } from './markdown.js';
 const COMMAND = '/overview';
 
 /**
- * `ask(text)` asks a question in the chat; `onOpen()` closes what else covers the chat.
+ * `ask(text, pdf)` asks a question about the paper, in the chat or a new one; `onOpen()` closes
+ * what else covers the chat.
  * Returns `about(pdf)`, the paper the chat asks about now (or null), `show()`, `hide()`,
  * `turnEnded(question)`, for a turn the page watched end, and `opensLink(url)`, which opens the
  * sheet for a link to the note and says whether it did.
@@ -125,7 +127,7 @@ export function startOverview({ ask, onOpen = () => {} }) {
   button.addEventListener('click', () => {
     if (!sheet.hidden) hide();
     else if (note) show();
-    else ask(COMMAND);
+    else ask(COMMAND, pdf);
   });
 
   look();

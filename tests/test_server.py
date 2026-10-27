@@ -215,7 +215,7 @@ def test_a_page_writes_to_the_log(client, caplog):
 def test_the_overview_note_shown_and_moved_to_the_trash(client, library, monkeypatch):
     trashed = []
     monkeypatch.setattr("carrel.server.send2trash", lambda path: trashed.append(path))
-    assert client.get(f"/api/overview/{PDF}").status_code == 404
+    assert client.get(f"/api/overview/{PDF}").json() is None
     note = library.overview_note(library.paper_for_pdf("recsys/Wide & Deep. A Test Paper.pdf"))
     note.write_text("# Wide & Deep\n\nWhat it does.\n")
     try:

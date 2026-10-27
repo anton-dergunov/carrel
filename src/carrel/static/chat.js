@@ -52,7 +52,12 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     onModel: () => renderStatus(),
   });
   const overview = startOverview({
-    ask: (text) => void ask(text),
+    // In this chat when it is only about this paper, so the paper the skill reads stays in a
+    // chat about it; else in a new one, and this chat waits in the list.
+    ask(text, pdf) {
+      if (!onlyAbout(pdf)) switchChat(null);
+      void ask(text);
+    },
     onOpen() {
       showSheet(false);
       void settings.show(false);
@@ -78,6 +83,8 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
   const permissionRows = new Map();
   let turn = null;
   let lastPaper = null;
+  // The papers this chat's questions were asked about, by stem; '' for the library.
+  const askedAbout = new Set();
   // The passage the next question carries: {pdf, page, text}.
   let passage = null;
 
@@ -285,6 +292,8 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     streamed.length = 0;
     const bubble = append('div', 'question');
     if (text.startsWith('/')) bubble.classList.add('command');
+    // A question asked here names its PDF; one read back from a transcript, its paper's stem.
+    askedAbout.add(pdf ? stem(pdf) : (paper ?? ''));
     if (paper && paper !== lastPaper) {
       // Which paper the question was about, when it changed: a tap opens it.
       bubble.append(placeLink('about', page ? `${paper} · p. ${page}` : paper, pdf, page));
@@ -399,7 +408,7 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     for (const block of content ?? []) {
       if ('text' in block && !('thinking' in block)) {
         // The complete text replaces what was streamed for it.
-        (streamed.shift() ?? answerBlock()).update(block.text);
+        (streamed.shift() ?? answerBlock()).update(block.text, true);
       } else if ('thinking' in block) {
         if (block.thinking) step('thinking', 'Thinking', block.thinking);
       } else if ('name' in block && 'input' in block) {
@@ -486,7 +495,13 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     append('div', `row ${className}`).textContent = text;
   }
 
+  /** Whether every question so far was asked about this paper (none is, too). */
+  function onlyAbout(pdf) {
+    return [...askedAbout].every((asked) => asked === stem(pdf));
+  }
+
   function clearLog() {
+    askedAbout.clear();
     log.replaceChildren();
     streamed.length = 0;
     toolRows.clear();
@@ -501,13 +516,16 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     let frame = 0;
     const block = {
       text: '',
-      update(text) {
+      complete: false,
+      /** The text so far, or all of it (`complete`), when its diagrams are drawn too. */
+      update(text, complete = false) {
         block.text = text;
+        block.complete = complete;
         if (!frame) {
           frame = requestAnimationFrame(() => {
             frame = 0;
             const stick = nearBottom();
-            drawMarkdown(element, block.text);
+            drawMarkdown(element, block.text, { diagrams: block.complete });
             if (stick) log.scrollTop = log.scrollHeight;
           });
         }
@@ -696,6 +714,11 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     about: (pdf) => overview.about(pdf),
     showOverview: () => overview.show(),
   };
+}
+
+/** A paper's stem, which its PDF and its text share: "llm/x/A Paper.pdf" → "A Paper". */
+export function stem(path) {
+  return path.split('/').at(-1).replace(/\.(pdf|txt|md)$/i, '').normalize('NFC');
 }
 
 function span(className, text) {

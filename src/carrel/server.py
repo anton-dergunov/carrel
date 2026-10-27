@@ -243,6 +243,15 @@ def make_app(
         text = await asyncio.to_thread(note.read_text, encoding="utf-8")
         return JSONResponse({"name": note.stem, "text": text})
 
+    async def overview_paper(request: Request) -> Response:
+        """The paper whose overview note a link in the chat names by its path on the laptop,
+        so the page opens the paper and shows the note."""
+        found = library.paper_for_overview_note(request.query_params.get("path", ""))
+        note = found and library.overview_note(found)
+        if not note or not note.is_file():
+            return JSONResponse({"error": "No overview note there."}, status_code=404)
+        return JSONResponse({"pdf": found.pdf})
+
     async def delete_overview(request: Request) -> Response:
         """An overview note wanted for one reading only: to the Trash, whence it can come
         back. Nothing else the skill wrote is touched."""
@@ -409,6 +418,7 @@ def make_app(
             Route("/pdf/{path:path}", save_pdf, methods=["PUT"]),
             Route("/api/log", page_log, methods=["POST"]),
             Route("/api/paper/{path:path}", paper),
+            Route("/api/overview-note", overview_paper, methods=["GET", "HEAD"]),
             Route("/api/overview/{path:path}", overview, methods=["GET", "HEAD"]),
             Route("/api/overview/{path:path}", delete_overview, methods=["DELETE"]),
             Route("/api/commands", commands),

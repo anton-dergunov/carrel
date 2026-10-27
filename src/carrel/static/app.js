@@ -113,6 +113,7 @@ const chat = startChat({
     return paper.pdf === reader.file() ? reader.currentPage() : (paper.place?.page ?? null);
   },
   openTarget,
+  reveal: revealChat,
   onActivity() {
     if (ready && !chatShowing()) {
       unseen = true;
@@ -194,10 +195,10 @@ async function openFile(file, target, { push = true } = {}) {
 }
 
 /** A citation: the paper's tab, opened when it has none, at the cited spot. */
-function openTarget(target) {
+async function openTarget(target) {
   const open = state.papers.find((paper) => sameFile(paper.pdf, target.file));
   if (open) go(open.pdf, { target });
-  else void openFile(target.file, target);
+  else await openFile(target.file, target);
 }
 
 function render() {

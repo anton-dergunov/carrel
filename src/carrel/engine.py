@@ -7,6 +7,7 @@ after the library is named.
 
 import os
 import sys
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
@@ -145,6 +146,21 @@ class Library:
         folder = self.overview_dir
         return folder / f"{self.lib.paper_stem(paper.text)}.md" if folder else None
 
+    def paper_for_overview_note(self, path: str) -> Paper | None:
+        """The paper whose overview note is at `path`, the laptop's path the overview skill
+        gives in its reply, or None for any other file."""
+        folder = self.overview_dir
+        note = Path(path)
+        if not folder or not note.is_absolute() or note.suffix != ".md":
+            return None
+        if _nfc(str(note.parent.resolve())) != _nfc(str(folder)):
+            return None
+        name = _nfc(note.stem)
+        return next(
+            (paper for paper in self.papers() if _nfc(self.lib.paper_stem(paper.text)) == name),
+            None,
+        )
+
     def resolve_pdf(self, rel: str) -> Path:
         """The PDF at `rel` under pdf_root. Anything that leaves pdf_root, by `..`, an
         absolute path or a symlink, or that is not a PDF, is refused with LookupError."""
@@ -174,3 +190,8 @@ def _plain(value: object) -> str | list[str]:
     if isinstance(value, list):
         return [str(item) for item in value]
     return value.isoformat() if hasattr(value, "isoformat") else str(value)
+
+
+def _nfc(text: str) -> str:
+    """A name as one Unicode form: a synced folder may hand back another."""
+    return unicodedata.normalize("NFC", text)

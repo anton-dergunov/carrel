@@ -236,6 +236,26 @@ def test_the_overview_note_shown_and_moved_to_the_trash(client, library, monkeyp
         note.unlink()
 
 
+def test_a_link_to_an_overview_note_finds_its_paper(client, library):
+    folder = library.overview_dir
+    path = str(folder / "Wide & Deep. A Test Paper.md")
+    assert client.get("/api/overview-note", params={"path": path}).status_code == 404
+    (folder / "Wide & Deep. A Test Paper.md").write_text("# Wide & Deep\n")
+    try:
+        assert client.get("/api/overview-note", params={"path": path}).json() == {
+            "pdf": "recsys/Wide & Deep. A Test Paper.pdf"
+        }
+        for elsewhere in (
+            str(library.root / "Wide & Deep. A Test Paper.md"),
+            "Wide & Deep. A Test Paper.md",
+            str(folder / "sub" / ".." / ".." / "Wide & Deep. A Test Paper.md"),
+            "",
+        ):
+            assert client.get("/api/overview-note", params={"path": elsewhere}).status_code == 404
+    finally:
+        (folder / "Wide & Deep. A Test Paper.md").unlink()
+
+
 class Commands:
     """Claude Code, as far as listing its commands goes."""
 

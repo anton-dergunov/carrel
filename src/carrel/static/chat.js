@@ -29,12 +29,12 @@ const QUOTE_SHOWN = 280;
 
 /**
  * `currentPaper()` and `currentPage()` say what a question is about; `openTarget` follows a
- * citation; `onActivity()` says an answer ended or a question for the reader came, so a chat out
+ * citation; `reveal()` brings the chat into view; `onActivity()` says an answer ended or a question for the reader came, so a chat out
  * of sight can say so. Returns `quote(passage)`, which sets the passage the next question
  * carries ({pdf, page, text}, or null for none), `quoted()`, the one it would carry, `focus()`,
  * `about(pdf)`, the paper the next question is about, and `showOverview()`.
  */
-export function startChat({ currentPaper, currentPage, openTarget, onActivity = () => {} }) {
+export function startChat({ currentPaper, currentPage, openTarget, reveal, onActivity = () => {} }) {
   const log = document.getElementById('log');
   const form = document.getElementById('ask');
   const question = document.getElementById('question');
@@ -57,6 +57,10 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     ask(text, pdf) {
       if (!onlyAbout(pdf)) switchChat(null);
       void ask(text);
+    },
+    async openPaper(pdf) {
+      await openTarget({ file: pdf });
+      reveal();
     },
     onOpen() {
       showSheet(false);
@@ -591,8 +595,8 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     return header;
   }
 
-  // Citations move the PDF, and a link to the paper's overview note opens it; any other link
-  // opens in a new tab.
+  // Citations move the PDF, and a link to a paper's overview note opens it, with its paper; any
+  // other link opens in a new tab.
   log.addEventListener('click', (event) => {
     const link = event.target.closest('a[href]');
     if (!link || link.classList.contains('about')) return;

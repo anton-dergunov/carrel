@@ -147,7 +147,7 @@ The chat reads as the VS Code panel does: a dozen real VS Code chats from the li
 
 **A note that doesn't exist is written by the engine's `/overview`, in a chat about the paper.**
 - **Why that chat.** The skill reads the whole paper into the chat, so the questions after it pay only for a cache read. A chat of its own, left behind, would make the reader's next chat read the paper a second time.
-- **The result.** The note is written once, as a file, and the sheet shows it. A tap on the skill's link to the note opens the sheet too.
+- **The result.** The note is written once, as a file, and the sheet shows it. A tap on the skill's link to the note opens the sheet too, later as well: the link is the note's path on the laptop, which the server maps back to its paper (`/api/overview-note`), so with another paper open its paper's tab opens and the sheet over it.
 - **Which chat is about the paper.** The open chat counts when it has no questions yet, or when each of its questions was asked with this paper open; otherwise the button starts a new chat, and the other waits in the list.
 - **What a question is about.** The paper open when it was asked, which each question records. A paper only mentioned in a question does not count.
 - **Why the rule exists.** At the first sitting, the button asked in a chat about another paper whose cache had expired, and the reader met the expired-cache question.

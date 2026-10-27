@@ -32,7 +32,8 @@ export function parseTargetParts(path, query) {
   };
 }
 
-function decode(text) {
+/** Percent-decoded text, or the text as it is when it does not decode. */
+export function decode(text) {
   try {
     return decodeURIComponent(text);
   } catch {

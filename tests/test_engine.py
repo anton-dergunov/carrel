@@ -1,3 +1,5 @@
+import unicodedata
+
 import pytest
 
 PDF = "recsys/Wide & Deep. A Test Paper.pdf"
@@ -62,3 +64,16 @@ def test_overview_note_is_where_the_skill_writes_it(library):
         assert library.paper_info(paper)["overview"] is True
     finally:
         note.unlink()
+
+
+def test_paper_for_overview_note_reads_the_path_the_skill_gives(library):
+    paper = library.paper_for_pdf(PDF)
+    note = str(library.overview_dir / "Wide & Deep. A Test Paper.md")
+    assert library.paper_for_overview_note(note) == paper
+    assert library.paper_for_overview_note(unicodedata.normalize("NFD", note)) == paper
+    assert (
+        library.paper_for_overview_note(str(library.root / "Wide & Deep. A Test Paper.md")) is None
+    )
+    assert library.paper_for_overview_note("Wide & Deep. A Test Paper.md") is None
+    assert library.paper_for_overview_note(note.removesuffix(".md") + ".txt") is None
+    assert library.paper_for_overview_note(str(library.overview_dir / "Another.md")) is None

@@ -5,29 +5,33 @@
 // questions after it find the paper in its cache.
 //
 // The note opens in a sheet over the chat, beside the paper. Delete moves it to the Trash, for a
-// note wanted only for this reading.
+// note wanted only for this reading. A link to a note in the chat, which the skill writes as the
+// note's path on the laptop, opens the note too, with its paper when another one is open.
 
+import { decode, sameFile } from './links.js';
 import { drawMarkdown } from './markdown.js';
 
 const COMMAND = '/overview';
 
 /**
- * `ask(text, pdf)` asks a question about the paper, in the chat or a new one; `onOpen()` closes
- * what else covers the chat.
+ * `ask(text, pdf)` asks a question about the paper, in the chat or a new one; `openPaper(pdf)`
+ * opens another paper with the chat in view; `onOpen()` closes what else covers the chat.
  * Returns `about(pdf)`, the paper the chat asks about now (or null), `show()`, `hide()`,
- * `turnEnded(question)`, for a turn the page watched end, and `opensLink(url)`, which opens the
- * sheet for a link to the note and says whether it did.
+ * `turnEnded(question)`, for a turn the page watched end, and `opensLink(url)`, which follows a
+ * link to an overview note and says whether it was one.
  */
-export function startOverview({ ask, onOpen = () => {} }) {
+export function startOverview({ ask, openPaper, onOpen = () => {} }) {
   const button = document.getElementById('overview');
   const sheet = document.getElementById('overview-sheet');
 
   let pdf = null;
   let note = null; // {name, text} of the paper's note, or null for none
   let asked = 0; // the lookup in flight, so an older one's answer is dropped
+  let wanted = null; // the paper whose note a link asked for, shown once it is found
 
   function about(next) {
     if (next === pdf) return;
+    if (next !== wanted) wanted = null;
     pdf = next;
     note = null;
     hide();
@@ -47,6 +51,10 @@ export function startOverview({ ask, onOpen = () => {} }) {
     if (mine !== asked) return;
     note = found;
     look();
+    if (note && wanted === pdf) {
+      wanted = null;
+      show();
+    }
   }
 
   function look() {
@@ -115,13 +123,30 @@ export function startOverview({ ask, onOpen = () => {} }) {
     if (note && question?.trim().startsWith(COMMAND)) show();
   }
 
-  /** A link to the paper's note, as the skill's reply gives it, opens it here. */
+  /**
+   * A link to an overview note, as the skill's reply gives it: the note's path on the laptop,
+   * which the browser has made a path on this server.
+   */
   function opensLink(url) {
-    if (!note || url.origin !== location.origin || !url.pathname.endsWith('.md')) return false;
-    const file = decodeURIComponent(url.pathname.split('/').at(-1));
-    if (file.normalize('NFC') !== `${note.name}.md`.normalize('NFC')) return false;
-    show();
+    if (url.origin !== location.origin || !url.pathname.endsWith('.md')) return false;
+    const path = decode(url.pathname);
+    if (note && sameFile(path.split('/').at(-1), `${note.name}.md`)) show();
+    else void openNote(path, url.href);
     return true;
+  }
+
+  /** Another paper's note: its paper opens, and the note with it once it is found. */
+  async function openNote(path, href) {
+    const response = await fetch(`/api/overview-note?path=${encodeURIComponent(path)}`).catch(() => null);
+    if (!response?.ok) {
+      window.open(href, '_blank', 'noopener');
+      return;
+    }
+    const { pdf: its } = await response.json();
+    const open = its === pdf; // then opening it looks nothing up
+    wanted = its;
+    await openPaper(its);
+    if (open) void lookUp();
   }
 
   button.addEventListener('click', () => {

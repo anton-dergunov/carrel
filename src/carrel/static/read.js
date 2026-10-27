@@ -93,6 +93,34 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     if (container.clientWidth !== width) refit();
   }).observe(container);
 
+  // Coming back to the app (iPad Safari) can leave the container's sideways scroll at 0 while
+  // the zoom and the vertical scroll stay: the container is laid out at no width for a moment, and
+  // the browser clamps its scrollLeft. The last scroll seen while the page was showing is put back.
+  let seen = null;
+  let settleAt = 0; // scrolls just after coming back are the browser's, not the reader's
+  container.addEventListener(
+    'scroll',
+    () => {
+      if (document.visibilityState === 'visible' && container.clientWidth && performance.now() > settleAt) {
+        seen = { left: container.scrollLeft, scale: viewer.currentScale };
+      }
+    },
+    { passive: true },
+  );
+  function putBackSideways() {
+    if (!seen || !seen.left || container.scrollLeft || seen.scale !== viewer.currentScale) return;
+    container.scrollLeft = seen.left;
+  }
+  function afterResume() {
+    if (document.visibilityState !== 'visible') return;
+    settleAt = performance.now() + 500;
+    putBackSideways();
+    requestAnimationFrame(putBackSideways);
+    setTimeout(putBackSideways, 300);
+  }
+  document.addEventListener('visibilitychange', afterResume);
+  window.addEventListener('pageshow', afterResume);
+
   stopPageZoom();
   pinchToZoom({ container, viewer, eventBus });
 

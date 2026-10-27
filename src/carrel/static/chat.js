@@ -3,14 +3,17 @@
 // socket drops (a reload, another paper, the tablet asleep), the page attaches again and asks
 // only for the messages after the last it drew.
 //
-// Each question opens a turn: the answer is drawn as markdown, and everything else (tools,
-// thinking, system messages, text written between tool calls) folds into one row per turn. A
-// kind this page does not know is a plain row in that fold, so an SDK update never breaks the
-// chat, it only looks plainer.
+// Each question opens a turn: the answer is drawn as markdown (with its maths and code), and
+// everything else (tools, thinking, system messages, text written between tool calls) folds into
+// one row per turn. A kind this page does not know is a plain row in that fold, so an SDK update
+// never breaks the chat, it only looks plainer.
+//
+// A question that starts with `/` is a slash command, run by Claude Code as in the terminal; the
+// box lists the commands that match while one is typed.
 
-import { marked } from './vendor/marked/marked.esm.js';
-import DOMPurify from './vendor/dompurify/purify.es.mjs';
 import { parsePaperLink } from './links.js';
+import { drawMarkdown } from './markdown.js';
+import { startOverview } from './overview.js';
 import { startSettings } from './settings.js';
 
 const RESULT_PREVIEW = 4000;
@@ -28,8 +31,8 @@ const QUOTE_SHOWN = 280;
  * `currentPaper()` and `currentPage()` say what a question is about; `openTarget` follows a
  * citation; `onActivity()` says an answer ended or a question for the reader came, so a chat out
  * of sight can say so. Returns `quote(passage)`, which sets the passage the next question
- * carries ({pdf, page, text}, or null for none), `quoted()`, the one it would carry, and
- * `focus()`.
+ * carries ({pdf, page, text}, or null for none), `quoted()`, the one it would carry, `focus()`,
+ * `about(pdf)`, the paper the next question is about, and `showOverview()`.
  */
 export function startChat({ currentPaper, currentPage, openTarget, onActivity = () => {} }) {
   const log = document.getElementById('log');
@@ -41,11 +44,19 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
   const sheet = document.getElementById('chats-sheet');
   const quoteBox = document.getElementById('quote');
   const modelButton = document.getElementById('model');
+  const commandList = document.getElementById('commands');
   const settings = startSettings({
     liveModel: () => model,
     name: modelName,
     onOpen: () => showSheet(false),
     onModel: () => renderStatus(),
+  });
+  const overview = startOverview({
+    ask: (text) => void ask(text),
+    onOpen() {
+      showSheet(false);
+      void settings.show(false);
+    },
   });
 
   let chatId = remembered();
@@ -162,6 +173,7 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     );
     setBusy(true);
     quote(null);
+    showCommands(false);
   }
 
   /** Shows the passage the next question carries over the box, or none. */
@@ -272,6 +284,7 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     endTurn();
     streamed.length = 0;
     const bubble = append('div', 'question');
+    if (text.startsWith('/')) bubble.classList.add('command');
     if (paper && paper !== lastPaper) {
       // Which paper the question was about, when it changed: a tap opens it.
       bubble.append(placeLink('about', page ? `${paper} · p. ${page}` : paper, pdf, page));
@@ -287,7 +300,7 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
       if (from) quoted.append(placeLink('from', from, selection.pdf ?? pdf, selection.page));
     }
     bubble.append(text);
-    turn = { question: bubble, fold: null, steps: 0, texts: [] };
+    turn = { question: bubble, fold: null, steps: 0, texts: [], text };
   }
 
   /** A line naming a place in a paper; a tap opens it there when the paper is known. */
@@ -417,10 +430,14 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     if (data.duration_ms != null) parts.push(`${Math.round(data.duration_ms / 1000)} s`);
     if (data.total_cost_usd != null) parts.push(`$${data.total_cost_usd.toFixed(2)}`);
     const failed = data.is_error && turn?.fold;
+    const asked = turn?.text;
     endTurn(parts.join(' · ') || 'Done');
     if (failed) failed.details.classList.add('failed');
     // A turn ending while this page watched, not one replayed when it attached.
-    if (busy) onActivity();
+    if (busy) {
+      onActivity();
+      void overview.turnEnded(asked);
+    }
   }
 
   function permission({ id, tool, input, title, description, decision_reason, blocked_path }) {
@@ -490,13 +507,7 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
           frame = requestAnimationFrame(() => {
             frame = 0;
             const stick = nearBottom();
-            element.innerHTML = DOMPurify.sanitize(marked.parse(block.text, { gfm: true }));
-            for (const table of element.querySelectorAll('table')) {
-              const wrap = document.createElement('div');
-              wrap.className = 'table';
-              table.replaceWith(wrap);
-              wrap.append(table);
-            }
+            drawMarkdown(element, block.text);
             if (stick) log.scrollTop = log.scrollHeight;
           });
         }
@@ -510,7 +521,10 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
   const chatsButton = document.getElementById('chats');
 
   function showSheet(open) {
-    if (open) void settings.show(false);
+    if (open) {
+      void settings.show(false);
+      overview.hide();
+    }
     sheet.hidden = !open;
     chatsButton.setAttribute('aria-expanded', String(open));
   }
@@ -559,7 +573,8 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     return header;
   }
 
-  // Citations move the PDF; any other link opens in a new tab.
+  // Citations move the PDF, and a link to the paper's overview note opens it; any other link
+  // opens in a new tab.
   log.addEventListener('click', (event) => {
     const link = event.target.closest('a[href]');
     if (!link || link.classList.contains('about')) return;
@@ -567,6 +582,8 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     const target = parsePaperLink(link.href);
     if (target) {
       openTarget(target);
+    } else if (overview.opensLink(new URL(link.href))) {
+      // shown over the chat
     } else {
       window.open(link.href, '_blank', 'noopener');
     }
@@ -594,7 +611,61 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     question.style.height = 'auto';
     question.style.height = `${Math.min(question.scrollHeight, 160)}px`;
   }
-  question.addEventListener('input', grow);
+  question.addEventListener('input', () => {
+    grow();
+    void listCommands();
+  });
+
+  // The slash commands that match what is typed, while the box holds just one being typed.
+
+  let commands = null; // as Claude Code offers them: a promise, fetched once
+
+  function loadCommands() {
+    commands ??= fetch('/api/commands')
+      .then((response) => response.json())
+      .catch(() => {
+        commands = null; // asked again next time
+        return [];
+      });
+    return commands;
+  }
+
+  async function listCommands() {
+    if (!/^\/\S*$/.test(question.value)) return showCommands(false);
+    const offered = await loadCommands();
+    // What the box holds now, the fetch done.
+    const typed = /^\/(\S*)$/.exec(question.value)?.[1];
+    if (typed == null) return showCommands(false);
+    const matching = offered.filter(({ name }) => name.toLowerCase().startsWith(typed.toLowerCase()));
+    if (!matching.length || (matching.length === 1 && matching[0].name === typed)) return showCommands(false);
+    commandList.replaceChildren(
+      ...matching.map(({ name, description, hint }) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.setAttribute('role', 'option');
+        item.append(span('name', `/${name}`));
+        if (hint) item.append(span('hint', hint));
+        item.append(span('description', description));
+        item.addEventListener('click', () => {
+          question.value = `/${name} `;
+          showCommands(false);
+          grow();
+          question.focus({ preventScroll: true });
+        });
+        return item;
+      }),
+    );
+    return showCommands(true);
+  }
+
+  // The first list starts a Claude Code process on the laptop, which takes a few seconds: asked
+  // for as soon as the box is.
+  question.addEventListener('focus', () => void loadCommands(), { once: true });
+
+  function showCommands(open) {
+    commandList.hidden = !open;
+    if (!open) commandList.replaceChildren();
+  }
   stop.addEventListener('click', () => socket?.send(JSON.stringify({ type: 'stop' })));
   document.getElementById('new-chat').addEventListener('click', () => {
     showSheet(false);
@@ -622,7 +693,16 @@ export function startChat({ currentPaper, currentPage, openTarget, onActivity = 
     quoted: () => passage,
     /** Puts the cursor in the question box. */
     focus: () => question.focus({ preventScroll: true }),
+    about: (pdf) => overview.about(pdf),
+    showOverview: () => overview.show(),
   };
+}
+
+function span(className, text) {
+  const element = document.createElement('span');
+  element.className = className;
+  element.textContent = text;
+  return element;
 }
 
 function remembered() {

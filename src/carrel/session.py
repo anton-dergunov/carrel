@@ -35,6 +35,7 @@ from claude_agent_sdk import (
     RateLimitEvent,
     ResultMessage,
     StreamEvent,
+    SystemMessage,
     ToolPermissionContext,
     get_session_info,
     get_session_messages,
@@ -128,19 +129,43 @@ def selection_block(text: str, page: int | None, paper_text: str | None = None) 
     return f"<selection{attributes}>\n{text}\n</selection>\n"
 
 
+def compose(text: str, context: str) -> str:
+    """The prompt for a question: the context line and the selection, then the question. A
+    slash command comes first, or Claude Code does not run it; the context then reaches the
+    command as the last lines of its arguments, so `/overview` alone means the paper open."""
+    if text.lstrip().startswith("/"):
+        return f"{text.strip()}\n{context}".rstrip("\n") if context else text
+    return context + text
+
+
 # The context line and the selection after it; a session list's first prompt has them on one
-# line with the question.
-_CONTEXT = re.compile(r"^\[Reading (?P<text>[^\n]+?)(?:, page (?P<page>\d+))?\][\n ]")
+# line with the question. Claude Code keeps a command's arguments without the last newline.
+_CONTEXT = re.compile(r"^\[Reading (?P<text>[^\n]+?)(?:, page (?P<page>\d+))?\](?:[\n ]|$)")
 _SELECTION = re.compile(
     r'<selection(?: paper="(?P<paper>[^"]*)")?(?: page="(?P<page>\d+)")?>[\n ]'
-    r"(?P<text>.*?)[\n ]</selection>[\n ]",
+    r"(?P<text>.*?)[\n ]</selection>(?:[\n ]|$)",
     re.DOTALL,
 )
+# A command as a transcript records it, its name and its arguments in tags, in either order.
+_COMMAND_NAME = re.compile(r"<command-name>(/[^<]*)</command-name>")
+_COMMAND_ARGS = re.compile(r"<command-args>(.*?)</command-args>", re.DOTALL)
+# Where a command's own arguments end and the context after them begins.
+_AFTER_COMMAND = re.compile(r"[\n ](?=\[Reading |<selection[ >])")
 
 
 def split_question(prompt: str) -> dict:
     """A prompt as the reader asked it: the question, the paper its context line names, and
     the passage it quotes."""
+    named = _COMMAND_NAME.search(prompt)
+    if named:
+        args = _COMMAND_ARGS.search(prompt)
+        prompt = named[1] + (f" {args[1]}" if args and args[1].strip() else "")
+    command = None
+    if prompt.startswith("/"):
+        after = _AFTER_COMMAND.search(prompt)
+        command, prompt = (
+            (prompt[: after.start()], prompt[after.end() :]) if after else (prompt, "")
+        )
     question = {}
     found = _CONTEXT.match(prompt)
     if found:
@@ -157,7 +182,7 @@ def split_question(prompt: str) -> dict:
         if quoted["paper"]:
             selection["paper"] = Path(quoted["paper"]).stem
         question["selection"] = selection
-    return {"text": prompt, **question}
+    return {"text": prompt if command is None else command, **question}
 
 
 def reader_prompt(note: str) -> dict:
@@ -206,6 +231,7 @@ class Session:
         limits: dict | None = None,
         clock: Callable[[], float] = time.time,
         settings: Settings | None = None,
+        commands: dict | None = None,
     ):
         self.library = library
         self.id = session_id or str(uuid.uuid4())
@@ -221,6 +247,8 @@ class Session:
         self._connect = connect or self._connect_client
         self._clock = clock
         self.limits = limits if limits is not None else {}
+        # The slash commands Claude Code offers, learnt when a process starts.
+        self.commands = commands if commands is not None else {}
         self.seq = 0
         self.log: list[dict] = []
         self.subscribers: set[Send] = set()
@@ -351,18 +379,24 @@ class Session:
             if self.client is None:
                 self.model = known_model(model)
                 self.client = await self._connect()
+                await self.learn_commands(self.client)
                 self._relay = asyncio.create_task(self._relay_messages())
             if not self.started:
                 record_session(self.id)
                 self.started = True
             await self.client.query(
-                context_line(found.text if found else None, page) + block + text
+                compose(text, context_line(found.text if found else None, page) + block)
             )
         except BaseException:
             self.busy = False
             if self.client is None:
                 self.model = None
             raise
+
+    async def learn_commands(self, client: ClaudeSDKClient) -> None:
+        info = await client.get_server_info()
+        if info and isinstance(info.get("commands"), list):
+            self.commands["listed"] = info["commands"]
 
     def _selection(self, selection: object, open_paper: Paper | None) -> tuple[dict | None, str]:
         """A selection as the question shows it, and as the prompt carries it."""
@@ -423,6 +457,9 @@ class Session:
                     self.limits[info.rate_limit_type or "limit"] = to_wire(info)
                     await self.emit("Limits", self.limits, keep=False)
                     continue
+                if isinstance(message, SystemMessage) and message.subtype == "init":
+                    # The commands bound to a terminal; the server's list does not mark them.
+                    self.commands["terminal"] = message.data.get("terminal_slash_commands", [])
                 await self.emit(type(message).__name__, to_wire(message))
                 if isinstance(message, ResultMessage):
                     self.busy = False
@@ -518,11 +555,17 @@ class Sessions:
         self.library = library
         self.chats: dict[str, Session] = {}
         self.limits: dict = {}  # the latest usage limits, shared by every chat
+        self.commands: dict = {}  # the slash commands, as the latest process to start offered them
         self.settings = settings or Settings()
         self._made = dict(
-            extra_folders=extra_folders, connect=connect, clock=clock, settings=self.settings
+            extra_folders=extra_folders,
+            connect=connect,
+            clock=clock,
+            settings=self.settings,
+            commands=self.commands,
         )
         self._clock = clock
+        self._learning = asyncio.Lock()
 
     def get(self, session_id: str | None) -> Session:
         """The chat with this id: kept here, else read from its transcript, else a new one
@@ -556,6 +599,32 @@ class Sessions:
                 }
             )
         return chats
+
+    async def command_list(self) -> list[dict]:
+        """The slash commands a question can start with, as Claude Code offers them in the
+        library: known once a chat's process has started, else from a process started to ask
+        (which asks the model nothing). Those bound to a terminal, and hidden ones, are left out."""
+        async with self._learning:
+            if "listed" not in self.commands:
+                probe = Session(self.library, **self._made, limits=self.limits)
+                client = await probe._connect()
+                try:
+                    await probe.learn_commands(client)
+                finally:
+                    await client.disconnect()
+        terminal = set(self.commands.get("terminal", ()))
+        return [
+            {
+                "name": command["name"],
+                "description": command.get("description", ""),
+                "hint": command.get("argumentHint", ""),
+            }
+            for command in self.commands.get("listed", [])
+            if isinstance(command, dict)
+            and command.get("name")
+            and not command["name"].startswith("_")
+            and command["name"] not in terminal
+        ]
 
     async def reap(self) -> None:
         """Closes the chats whose prompt cache has expired."""

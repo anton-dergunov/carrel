@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>$title</title>
 <link rel="stylesheet" href="/static/vendor/pdfjs/pdf_viewer.css">
+<link rel="stylesheet" href="/static/vendor/katex/katex.min.css">
 <link rel="stylesheet" href="/static/app.css">
 <meta name="theme-color" content="#fffdf6" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#24282a" media="(prefers-color-scheme: dark)">
@@ -39,6 +40,10 @@
   <symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6" /></symbol>
   <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></symbol>
   <symbol id="i-highlighter" viewBox="0 0 24 24"><path d="m9 11-6 6v3h9l3-3" /><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4" /></symbol>
+  <symbol id="i-notebook-text" viewBox="0 0 24 24"><path d="M2 6h4" /><path d="M2 10h4" /><path d="M2 14h4" /><path d="M2 18h4" /><rect width="16" height="20" x="4" y="2" rx="2" /><path d="M9.5 8h5" /><path d="M9.5 12H16" /><path d="M9.5 16H14" /></symbol>
+  <symbol id="i-notebook-pen" viewBox="0 0 24 24"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4" /><path d="M2 6h4" /><path d="M2 10h4" /><path d="M2 14h4" /><path d="M2 18h4" /><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z" /></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M10 11v6" /><path d="M14 11v6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></symbol>
 </svg>
 <nav id="strip" class="bar">
@@ -73,6 +78,7 @@ $papers
   <div id="viewerContainer"><div id="viewer" class="pdfViewer"></div></div>
   <button type="button" id="page-badge" aria-label="Contents and pages" aria-expanded="false" aria-controls="contents-sheet" hidden></button>
   <div id="contents-sheet" class="sheet" hidden>
+    <div id="paper-info" hidden></div>
     <form id="go-to-page">
       <label for="page-number">Page</label>
       <input id="page-number" type="number" inputmode="numeric" min="1" enterkeyhint="go">
@@ -93,13 +99,16 @@ $papers
   <div id="chat-body">
     <div id="log" aria-live="polite"></div>
     <div id="chats-sheet" hidden></div>
+    <div id="overview-sheet" hidden></div>
   </div>
   <div id="chat-foot">
     <button type="button" class="plain" id="model" aria-label="Chat settings" title="Chat settings" aria-expanded="false" aria-controls="settings-dialog">Model</button>
     <div id="status" aria-live="polite"></div>
+    <button type="button" class="icon-button" id="overview" aria-label="Write an overview" title="Write an overview" aria-expanded="false" aria-controls="overview-sheet" hidden><svg class="icon"><use href="#i-notebook-pen"/></svg></button>
     <button type="button" class="icon-button" id="chats" aria-label="Earlier chats" title="Earlier chats" aria-expanded="false"><svg class="icon"><use href="#i-history"/></svg></button>
     <button type="button" class="icon-button" id="new-chat" aria-label="New chat" title="New chat"><svg class="icon"><use href="#i-new-chat"/></svg></button>
   </div>
+  <div id="commands" role="listbox" aria-label="Slash commands" hidden></div>
   <div id="quote" hidden>
     <button type="button" class="words" title="Go to it in the paper"></button>
     <span class="where"></span>

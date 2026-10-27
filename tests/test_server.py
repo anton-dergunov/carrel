@@ -98,13 +98,16 @@ def test_a_chat_outlives_its_page(library, monkeypatch, tmp_path):
         assert socket.receive_json()["kind"] == "Error"
 
 
-def test_a_paper_to_open_beside_the_chat(client):
-    response = client.get(f"/api/paper/{PDF}")
-    assert response.json() == {
+def test_a_paper_to_open_beside_the_chat_and_what_the_library_knows_of_it(client):
+    paper = client.get(f"/api/paper/{PDF}").json()
+    info = paper.pop("info")
+    assert paper == {
         "pdf": "recsys/Wide & Deep. A Test Paper.pdf",
         "title": "Wide & Deep: A Test Paper",
         "pdf_url": f"/pdf/{PDF}",
     }
+    assert ["summary", "A paper for the tests."] in info["fields"]
+    assert info["overview"] is False
     assert client.get("/api/paper/recsys/missing.pdf").status_code == 404
 
 
@@ -207,3 +210,48 @@ def test_a_page_writes_to_the_log(client, caplog):
         client.post("/api/log", json=entry, headers={"Host": "127.0.0.1:8517"}).status_code == 403
     )
     assert client.post("/api/log", content=b"[]", headers=OWN).status_code == 400
+
+
+def test_the_overview_note_shown_and_moved_to_the_trash(client, library, monkeypatch):
+    trashed = []
+    monkeypatch.setattr("carrel.server.send2trash", lambda path: trashed.append(path))
+    assert client.get(f"/api/overview/{PDF}").status_code == 404
+    note = library.overview_note(library.paper_for_pdf("recsys/Wide & Deep. A Test Paper.pdf"))
+    note.write_text("# Wide & Deep\n\nWhat it does.\n")
+    try:
+        assert client.get(f"/api/overview/{PDF}").json() == {
+            "name": "Wide & Deep. A Test Paper",
+            "text": "# Wide & Deep\n\nWhat it does.\n",
+        }
+        assert client.get("/api/overview/..%2Fpaper-library.yaml").status_code == 404
+        # Only from carrel's own page.
+        assert (
+            client.delete(f"/api/overview/{PDF}", headers={"Host": "127.0.0.1:8517"}).status_code
+            == 403
+        )
+        assert trashed == []
+        assert client.delete(f"/api/overview/{PDF}", headers=OWN).status_code == 204
+        assert trashed == [note]
+    finally:
+        note.unlink()
+
+
+class Commands:
+    """Claude Code, as far as listing its commands goes."""
+
+    async def get_server_info(self):
+        return {"commands": [{"name": "overview", "description": "A pre-read note"}]}
+
+    async def disconnect(self):
+        pass
+
+
+def test_the_slash_commands(library):
+    async def connect():
+        return Commands()
+
+    app = make_app(library, sessions=Sessions(library, connect=connect))
+    with TestClient(app, base_url="http://127.0.0.1:8517") as client:
+        assert client.get("/api/commands").json() == [
+            {"name": "overview", "description": "A pre-read note", "hint": ""}
+        ]

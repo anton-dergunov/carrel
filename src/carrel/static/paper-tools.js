@@ -1,11 +1,12 @@
 // What acts on the paper showing, kept off the screen until asked for, since the paper and the
 // chat already share a small one:
 //
-// - the page badge, faint in the PDF's corner, which opens the paper's contents and a field to
-//   go to a page;
+// - the page badge, faint in the PDF's corner, which opens what the library knows of the paper
+//   (from its frontmatter, with no model call), a field to go to a page, and its contents;
 // - find, which takes the place of the tabs in the bar while it is open.
 
-export function startPaperTools({ reader }) {
+/** `showOverview()` shows the paper's overview note, beside it. */
+export function startPaperTools({ reader, showOverview }) {
   const body = document.body;
   const badge = document.getElementById('page-badge');
   const sheet = document.getElementById('contents-sheet');
@@ -13,6 +14,7 @@ export function startPaperTools({ reader }) {
   const pageNumber = document.getElementById('page-number');
   const pageCount = document.getElementById('page-count');
   const outlineNav = document.getElementById('outline');
+  const infoBox = document.getElementById('paper-info');
   const findButton = document.getElementById('find-button');
   const findForm = document.getElementById('find');
   const findInput = document.getElementById('find-input');
@@ -30,6 +32,8 @@ export function startPaperTools({ reader }) {
     pageNumber.max = String(count);
     pageNumber.value = String(reader.currentPage() ?? '');
     pageCount.textContent = `of ${count}`;
+    // Asked each time: the overview note comes and goes.
+    void drawInfo(reader.file());
     if (outlineOf !== reader.file()) {
       outlineOf = reader.file();
       void drawOutline(outlineOf);
@@ -45,6 +49,69 @@ export function startPaperTools({ reader }) {
       return;
     }
     outlineNav.append(outlineList(items));
+  }
+
+  // What the library knows of the paper.
+
+  async function drawInfo(file) {
+    const response = await fetch(`/api/paper/${file.split('/').map(encodeURIComponent).join('/')}`).catch(() => null);
+    const paper = response?.ok ? await response.json().catch(() => null) : null;
+    if (file !== reader.file()) return;
+    if (!paper?.info) {
+      infoBox.hidden = true;
+      return;
+    }
+    const fields = Object.fromEntries(paper.info.fields);
+    const parts = [element('h2', 'title', fields.title ?? paper.title)];
+    const byline = element('p', 'byline');
+    if (fields.authors?.length) byline.append(authors([fields.authors].flat()));
+    if (fields.published) byline.append(element('span', 'year', String(fields.published).slice(0, 4)));
+    const where = source(fields);
+    if (where) byline.append(where);
+    parts.push(byline);
+    if (fields.summary) parts.push(element('p', 'summary', fields.summary));
+    const facts = element('p', 'facts');
+    for (const [label, value] of [
+      ['Type', fields.type],
+      ['Topic', paper.info.topic],
+      ['Added', fields.added],
+      ['Text layer', fields['text-layer']],
+    ]) {
+      if (value) facts.append(element('span', 'fact', `${label}: ${value}`));
+    }
+    if (facts.childElementCount) parts.push(facts);
+    if (paper.info.overview) {
+      const button = element('button', 'plain overview-link', 'Overview');
+      button.type = 'button';
+      button.addEventListener('click', () => {
+        openContents(false);
+        showOverview();
+      });
+      parts.push(button);
+    }
+    infoBox.replaceChildren(...parts);
+    infoBox.hidden = false;
+  }
+
+  /** The authors, the first few shown and the rest a tap away. */
+  function authors(names) {
+    const SHOWN = 3;
+    if (names.length <= SHOWN + 1) return element('span', 'authors', names.join(', '));
+    const fold = element('details', 'authors');
+    fold.append(element('summary', '', `${names.slice(0, SHOWN).join(', ')} and ${names.length - SHOWN} more`));
+    fold.append(element('span', 'all', names.join(', ')));
+    return fold;
+  }
+
+  /** Where the paper comes from: its arXiv page, or its address. */
+  function source(fields) {
+    const href = fields.arxiv ? `https://arxiv.org/abs/${fields.arxiv}` : fields.url;
+    if (!href || !/^https?:/.test(href)) return null;
+    const link = element('a', 'source', fields.arxiv ? `arXiv ${fields.arxiv}` : new URL(href).hostname);
+    link.href = href;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    return link;
   }
 
   function outlineList(items) {
@@ -139,4 +206,11 @@ export function startPaperTools({ reader }) {
       openContents(false);
     },
   };
+}
+
+function element(tag, className, text) {
+  const made = document.createElement(tag);
+  if (className) made.className = className;
+  if (text != null) made.textContent = text;
+  return made;
 }

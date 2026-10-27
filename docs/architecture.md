@@ -47,11 +47,11 @@ This came from the first sitting, where the chat closed after the first question
 
 ## Settings
 
-The chat's settings open from the model's name on its status line, as a small dialog over the page. It sits near the top and within the area above the keyboard, so the note being typed stays in sight.
+The chat's settings open from the model's name on its status line, as a small dialog over the page: a sheet over the chat was too cramped below the paper. It sits near the top and within the area above the keyboard, so the note being typed stays in sight.
 
-- **The model is each device's own**, kept in the page's `localStorage`. A page sends it with every question, and it is used when that question starts the chat's Claude Code process. A chat no device has chosen for runs on Opus.
+- **The model is each device's own**, chosen with one tap from a list and kept in the page's `localStorage`. A page sends it with every question, and it is used when that question starts the chat's Claude Code process. A chat no device has chosen for runs on Opus.
 - **The note about the reader is the server's**, so every device shares it. It is appended to Claude Code's system prompt under "The reader". It is saved as it is typed, with no Save button.
-- **When a change applies.** Both apply only when a Claude Code process starts: a new chat, or one resumed after its cache expired. A running chat keeps the model it started on, so its prompt cache stays valid, and the sheet says so when the device has chosen another one. A resumed chat keeps the note it began with, because Claude Code keeps the system prompt it first recorded.
+- **When a change applies.** Both apply only when a Claude Code process starts: a new chat, or one resumed after its cache expired. A running chat keeps the model it started on, so its prompt cache stays valid, and the dialog says so when the device has chosen another one. A resumed chat keeps the note it began with, because Claude Code keeps the system prompt it first recorded.
 
 ## The screen
 

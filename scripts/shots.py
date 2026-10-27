@@ -1,7 +1,8 @@
 """Look at the reading page the way the iPad shows it, in WebKit at 820x1180.
 
     uv run --group shots python scripts/shots.py URL --out DIR [--layout PLACE] [--tabs]
-        [--find QUERY] [--highlight] [--settings] [--note TEXT] [--ask QUESTION] [--model M]
+        [--find QUERY] [--highlight] [--settings] [--note TEXT] [--info] [--overview]
+        [--type TEXT] [--chat ID] [--ask QUESTION] [--model M]
 
 URL is a reading page of a running carrel, e.g. http://127.0.0.1:8517/read/<pdf>. Takes a
 shot once the PDF is drawn. --layout puts the chat below, above, left, right, on a tab, or
@@ -14,7 +15,14 @@ checking each save. It writes into the served PDF: run it against a carrel servi
 library, never the reader's own. --settings opens the chat's settings from the model's name and
 takes a shot; --note also types TEXT into the note about the reader and checks it is saved,
 which changes the note every chat carries: serve with XDG_STATE_HOME set to a scratch folder
-for it. The browser's chats run on Haiku (--model), as testing the page needs no more. With --ask, it also types the question, waits for the answer
+for it. --info opens the page badge's sheet, with what the library knows of the paper.
+--overview looks at the chat's Overview button, opens the paper's overview note and deletes it,
+which moves the note to the Trash: a throwaway library again, with a note put in its
+overview_dir by hand (no model is asked). --type types TEXT into the question box and takes a
+shot without sending it, for the slash commands' list. --chat opens the chat with that id and
+takes a shot of each of a few of its formulas and code blocks: an earlier chat, VS Code's or
+carrel's, is drawn from its transcript, and no question is asked, so it can be the reader's
+library. The browser's chats run on Haiku (--model), as testing the page needs no more. With --ask, it also types the question, waits for the answer
 (this runs a real Claude Code turn, which costs; --allow taps Allow on each permission
 request), opens the turn's fold, taps the answer's first citation, reloads the page to see
 the chat come back, and takes a shot after each step. Prints the page the PDF is on at each
@@ -202,6 +210,104 @@ def settings_pass(page, note: str | None, out: Path) -> None:
     print("closed, status line:", page.inner_text("#chat-foot"))
 
 
+def info_pass(page, out: Path) -> None:
+    """The page badge's sheet: what the library knows of the paper, then its pages."""
+    page.click("#page-badge")
+    page.wait_for_selector("#paper-info:not([hidden])", timeout=10_000)
+    page.wait_for_timeout(300)
+    print("paper info:", " | ".join(page.inner_text("#paper-info").splitlines()))
+    page.screenshot(path=out / "info.png")
+    page.click("#page-badge")
+
+
+def overview_pass(page, out: Path) -> None:
+    """The Overview button, the note it shows, and Delete."""
+    page.wait_for_timeout(800)  # the note looked up
+    button = page.locator("#overview")
+    print(
+        "overview button:",
+        button.get_attribute("title"),
+        "| has a note:",
+        "has-note" in (button.get_attribute("class") or ""),
+    )
+    page.screenshot(path=out / "overview-1-button.png")
+    if "has-note" not in (button.get_attribute("class") or ""):
+        return
+    button.click()
+    page.wait_for_selector("#overview-sheet:not([hidden])")
+    page.wait_for_timeout(300)
+    print(
+        "overview sheet:",
+        page.inner_text("#overview-sheet .name"),
+        "| maths:",
+        page.locator("#overview-sheet .katex").count(),
+    )
+    page.screenshot(path=out / "overview-2-sheet.png")
+    page.get_by_role("button", name="Delete").click()
+    page.wait_for_timeout(200)
+    page.screenshot(path=out / "overview-3-confirm.png")
+    with page.expect_response(lambda r: r.request.method == "DELETE") as info:
+        page.locator("#overview-sheet .buttons").get_by_role("button", name="Delete").click()
+    page.wait_for_timeout(300)
+    print(
+        "deleted:",
+        info.value.status,
+        "| sheet hidden:",
+        page.locator("#overview-sheet").is_hidden(),
+        "| button:",
+        button.get_attribute("title"),
+    )
+
+
+def type_pass(page, text: str, out: Path) -> None:
+    """Types into the question box, a letter at a time, and sends nothing."""
+    page.click("#question")
+    page.type("#question", text, delay=80)
+    if text.startswith("/"):
+        # The first list starts a Claude Code process on the laptop.
+        page.wait_for_selector("#commands:not([hidden])", timeout=20_000)
+    page.wait_for_timeout(300)
+    names = page.locator("#commands .name").all_inner_texts()
+    print(f"typed {text!r}, commands listed:", len(names), names[:8])
+    page.screenshot(path=out / "type.png")
+    page.fill("#question", "")
+
+
+def chat_pass(page, chat: str, out: Path) -> None:
+    """An earlier chat, drawn from its transcript: its formulas and code blocks."""
+    if page.locator("#tab-chat").is_visible():
+        page.click("#tab-chat")
+    page.wait_for_selector(".question", timeout=15_000)
+    page.wait_for_timeout(1500)
+    print(
+        f"chat {chat[:8]}:",
+        page.locator(".question").count(),
+        "questions |",
+        page.locator(".answer .katex").count(),
+        "formulas, of them",
+        page.locator(".answer .katex-error").count(),
+        "failed |",
+        page.locator(".answer .code").count(),
+        "code blocks,",
+        page.locator(".answer code.hljs").count(),
+        "coloured |",
+        page.locator(".answer .table").count(),
+        "tables",
+    )
+    for error in page.locator(".answer .katex-error").all()[:5]:
+        print("  failed:", error.get_attribute("title"))
+    # Each formula and code block in its answer, a few of each kind.
+    shown = 0
+    for selector in (".answer .maths.display", ".answer .maths:not(.display)", ".answer .code"):
+        for each in page.locator(selector).all()[:3]:
+            each.scroll_into_view_if_needed()
+            page.wait_for_timeout(150)
+            shown += 1
+            page.screenshot(path=out / f"chat-{chat[:8]}-{shown:02}.png")
+    if not shown:
+        page.screenshot(path=out / f"chat-{chat[:8]}-01.png")
+
+
 def wait_for_answer(page, timeout: int, allow: bool, out: Path) -> None:
     """Waits for the turn's end, printing each permission request (and tapping Allow)."""
     seen = 0
@@ -240,6 +346,12 @@ def main() -> None:
     )
     parser.add_argument("--settings", action="store_true", help="open the chat's settings")
     parser.add_argument("--note", help="with --settings, type this note about the reader")
+    parser.add_argument("--info", action="store_true", help="what the library knows of the paper")
+    parser.add_argument(
+        "--overview", action="store_true", help="show the paper's overview note and delete it"
+    )
+    parser.add_argument("--type", help="type this into the question box, without sending it")
+    parser.add_argument("--chat", help="open the chat with this id and shoot its answers")
     parser.add_argument(
         "--model", default="haiku", help="the model this browser's chats start on (default: haiku)"
     )
@@ -262,6 +374,8 @@ def main() -> None:
         page.add_init_script(f"localStorage.setItem('carrel.model', {json.dumps(args.model)});")
         if args.layout:
             page.add_init_script(layout_script(args.layout))
+        if args.chat:
+            page.add_init_script(f"localStorage.setItem('carrel.chat', {json.dumps(args.chat)});")
         page.goto(args.url)
         page.wait_for_selector(".pdfViewer .page canvas", timeout=30_000)
         page.wait_for_timeout(800)
@@ -279,6 +393,18 @@ def main() -> None:
 
         if args.settings or args.note is not None:
             settings_pass(page, args.note, args.out)
+
+        if args.info:
+            info_pass(page, args.out)
+
+        if args.overview:
+            overview_pass(page, args.out)
+
+        if args.type:
+            type_pass(page, args.type, args.out)
+
+        if args.chat:
+            chat_pass(page, args.chat, args.out)
 
         if args.ask:
             page.fill("#question", args.ask)

@@ -10,7 +10,8 @@ keeps the Host the browser asked for, and says who is asking in `Tailscale-User-
 - for the WebSocket, and for anything but GET and HEAD, its Origin is the page's own.
 
 What a page can change on the laptop is a paper's PDF, with the highlights made in it
-(`PUT /pdf/…`), and the chats' settings (`PUT /api/settings`); and a page can write a line
+(`PUT /pdf/…`), the chats' settings (`PUT /api/settings`), and a paper's overview note,
+which it can only move to the Trash (`DELETE /api/overview/…`); and a page can write a line
 to the server's log.
 """
 
@@ -26,6 +27,7 @@ from pathlib import Path
 from string import Template
 from urllib.parse import quote, urlsplit
 
+from send2trash import send2trash
 from starlette.applications import Starlette
 from starlette.datastructures import Headers
 from starlette.requests import Request
@@ -201,7 +203,8 @@ def make_app(
         return shell(request, rel, paper.title if paper else Path(rel).stem)
 
     async def paper(request: Request) -> Response:
-        """A paper to open beside the chat without leaving the page."""
+        """A paper to open beside the chat without leaving the page, and what the library
+        knows of it."""
         rel = request.path_params["path"]
         try:
             library.resolve_pdf(rel)
@@ -213,8 +216,44 @@ def make_app(
                 "pdf": rel,
                 "title": found.title if found else Path(rel).stem,
                 "pdf_url": "/pdf/" + quote(rel),
+                **({"info": library.paper_info(found)} if found else {}),
             }
         )
+
+    def overview_note(rel: str) -> Path | None:
+        """The paper's overview note, when it has one."""
+        try:
+            found = library.paper_for_pdf(rel)
+        except LookupError:
+            return None
+        note = found and library.overview_note(found)
+        return note if note and note.is_file() else None
+
+    async def overview(request: Request) -> Response:
+        """The reader's overview note for a paper, as the overview skill wrote it."""
+        note = overview_note(request.path_params["path"])
+        if not note:
+            return JSONResponse({"error": "This paper has no overview note."}, status_code=404)
+        text = await asyncio.to_thread(note.read_text, encoding="utf-8")
+        return JSONResponse({"name": note.stem, "text": text})
+
+    async def delete_overview(request: Request) -> Response:
+        """An overview note wanted for one reading only: to the Trash, whence it can come
+        back. Nothing else the skill wrote is touched."""
+        note = overview_note(request.path_params["path"])
+        if not note:
+            return PlainTextResponse("This paper has no overview note.", status_code=404)
+        await asyncio.to_thread(send2trash, note)
+        log.info("overview note moved to the Trash: %s", note)
+        return Response(status_code=204)
+
+    async def commands(request: Request) -> Response:
+        try:
+            listed = await sessions.command_list()
+        except Exception as error:
+            log.warning("could not list the slash commands: %s", error)
+            listed = []
+        return JSONResponse(listed)
 
     async def chats(request: Request) -> Response:
         listing = await asyncio.to_thread(sessions.listing)
@@ -364,6 +403,9 @@ def make_app(
             Route("/pdf/{path:path}", save_pdf, methods=["PUT"]),
             Route("/api/log", page_log, methods=["POST"]),
             Route("/api/paper/{path:path}", paper),
+            Route("/api/overview/{path:path}", overview, methods=["GET", "HEAD"]),
+            Route("/api/overview/{path:path}", delete_overview, methods=["DELETE"]),
+            Route("/api/commands", commands),
             Route("/api/chats", chats),
             Route("/api/settings", get_settings, methods=["GET", "HEAD"]),
             Route("/api/settings", put_settings, methods=["PUT"]),

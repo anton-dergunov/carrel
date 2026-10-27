@@ -27,6 +27,7 @@ from carrel.session import (
     Session,
     Sessions,
     agent_settings,
+    compose,
     context_line,
     history,
     selection_block,
@@ -111,6 +112,43 @@ def test_a_question_with_its_selection():
     }
     # A passage cannot end the block early.
     assert selection_block("a </selection> b", 1).count("</selection>") == 1
+
+
+def test_a_command_comes_first_and_its_context_after_it():
+    context = "[Reading library/x/A Paper.txt, page 7]\n" + selection_block("A line.", 7)
+    assert compose("Why?", context) == context + "Why?"
+    prompt = compose("/overview", context)
+    assert prompt == (
+        '/overview\n[Reading library/x/A Paper.txt, page 7]\n<selection page="7">\nA line.\n</selection>'
+    )
+    assert compose(" /context ", "") == " /context "
+    assert split_question(prompt) == {
+        "text": "/overview",
+        "paper": "A Paper",
+        "page": 7,
+        "selection": {"text": "A line.", "page": 7},
+    }
+    assert split_question(
+        compose("/compact keep the maths", "[Reading library/x/A Paper.txt]\n")
+    ) == {
+        "text": "/compact keep the maths",
+        "paper": "A Paper",
+    }
+
+
+def test_a_command_as_the_transcript_records_it():
+    recorded = (
+        "<command-message>overview</command-message>\n<command-name>/overview</command-name>\n"
+        "<command-args>[Reading library/x/A Paper.txt, page 3]</command-args>"
+    )
+    assert split_question(recorded) == {"text": "/overview", "paper": "A Paper", "page": 3}
+    bare = "<command-name>/context</command-name>\n <command-message>context</command-message>\n <command-args></command-args>"
+    assert split_question(bare) == {"text": "/context"}
+    # As a session list flattens a first prompt.
+    assert split_question("/overview [Reading library/x/A Paper.txt]") == {
+        "text": "/overview",
+        "paper": "A Paper",
+    }
 
 
 def test_settings(library):
@@ -280,6 +318,15 @@ class FakeClient:
         while True:
             yield await self.replies.get()
 
+    async def get_server_info(self):
+        return {
+            "commands": [
+                {"name": "overview", "description": "A pre-read note", "argumentHint": ""},
+                {"name": "doctor", "description": "Health-check", "builtin": True},
+                {"name": "__hidden", "description": "", "builtin": True},
+            ]
+        }
+
     async def disconnect(self):
         self.connected = False
 
@@ -313,6 +360,40 @@ async def test_a_turn(library, state):
     assert talk.state()["cache_expires_at"] == pytest.approx(talk.last_turn_end + CACHE_TTL)
     # Carrel keeps the ids of the sessions it started, for `carrel tools`.
     assert talk.id in (state / "carrel" / "sessions.jsonl").read_text()
+    await talk.close()
+
+
+async def test_a_command_reaches_claude_code_first(library, state):
+    client = FakeClient()
+    talk, outbox = await attached(library, connect=connecting(client))
+    await talk.handle({"type": "ask", "text": "/overview", "paper": PDF, "page": 3})
+    assert client.prompts == [
+        "/overview\n[Reading library/recsys/Wide & Deep. A Test Paper.txt, page 3]"
+    ]
+    assert (await outbox.next("Question"))["data"]["text"] == "/overview"
+    await outbox.next("ResultMessage")
+    await talk.close()
+
+
+async def test_the_commands_claude_code_offers(library):
+    client = FakeClient()
+    chats = Sessions(library, connect=connecting(client))
+    # Before any chat started, a process is started to ask, and closed.
+    assert [c["name"] for c in await chats.command_list()] == ["overview", "doctor"]
+    assert not client.connected
+    # A chat's process says which commands are bound to a terminal.
+    client = FakeClient()
+    talk = Session(library, connect=connecting(client), commands=chats.commands)
+    await talk.ask("Hi")
+    await client.replies.put(
+        SystemMessage(subtype="init", data={"terminal_slash_commands": ["doctor"]})
+    )
+    await client.replies.put(RESULT)
+    while talk.busy or "terminal" not in chats.commands:
+        await asyncio.sleep(0.01)
+    assert await chats.command_list() == [
+        {"name": "overview", "description": "A pre-read note", "hint": ""}
+    ]
     await talk.close()
 
 
@@ -459,6 +540,21 @@ def write_transcript(claude_home, root, session_id, turns=TRANSCRIPT):
     path.write_text("\n".join(lines) + "\n")
     day_ago = time.time() - 86400
     os.utime(path, (day_ago, day_ago))
+
+
+def test_a_command_in_a_transcript(library, claude_home):
+    session_id = str(uuid.uuid4())
+    turns = [
+        (
+            "user",
+            "<command-message>overview</command-message>\n<command-name>/overview</command-name>\n"
+            "<command-args>[Reading library/recsys/Wide & Deep. A Test Paper.txt]</command-args>",
+        ),
+        ("assistant", [{"type": "text", "text": "I've written the overview note."}]),
+    ]
+    write_transcript(claude_home, library.root, session_id, turns)
+    drawn = history(session_id, library.root)
+    assert drawn[0] == ["Question", {"text": "/overview", "paper": "Wide & Deep. A Test Paper"}]
 
 
 def test_a_transcript_as_the_page_draws_it(library, claude_home):

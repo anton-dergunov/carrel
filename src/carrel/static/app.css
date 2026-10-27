@@ -298,6 +298,20 @@ body.finding #strip > :not(#find) { display: none; }
 #outline > ul > li > button { font-weight: 500; }
 #outline button:disabled { color: var(--muted); cursor: default; }
 #outline .none { margin: 8px 0 2px; font-size: 14px; color: var(--muted); }
+/* What the library knows of the paper, above the page field */
+#paper-info { padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+#paper-info[hidden] { display: none; }
+#paper-info .title { margin: 0 0 4px; font: 600 15px/1.3 var(--ui); }
+#paper-info .byline { margin: 0 0 6px; font-size: 13px; line-height: 1.4; color: var(--muted); }
+#paper-info .byline > :not(.authors) + *::before { content: " · "; color: var(--muted); }
+#paper-info .authors { display: block; }
+#paper-info .authors summary { display: inline; cursor: pointer; list-style: none; text-decoration: underline dotted; text-underline-offset: 3px; }
+#paper-info .authors summary::-webkit-details-marker { display: none; }
+#paper-info .authors[open] summary { display: none; }
+#paper-info .source { text-decoration: none; }
+#paper-info .summary { margin: 0 0 6px; font: 14px/1.4 var(--reading); }
+#paper-info .facts { margin: 0; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 0 12px; }
+#paper-info .overview-link { margin-top: 4px; padding: 2px 0; }
 
 /* A tap on a highlight: its colours, Remove, and Ask (highlight.js places it). */
 #mark-panel { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 999px; }
@@ -443,6 +457,33 @@ button.plain {
   padding: 4px 16px 16px;
 }
 #chats-sheet[hidden] { display: none; }
+/* The paper's overview note, over the log, so the paper stays in view beside it */
+#overview-sheet {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--surface);
+  padding: 0 16px 16px;
+}
+#overview-sheet[hidden] { display: none; }
+#overview-sheet .sheet-header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  padding: 6px 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+#overview-sheet .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#overview-sheet .buttons { display: flex; align-items: center; gap: 8px; }
+#overview-sheet .why { color: var(--muted); }
+/* The overview button: a filled notebook when the paper has its note, a pen when it is to be written */
+#overview[hidden] { display: none; }
+#overview.has-note { color: var(--accent); }
 #chats-sheet .sheet-header, #settings-dialog .sheet-header { font-size: 13px; color: var(--muted); padding: 6px 0; }
 /* The settings: a dialog over the page, a little above the middle of the area the keyboard leaves
    (screen.js's --area-*), so the note being typed stays in sight. A title, then each setting under
@@ -585,6 +626,8 @@ button.plain {
   color: var(--muted);
   white-space: normal;
 }
+.question.command { font-family: var(--mono); font-size: 15px; }
+.question.command :is(.about, .quoted .from) { font-family: var(--ui); }
 .question .quoted .from { display: block; margin-top: 2px; font: 12px var(--ui); color: var(--muted); text-decoration: none; }
 
 .answer { margin: 8px 0; }
@@ -592,7 +635,29 @@ button.plain {
 .answer > :last-child { margin-bottom: 0; }
 .answer p, .answer ul, .answer ol { margin: 0 0 10px; }
 .answer code { font: 0.88em var(--mono); }
+.answer blockquote { margin: 0 0 10px; padding-left: 12px; border-left: 3px solid var(--line); }
 .answer pre { overflow-x: auto; padding: 8px; background: var(--bg); border-radius: 6px; }
+/* A code block, with its copy button in the corner */
+.answer .code { position: relative; margin: 0 0 10px; }
+.answer .code pre { margin: 0; padding-right: 38px; }
+.answer pre code { font: 13px/1.45 var(--mono); }
+.answer .copy { position: absolute; top: 4px; right: 4px; width: 30px; height: 28px; background: var(--bg); }
+.answer .copy .icon { width: 15px; height: 15px; }
+/* Maths: a formula set apart scrolls sideways when it is wider than the chat, as a table does. */
+.answer .maths.display { display: block; overflow-x: auto; overflow-y: hidden; margin: 4px 0 10px; padding: 2px 0; }
+.answer .maths .katex-display { margin: 0; }
+.answer .maths .katex { font-size: 1.1em; }
+/* Code's colours: Solarized's accents, which read on the light page and the dark one alike */
+.hljs-comment, .hljs-quote { color: var(--muted); font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-addition { color: #859900; }
+.hljs-string, .hljs-regexp, .hljs-meta .hljs-string { color: #2aa198; }
+.hljs-number, .hljs-symbol, .hljs-bullet { color: #d33682; }
+.hljs-title, .hljs-section, .hljs-name, .hljs-selector-id { color: #268bd2; }
+.hljs-built_in, .hljs-type, .hljs-class .hljs-title { color: #b58900; }
+.hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable, .hljs-params { color: #6c71c4; }
+.hljs-meta, .hljs-deletion { color: #cb4b16; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 600; }
 .answer .table { overflow-x: auto; margin: 0 0 10px; }
 .answer table { border-collapse: collapse; font-size: 15px; }
 .answer th, .answer td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; vertical-align: top; }
@@ -638,6 +703,34 @@ button.plain {
 }
 .permission .why { color: var(--muted); margin-top: 2px; }
 .permission .buttons { display: flex; gap: 8px; margin-top: 6px; }
+
+/* The slash commands that match what is being typed, over the box */
+#commands {
+  max-height: min(240px, 40vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 4px 16px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+}
+#commands[hidden] { display: none; }
+#commands button {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  font-size: 14px;
+}
+#commands button + button { border-top: 1px solid var(--line); }
+#commands .name { flex: none; font-family: var(--mono); color: var(--accent); }
+#commands .hint { flex: 0 1 auto; max-width: 35%; font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#commands .description { flex: 1; min-width: 0; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* The passage the next question carries, over the box: a tap goes to it, × drops it. */
 #quote {

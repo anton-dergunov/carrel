@@ -65,13 +65,18 @@ const reader = createReader({
   onFound: (found) => tools.showFound(found),
   onSaved: (saved) => highlights.showSaved(saved),
 });
-const tools = startPaperTools({ reader });
+const tools = startPaperTools({
+  reader,
+  showOverview() {
+    revealChat();
+    chat.showOverview();
+  },
+});
 const highlights = startHighlights({
   reader,
   onPassage: (passage) => chat.quote(passage),
   onAsk() {
-    if (layout.place === 'tab') go(CHAT);
-    else if (layout.hidden) chatToggle.click();
+    revealChat();
     chat.focus();
   },
 });
@@ -119,6 +124,12 @@ const chat = startChat({
 /** The paper whose tab is showing, if a paper's is. */
 function shownPaper() {
   return state.papers.find((paper) => paper.pdf === state.active) ?? null;
+}
+
+/** Brings the chat into view: its tab, or the pane when it is hidden. */
+function revealChat() {
+  if (layout.place === 'tab') go(CHAT);
+  else if (layout.hidden) chatToggle.click();
 }
 
 function chatShowing() {
@@ -225,6 +236,7 @@ function render() {
   // The paper a question is about, said where the question is typed.
   const about = paperInView(state);
   question.placeholder = about ? `Ask about “${shorten(about.title, 48)}”` : 'Ask about the library';
+  chat.about(about?.pdf ?? null);
   document.title = paper?.title ?? library;
 }
 

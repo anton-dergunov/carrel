@@ -123,6 +123,28 @@ class Library:
         meta, _ = self.lib.read_paper(text)
         return self._paper(text, meta, rel)
 
+    def paper_info(self, paper: Paper) -> dict:
+        """What the library knows of a paper, without reading it: its frontmatter in the
+        engine's field order, and whether the agent's note and the reader's overview exist."""
+        meta, _ = self.lib.read_paper(self.root / paper.text)
+        order = [key for key in self.lib.FIELDS if key in meta]
+        order += [key for key in meta if key not in order]
+        overview = self.overview_note(paper)
+        return {
+            "fields": [
+                [key, _plain(meta[key])] for key in order if meta[key] not in (None, "", [])
+            ],
+            "topic": paper.topic,
+            "notes": Path(self.lib.note_path(paper.text)).is_file(),
+            "overview": bool(overview and overview.is_file()),
+        }
+
+    def overview_note(self, paper: Paper) -> Path | None:
+        """The reader's overview note for a paper, where the overview skill writes it (and the
+        engine's scripts look for it), or None when the library keeps no overview notes."""
+        folder = self.overview_dir
+        return folder / f"{self.lib.paper_stem(paper.text)}.md" if folder else None
+
     def resolve_pdf(self, rel: str) -> Path:
         """The PDF at `rel` under pdf_root. Anything that leaves pdf_root, by `..`, an
         absolute path or a symlink, or that is not a PDF, is refused with LookupError."""
@@ -145,3 +167,10 @@ class Library:
             text=text.relative_to(self.root).as_posix(),
             pdf=pdf,
         )
+
+
+def _plain(value: object) -> str | list[str]:
+    """A frontmatter value as text: YAML reads dates as dates."""
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    return value.isoformat() if hasattr(value, "isoformat") else str(value)

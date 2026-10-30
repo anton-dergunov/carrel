@@ -20,7 +20,7 @@ for it. --info opens the page badge's sheet, with what the library knows of the 
 which moves the note to the Trash: a throwaway library again, with a note put in its
 overview_dir by hand (no model is asked). --type types TEXT into the question box and takes a
 shot without sending it, for the slash commands' list. --chat opens the chat with that id and
-takes a shot of each of a few of its formulas and code blocks: an earlier chat, VS Code's or
+takes a shot of each of a few of its formulas, code blocks and tables: an earlier chat, VS Code's or
 carrel's, is drawn from its transcript, and no question is asked, so it can be the reader's
 library. The browser's chats run on Haiku (--model), as testing the page needs no more. With --ask, it also types the question, waits for the answer
 (this runs a real Claude Code turn, which costs; --allow taps Allow on each permission
@@ -274,7 +274,7 @@ def type_pass(page, text: str, out: Path) -> None:
 
 
 def chat_pass(page, chat: str, out: Path) -> None:
-    """An earlier chat, drawn from its transcript: its formulas and code blocks."""
+    """An earlier chat, drawn from its transcript: its formulas, code blocks and tables."""
     if page.locator("#tab-chat").is_visible():
         page.click("#tab-chat")
     page.wait_for_selector(".question", timeout=15_000)
@@ -296,9 +296,26 @@ def chat_pass(page, chat: str, out: Path) -> None:
     )
     for error in page.locator(".answer .katex-error").all()[:5]:
         print("  failed:", error.get_attribute("title"))
-    # Each formula and code block in its answer, a few of each kind.
+    # The most lines any entry of a table's first column is broken over: 1 when none is.
+    lines = page.evaluate(
+        """() => [...document.querySelectorAll('.answer table')].map((table) =>
+             Math.max(...[...table.rows].map((row) => {
+               const range = document.createRange();
+               range.selectNodeContents(row.cells[0]);
+               return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+             })))"""
+    )
+    if lines:
+        print("  tables' first columns, most lines to an entry:", lines)
+    # Each formula, code block and table in its answer, a few of each kind.
     shown = 0
-    for selector in (".answer .maths.display", ".answer .maths:not(.display)", ".answer .code"):
+    kinds = (
+        ".answer .maths.display",
+        ".answer .maths:not(.display)",
+        ".answer .code",
+        ".answer .table",
+    )
+    for selector in kinds:
         for each in page.locator(selector).all()[:3]:
             each.scroll_into_view_if_needed()
             page.wait_for_timeout(150)

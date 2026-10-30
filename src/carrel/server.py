@@ -148,6 +148,17 @@ def write_pdf(path: Path, data: bytes, base: int, expected: str | None) -> str |
     return version(path)
 
 
+class PageFiles(StaticFiles):
+    """The page's scripts and styles, asked after again at every load (a 304 when unchanged).
+    Sent with only their Last-Modified, Safari keeps one it has for a while by how old it is, so a
+    change to carrel reached the iPad only days later, if a reload did not happen to ask."""
+
+    def file_response(self, *args, **kwargs) -> Response:
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 def page(request: Request, name: str, **values: str) -> HTMLResponse:
     text = Template((PAGES / name).read_text(encoding="utf-8")).substitute(values)
     return HTMLResponse(text, headers={"Content-Security-Policy": csp(request)})
@@ -426,7 +437,7 @@ def make_app(
             Route("/api/settings", get_settings, methods=["GET", "HEAD"]),
             Route("/api/settings", put_settings, methods=["PUT"]),
             WebSocketRoute("/ws", session),
-            Mount("/static", StaticFiles(directory=STATIC), name="static"),
+            Mount("/static", PageFiles(directory=STATIC), name="static"),
         ],
         lifespan=lifespan,
     )

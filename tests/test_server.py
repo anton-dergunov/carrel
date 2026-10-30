@@ -37,6 +37,15 @@ def test_read_page_is_the_same_page_with_the_paper_showing(client):
     assert client.get("/read/recsys/missing.pdf").status_code == 404
 
 
+def test_the_page_s_own_files_are_asked_after_at_every_load(client):
+    response = client.get("/static/markdown.js")
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-cache"
+    again = client.get("/static/markdown.js", headers={"If-None-Match": response.headers["etag"]})
+    assert again.status_code == 304
+    assert again.headers["cache-control"] == "no-cache"
+
+
 def test_pdf_in_ranges(client):
     response = client.get(f"/pdf/{PDF}", headers={"Range": "bytes=0-8"})
     assert response.status_code == 206

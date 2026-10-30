@@ -7,7 +7,7 @@
 // papers.js fills. The library's own page is a treemap of the top-level areas and the reviews.
 
 import { ancestry, areaCounts, inArea, reviewFor, reviewsInside, shortDate, topicTree, yearCounts } from './library.js';
-import { nestedTreemap } from './treemap.js';
+import { keepLargest, squarify } from './treemap.js';
 import { element, icon } from './rows.js';
 import { areaUrl, reviewUrl } from './tabs.js';
 
@@ -107,7 +107,11 @@ export function drawAreaPage(page, doc, { area, matches, query, year, searching 
 
   if (!area && !query && !searching) {
     parts.push(treemap(doc));
-    parts.push(reviewShelf(doc.reviews, 'Reviews'));
+    // Every area, as bars: the ones too small to name in the treemap are here too.
+    const largest = childrenOf(doc, '').sort((a, b) => b.total - a.total);
+    const every = subtopicBars(largest, doc.papers, '', doc, 'Every area');
+    every.id = 'all-areas';
+    parts.push(every, reviewShelf(doc.reviews, 'Reviews'));
     page.replaceChildren(...parts);
     return null;
   }
@@ -188,13 +192,13 @@ function reviewShelf(reviews, title) {
 }
 
 /** The subtopics, each a bar as long as its share of the largest. */
-function subtopicBars(children, papers, area, doc) {
+function subtopicBars(children, papers, area, doc, title = 'Subtopics') {
   const counts = areaCounts(papers);
   const hue = hues(doc);
   const rows = children.map((topic) => ({ topic, count: counts.get(topic.path) ?? 0 }));
   const most = Math.max(1, ...rows.map((row) => row.count));
   const section = element('section', 'subtopics');
-  section.append(element('h3', 'section-title', 'Subtopics'));
+  section.append(element('h3', 'section-title', title));
   for (const { topic, count } of rows) {
     const link = section.appendChild(areaLink(topic.path, 'bar-row'));
     link.textContent = '';
@@ -245,6 +249,15 @@ function histogram(years, chosen, hue) {
 }
 
 // The treemap of the whole library.
+//
+// Every tile names its area and its count, or is merged: an area's subtopics too small for a
+// label become one "+N more" tile, which opens the area's page (its subtopic bars list them),
+// and the smallest areas one "+N more areas" tile, which goes to the list of every area under
+// the treemap. A label is measured before it is drawn (fitLabel), so it is never cut.
+
+const GUTTER = 3;
+const PAD = { x: 8, y: 5 }; // a label's padding inside its tile
+const SUB_PAD = { x: 6, y: 4 };
 
 function treemap(doc) {
   const box = element('div', 'treemap');
@@ -263,22 +276,29 @@ function treemap(doc) {
     width = now;
     const height = Math.round(Math.min(640, Math.max(340, now * 0.62)));
     box.style.height = `${height}px`;
-    const tiles = nestedTreemap(nodes, { x: 0, y: 0, width: now, height }, { gutter: 3, header: 26 });
     const drawn = [];
-    for (const tile of tiles) {
-      const link = place(areaLink(tile.item.path, 'tile', ''), tile);
+    for (const tile of layoutTreemap(nodes, { x: 0, y: 0, width: now, height })) {
+      const area = tile.item.merged ? '' : tile.item.path;
+      const link = place(areaLink(area, 'tile', ''), tile);
       link.setAttribute('role', 'listitem');
-      link.style.setProperty('--hue', `var(--area-${hueOf(tile.item.path, hue)})`);
-      link.title = `${areaName(tile.item.path)}: ${plural(tile.item.value, 'paper')}`;
-      const top = fit(areaName(tile.item.path), tile.width - 22, tile.children.length ? 22 : tile.height - 10, 15, 600);
-      if (top) link.append(label(tile.item, top, tile.width > 120));
+      if (tile.item.merged) {
+        // The areas too small to name: the list of every area, under the treemap.
+        link.classList.add('more');
+        link.href = '#all-areas';
+        delete link.dataset.area;
+        link.dataset.scroll = 'all-areas';
+      }
+      link.style.setProperty('--hue', tile.item.merged ? 'var(--muted)' : `var(--area-${hueOf(area, hue)})`);
+      link.title = tileTitle(tile.item);
+      if (tile.label) link.append(drawLabel(tile.item, tile.label));
       drawn.push(link);
       for (const child of tile.children) {
-        const sub = place(areaLink(child.item.path, 'tile sub', ''), child);
+        // A merged subtopic tile opens its area's page, where the bars name them all.
+        const sub = place(areaLink(child.item.merged ? tile.item.path : child.item.path, 'tile sub', ''), child);
+        if (child.item.merged) sub.classList.add('more');
         sub.style.setProperty('--hue', `var(--area-${hueOf(tile.item.path, hue)})`);
-        sub.title = `${areaName(child.item.path)}: ${plural(child.item.value, 'paper')}`;
-        const fitted = fit(areaName(child.item.path), child.width - 18, child.height - 8, 13.5, 400);
-        if (fitted) sub.append(label(child.item, fitted, child.width > 96 && fitted.lines < fitted.room));
+        sub.title = tileTitle(child.item);
+        if (child.label) sub.append(drawLabel(child.item, child.label));
         drawn.push(sub);
       }
     }
@@ -289,52 +309,111 @@ function treemap(doc) {
   return box;
 }
 
+// The rest, merged: laid out last, in the corner where the smallest tiles are.
+const merge = (members) => ({ merged: true, last: true, members, value: members.reduce((sum, item) => sum + item.value, 0), children: [] });
+
+/** What a tile says: its name, or for a merged one "+N more", then the count. */
+function tileText(item, top) {
+  if (!item.merged) return { name: areaName(item.path), count: number.format(item.value) };
+  return { name: `+${item.members.length} more${top ? ' areas' : ''}`, count: number.format(item.value) };
+}
+
+function tileTitle(item) {
+  if (!item.merged) return `${areaName(item.path)}: ${plural(item.value, 'paper')}`;
+  return item.members.map((member) => `${areaName(member.path)}: ${number.format(member.value)}`).join('\n');
+}
+
+/**
+ * The tiles to draw: the top-level areas, each with its label and, inside a tile large enough,
+ * its subtopics below the label. Tiles that cannot hold a label are merged, at each level.
+ */
+function layoutTreemap(nodes, rect) {
+  const half = GUTTER / 2;
+  const inset = (tile) => ({ ...tile, x: tile.x + half, y: tile.y + half, width: Math.max(0, tile.width - GUTTER), height: Math.max(0, tile.height - GUTTER) });
+  const topLabel = (tile, height = tile.height) => fitLabel(tileText(tile.item, true), tile.width - 2 * PAD.x, height - 2 * PAD.y, TOP_TEXT);
+  const { tiles: tops } = keepLargest(nodes, (items) => squarify(items, rect).map(inset), (tile) => topLabel(tile) !== null, merge);
+  return tops.map((tile) => {
+    const children = tile.item.children ?? [];
+    if (children.length < 2 || tile.width < 110 || tile.height < 90) return { ...tile, label: topLabel(tile), children: [] };
+    // The header takes what its label needs, at most a third of the tile.
+    const label = topLabel(tile, Math.max(30, tile.height / 3));
+    if (!label) return { ...tile, label: topLabel(tile), children: [] };
+    const header = label.height + 2 * PAD.y;
+    const area = { x: tile.x + half, y: tile.y + header, width: tile.width - GUTTER, height: tile.height - header - half };
+    const subLabel = (child) => fitLabel(tileText(child.item, false), child.width - 2 * SUB_PAD.x, child.height - 2 * SUB_PAD.y, SUB_TEXT);
+    const { tiles: laid, kept } = keepLargest(children, (items) => squarify(items, area).map(inset), (child) => subLabel(child) !== null, merge);
+    // Not even one subtopic can be named: the tile shows its own label alone.
+    if (!kept) return { ...tile, label: topLabel(tile), children: [] };
+    return { ...tile, label, children: laid.map((child) => ({ ...child, label: subLabel(child) })) };
+  });
+}
+
 function place(element, rect) {
   Object.assign(element.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` });
   return element;
 }
 
-// Labels are measured: a name's longest word must fit its tile's width, at a smaller size if it
-// must (never below 11 px), and it gets only the lines the tile has room for.
+// Labels are measured with the page's own font: the name wraps between words, never inside one,
+// at the largest size from the text's own down to 11 px at which it fits; the count follows on
+// the name's last line when there is room, else on a line of its own. A label that does not fit
+// at 11 px is not drawn, and its tile is merged.
+const TOP_TEXT = { size: 15, weight: 600, count: 12 };
+const SUB_TEXT = { size: 13.5, weight: 400, count: 11.5 };
 const SMALLEST_TEXT = 11;
+const LINE = 1.2;
+const MOST_LINES = 3;
+const SAFETY = 4; // px: the canvas measures a little narrower than WebKit draws
 let measure = null;
+let family = null;
 
 function textWidth(text, size, weight) {
   measure ??= document.createElement('canvas').getContext('2d');
-  const family = getComputedStyle(document.documentElement).getPropertyValue('--reading').trim() || 'serif';
+  family ??= getComputedStyle(document.documentElement).getPropertyValue('--reading').trim() || 'serif';
   measure.font = `${weight} ${size}px ${family}`;
   return measure.measureText(text).width;
 }
 
-/** The size and lines a name fits in `width` × `height` px at, or null when it cannot. */
-function fit(name, width, height, size, weight) {
-  const words = name.split(' ');
-  const longest = Math.max(...words.map((word) => textWidth(word, size, weight)));
-  const scaled = longest > width ? Math.floor((size * width) / longest) : size;
-  if (scaled < SMALLEST_TEXT) return null;
-  const line = scaled * 1.2;
-  const room = Math.floor(height / line);
-  if (room < 1) return null;
-  // Lines needed, filling each greedily.
-  let lines = 1;
-  let filled = 0;
+/** The lines `words` wrap into at `width` px, or null when a word alone is wider. */
+function wrap(words, width, size, weight) {
+  const lines = [];
+  let line = '';
   for (const word of words) {
-    const add = textWidth(filled ? ` ${word}` : word, scaled, weight);
-    if (filled && filled + add > width) {
-      lines += 1;
-      filled = textWidth(word, scaled, weight);
+    if (textWidth(word, size, weight) > width) return null;
+    const longer = line ? `${line} ${word}` : word;
+    if (line && textWidth(longer, size, weight) > width) {
+      lines.push(line);
+      line = word;
     } else {
-      filled += add;
+      line = longer;
     }
   }
-  return { size: scaled, lines: Math.min(lines, room), room };
+  lines.push(line);
+  return lines;
 }
 
-function label(item, fitted, wide) {
-  const box = element('span', fitted.lines === 1 ? 'label one-line' : 'label');
-  box.style.webkitLineClamp = String(fitted.lines);
+/** How a label of {name, count} fits in `width` × `height` px: {size, countSize, below, height, said}, or null. */
+function fitLabel({ name, count }, width, height, text) {
+  const said = { name, count };
+  width -= SAFETY;
+  if (width <= 0 || height <= 0) return null;
+  for (let size = text.size; size >= SMALLEST_TEXT; size -= 0.5) {
+    const countSize = Math.min(text.count, size);
+    const lines = wrap(name.split(' '), width, size, text.weight);
+    if (!lines || lines.length > MOST_LINES) continue;
+    const countWidth = textWidth(count, countSize, 400) + 6;
+    const below = textWidth(lines.at(-1), size, text.weight) + countWidth > width;
+    const needed = lines.length * size * LINE + (below ? countSize * LINE : 0);
+    if (needed <= height) return { size, countSize, below, height: needed, said };
+  }
+  return null;
+}
+
+function drawLabel(item, fitted) {
+  const { name, count } = fitted.said;
+  const box = element('span', fitted.below ? 'label count-below' : 'label');
   box.style.fontSize = `${fitted.size}px`;
-  box.append(element('span', 'name', areaName(item.path)));
-  box.append(element('span', 'count', wide ? number.format(item.value) : ''));
+  box.append(element('span', 'name', name));
+  const tally = box.appendChild(element('span', 'count', count));
+  tally.style.fontSize = `${fitted.countSize}px`;
   return box;
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { nestedTreemap, squarify } from '../src/carrel/static/treemap.js';
+import { keepLargest, squarify } from '../src/carrel/static/treemap.js';
 
 const close = (a, b) => Math.abs(a - b) < 1e-9;
 
@@ -32,16 +32,28 @@ test('no tiles overlap, and none of no value is drawn', () => {
   assert.deepEqual(squarify([], { x: 0, y: 0, width: 10, height: 10 }), []);
 });
 
-test('children inside a large tile, below its header, inside its gutter', () => {
-  const nodes = [
-    { value: 80, children: [{ value: 50 }, { value: 30 }] },
-    { value: 20, children: [{ value: 10 }, { value: 10 }] },
-  ];
-  const [big, small] = nestedTreemap(nodes, { x: 0, y: 0, width: 400, height: 300 }, { gutter: 4, header: 24, smallest: { width: 120, height: 84 } });
-  assert.equal(big.children.length, 2);
-  for (const child of big.children) {
-    assert.ok(child.x >= big.x && child.x + child.width <= big.x + big.width + 1e-9);
-    assert.ok(child.y >= big.y + 24 && child.y + child.height <= big.y + big.height + 1e-9);
-  }
-  assert.equal(small.children.length, 0); // too small for its children: 76 px wide
+test('the largest that can be named are kept, the rest merged into one', () => {
+  const items = [100, 60, 40, 3, 2, 2, 1].map((value, i) => ({ value, name: `t${i}` }));
+  const rect = { x: 0, y: 0, width: 300, height: 200 };
+  const merge = (members) => ({ value: members.reduce((sum, item) => sum + item.value, 0), members });
+  const big = (tile) => tile.width * tile.height >= 1500;
+  const { tiles, kept } = keepLargest(items, (list) => squarify(list, rect), big, merge);
+  assert.equal(kept, 3);
+  const merged = tiles.find((tile) => tile.item.members);
+  assert.deepEqual(merged.item.members.map((item) => item.name), ['t3', 't4', 't5', 't6']);
+  assert.equal(merged.item.value, 8);
+  // All fit: nothing merged.
+  assert.equal(keepLargest(items, (list) => squarify(list, rect), () => true, merge).kept, 7);
+  // One small item is never merged alone: it goes with the next smallest.
+  const three = [{ value: 100 }, { value: 50 }, { value: 1 }];
+  const fitsBig = (tile) => tile.item.members || tile.item.value >= 50;
+  assert.equal(keepLargest(three, (list) => squarify(list, rect), fitsBig, merge).kept, 1);
+  // Nothing fits: every item laid out, none kept.
+  assert.equal(keepLargest(three, (list) => squarify(list, rect), () => false, merge).kept, 0);
+});
+
+test('an item marked last goes after the others, whatever its size', () => {
+  const tiles = squarify([{ value: 10 }, { value: 50, last: true }, { value: 30 }], { x: 0, y: 0, width: 90, height: 10 });
+  assert.deepEqual(tiles.map((tile) => tile.item.value), [30, 10, 50]);
+  assert.ok(tiles.at(-1).x >= tiles[0].x && tiles.at(-1).x + tiles.at(-1).width <= 90 + 1e-9);
 });

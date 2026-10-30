@@ -3,7 +3,8 @@
 // label fits and the eye compares them. Pure: the view (areas.js) draws what this returns.
 
 /**
- * Lays `items` ({value, …}) out in `rect` ({x, y, width, height}), the largest first. Returns
+ * Lays `items` ({value, last?, …}) out in `rect` ({x, y, width, height}), the largest first and
+ * an item marked `last` after all the others, whatever its size (the rest, merged). Returns
  * [{item, x, y, width, height}], which fill the rectangle; items of no value are left out.
  */
 export function squarify(items, rect) {
@@ -12,7 +13,7 @@ export function squarify(items, rect) {
   const scale = (rect.width * rect.height) / total;
   const queue = items
     .filter((item) => item.value > 0)
-    .sort((a, b) => b.value - a.value)
+    .sort((a, b) => Number(Boolean(a.last)) - Number(Boolean(b.last)) || b.value - a.value)
     .map((item) => ({ item, area: item.value * scale }));
   const free = { ...rect };
   const placed = [];
@@ -71,26 +72,19 @@ function placeRow(row, free, placed, last = false) {
 }
 
 /**
- * Two levels: the nodes ({value, children: [{value, …}]}) laid out in `rect`, and inside each
- * tile large enough for them, its children, below a header of `header` px. Tiles are inset by
- * half the `gutter` on every side, so two neighbours sit a gutter apart.
+ * The largest items that can each be named, and the rest merged into one: lays out the k
+ * largest of `items` with `merge(rest)` beside them, using `place(items)`, which returns tiles
+ * ({item, …}), for the largest k at which `fits(tile)` holds for every tile, the merged one too.
+ * Merging a single item would only rename it, so the rest is never one item. Returns the tiles
+ * and k; when not even the largest item and the rest fit, k is 0 and the tiles are all of them.
  */
-export function nestedTreemap(nodes, rect, { gutter = 2, header = 24, smallest = { width: 120, height: 84 } } = {}) {
-  const half = gutter / 2;
-  return squarify(nodes, rect).map((tile) => {
-    const inner = { x: tile.x + half, y: tile.y + half, width: Math.max(0, tile.width - gutter), height: Math.max(0, tile.height - gutter) };
-    const children = tile.item.children ?? [];
-    let laid = [];
-    if (children.length > 1 && inner.width >= smallest.width && inner.height >= smallest.height) {
-      const area = { x: inner.x + half, y: inner.y + header, width: inner.width - gutter, height: inner.height - header - half };
-      laid = squarify(children, area).map((child) => ({
-        ...child,
-        x: child.x + half,
-        y: child.y + half,
-        width: Math.max(0, child.width - gutter),
-        height: Math.max(0, child.height - gutter),
-      }));
-    }
-    return { ...inner, item: tile.item, children: laid };
-  });
+export function keepLargest(items, place, fits, merge) {
+  const sorted = [...items].sort((a, b) => b.value - a.value);
+  for (let k = sorted.length; k >= 1; k--) {
+    if (sorted.length - k === 1) continue;
+    const rest = sorted.slice(k);
+    const tiles = place(rest.length ? [...sorted.slice(0, k), merge(rest)] : sorted);
+    if (tiles.every(fits)) return { tiles, kept: k };
+  }
+  return { tiles: place(sorted), kept: 0 };
 }

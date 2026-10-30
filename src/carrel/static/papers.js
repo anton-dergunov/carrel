@@ -512,6 +512,13 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
       drawTree(tree, doc, { area: state.area, counts: titleQuery() ? areaCounts(filterPapers(doc.papers, titleQuery())) : null, expanded });
       return;
     }
+    const scroll = event.target.closest('[data-scroll]');
+    if (scroll) {
+      event.preventDefault();
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      document.getElementById(scroll.dataset.scroll)?.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
+      return;
+    }
     const mode = event.target.closest('[data-timeline]');
     if (mode) {
       state.timeline = mode.dataset.timeline;

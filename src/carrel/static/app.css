@@ -726,20 +726,23 @@ h3.group .count { font-weight: 400; font-variant-numeric: tabular-nums; opacity:
 }
 .treemap .tile.sub { z-index: 1; border-radius: 4px; background: color-mix(in srgb, var(--hue) 42%, var(--surface)); }
 .treemap .tile:active { filter: brightness(0.94); }
-/* A label wraps to two lines before it is cut, its count after the name. */
-.treemap .label {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  padding: 5px 8px 0;
-}
-.treemap .label.one-line { display: block; white-space: nowrap; text-overflow: ellipsis; }
-.treemap .label .name { font: 600 1em/1.2 var(--reading); }
+/* Labels are measured to fit (areas.js): the name wraps between words, the count after it or
+   under it. A tile that stands for several too small to name is a lighter wash, hatched. */
+.treemap .label { display: block; padding: 5px 8px 0; line-height: 1.2; }
 .treemap .sub .label { padding: 4px 6px 0; }
-.treemap .label { line-height: 1.2; }
-.treemap .sub .label .name { font: 400 1em/1.2 var(--reading); }
-.treemap .label .count { margin-left: 6px; font-size: 12px; color: color-mix(in srgb, var(--text) 62%, transparent); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.treemap .label .name { font: 600 1em/1.2 var(--reading); }
+.treemap .sub .label .name { font-weight: 400; }
+.treemap .label .count { margin-left: 0.4em; color: color-mix(in srgb, var(--text) 62%, transparent); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.treemap .label.count-below .count { display: block; margin: 1px 0 0; }
+.treemap .tile.more {
+  background:
+    repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--hue) 10%, transparent) 6px 7px),
+    color-mix(in srgb, var(--hue) 14%, var(--surface));
+}
+.treemap .tile.sub.more { background:
+    repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--hue) 18%, transparent) 6px 7px),
+    color-mix(in srgb, var(--hue) 26%, var(--surface)); }
+.treemap .tile.more .label .name { font-style: italic; font-weight: 400; }
 
 /* The Text depth: the papers whose text holds the words, with snippets and their pages. */
 .text-head { padding-left: 4px; }
@@ -1330,3 +1333,5 @@ button.danger { background: var(--error); color: var(--surface); padding: 6px 14
 .confirm-remove { display: grid; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .confirm-remove .warning { margin: 0; font-size: 13.5px; line-height: 1.4; color: var(--text); }
 .confirm-remove .buttons { display: flex; align-items: center; gap: 12px; }
+
+#all-areas { scroll-margin-top: calc(var(--bar-height, 104px) + 12px); }

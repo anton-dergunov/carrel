@@ -4,7 +4,7 @@ The library tab becomes the reader's overview of what they have: one collection 
 
 This plan is plan.md's step 6 and its feedback items 16 (notes and reviews), 17 (add and remove papers) and 18 (a better paper list). Notes belong to the paper's sheet, reviews to the library. How the built parts work is in [architecture.md](architecture.md); the rest of what is left is in [plan.md](plan.md).
 
-**Status (30 Oct 2026): phases 1–3 are built and await their sitting on the iPad**, where their notes below move to architecture.md, as the convention says. They were checked in WebKit at the iPad's size, in both orientations and both themes, on the real library (the views only read), and adding, removing and a question beside a review on a throwaway one, on Haiku. Meaning search and the map are still to do.
+**Status (30 Oct 2026): phases 1–3 are built and await their sitting on the iPad**, where their notes below move to architecture.md, as the convention says. They were checked in WebKit at the iPad's size, in both orientations and both themes, on the real library (the views only read), and adding, removing and a question beside a review on a throwaway one, on Haiku. Meaning search and the map are still to do; the treemap of areas has its own plan, [plan-area-map.md](plan-area-map.md).
 
 **What the building changed:**
 - **The document** is 0.5 MB gzipped, not 250 KB: 2,275 papers with their summaries and authors. It is fetched once per page and then answered with a 304.

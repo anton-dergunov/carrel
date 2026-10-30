@@ -1,4 +1,5 @@
-"""The HTTP server: the paper list, the reading page, the PDFs, and the chats' WebSocket.
+"""The HTTP server: the one page (the library, an area of it, a paper or a review showing), the
+library as one document, the PDFs, and the chats' WebSocket.
 
 It listens on 127.0.0.1 only. `tailscale serve` publishes it to the tailnet over HTTPS,
 keeps the Host the browser asked for, and says who is asking in `Tailscale-User-Login`
@@ -42,6 +43,7 @@ from starlette.routing import Mount, Route, WebSocketRoute
 from starlette.staticfiles import StaticFiles
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
+from .catalog import Catalog
 from .engine import Library
 from .session import Session, Sessions
 from .settings import DEFAULT_MODEL, LONGEST_NOTE, MODELS, Settings
@@ -171,8 +173,10 @@ def make_app(
     extra_folders: tuple[Path, ...] = (),
     sessions: Sessions | None = None,
     settings: Settings | None = None,
+    catalog: Catalog | None = None,
 ):
     sessions = sessions or Sessions(library, extra_folders, settings=settings)
+    catalog = catalog or Catalog(library)
     # One PDF written at a time: a save checks the file's version, then replaces it.
     writing = asyncio.Lock()
 
@@ -188,9 +192,11 @@ def make_app(
             for topic, items in topics.items()
         )
 
-    def shell(request: Request, pdf: str = "", title: str = "") -> Response:
-        """The one page: the paper list and the open papers in tabs, and the chat beside them.
-        The address only says which tab is showing."""
+    def shell(
+        request: Request, pdf: str = "", title: str = "", area: str = "", review: str = ""
+    ) -> Response:
+        """The one page: the library and the open papers and reviews in tabs, and the chat
+        beside them. The address only says which tab, or which area of the library, shows."""
         return page(
             request,
             "app.html",
@@ -199,10 +205,44 @@ def make_app(
             title=html.escape(title or library.root.name),
             pdf=html.escape(pdf, quote=True),
             pdf_title=html.escape(title, quote=True),
+            area=html.escape(area, quote=True),
+            review=html.escape(review, quote=True),
         )
 
     async def index(request: Request) -> Response:
         return shell(request)
+
+    async def area(request: Request) -> Response:
+        """The library open at one of its topics."""
+        topic = request.path_params["topic"].strip("/")
+        known = await asyncio.to_thread(library.topics)
+        if topic not in known and not (library.papers_dir / topic).is_dir():
+            return PlainTextResponse("No such area in the library.", status_code=404)
+        return shell(request, title=f"{topic} · {library.root.name}", area=topic)
+
+    async def review_page(request: Request) -> Response:
+        """The page with a literature review's tab showing."""
+        scope = request.path_params["scope"].strip("/")
+        reviews = await asyncio.to_thread(library.lib.load_reviews)
+        if scope not in reviews:
+            return PlainTextResponse("No review of that area in the library.", status_code=404)
+        title = str(reviews[scope]["meta"].get("title") or scope)
+        return shell(request, title=title, review=scope)
+
+    async def library_document(request: Request) -> Response:
+        """Every paper, topic and review, as one document. It changes only when the library
+        does: a page that has it gets a 304, and it goes compressed (the PDFs do not: a
+        compressed range is no range)."""
+        built = await asyncio.to_thread(catalog.current)
+        headers = {"ETag": built.etag, "Cache-Control": "no-cache", "Vary": "Accept-Encoding"}
+        if built.etag in [
+            tag.strip() for tag in request.headers.get("if-none-match", "").split(",")
+        ]:
+            return Response(status_code=304, headers=headers)
+        if "gzip" in request.headers.get("accept-encoding", "").lower():
+            headers["Content-Encoding"] = "gzip"
+            return Response(built.gzipped, media_type="application/json", headers=headers)
+        return Response(built.body, media_type="application/json", headers=headers)
 
     async def read(request: Request) -> Response:
         rel = request.path_params["path"]
@@ -425,6 +465,9 @@ def make_app(
         routes=[
             Route("/", index),
             Route("/read/{path:path}", read),
+            Route("/area/{topic:path}", area),
+            Route("/review/{scope:path}", review_page),
+            Route("/api/library", library_document),
             Route("/pdf/{path:path}", pdf, methods=["GET", "HEAD"]),
             Route("/pdf/{path:path}", save_pdf, methods=["PUT"]),
             Route("/api/log", page_log, methods=["POST"]),

@@ -9,10 +9,14 @@ What the reader was asked, and answered, carrel keeps too, one line each.
 import json
 import os
 import re
+import shutil
+import subprocess
 import time
 from collections import Counter
 from pathlib import Path
 from urllib.parse import urlsplit
+
+from .prompt import paper_named
 
 # The tag of carrel's sessions, and of its first ones, which ran as the SDK's.
 OUR_ENTRYPOINTS = {"carrel", "sdk-py"}
@@ -151,6 +155,74 @@ def permission_answers(log: Path | None = None) -> Counter:
                 answer += f" by the {entry['by']}"
             counts[f"{entry['tool']} {what}".strip() + f": {answer}"] += 1
     return counts
+
+
+CARREL_TAG = '"entrypoint":"carrel"'
+# Each transcript's count, by its path, with the size and time it was counted at.
+_discussed: dict[Path, tuple[tuple[int, int], Counter]] = {}
+
+
+def _tagged(transcripts: Path) -> list[Path]:
+    """The transcripts with a line carrel ran: ripgrep finds them in a tenth of a second
+    among a few hundred MB, and Python is the fallback."""
+    rg = shutil.which("rg")
+    if rg:
+        found = subprocess.run(
+            [rg, "-l", "-F", "--no-ignore", "--hidden", "--max-depth", "1", "-g", "*.jsonl"]
+            + [CARREL_TAG, str(transcripts)],
+            capture_output=True,
+            text=True,
+        )
+        if found.returncode in (0, 1):
+            return sorted(Path(line) for line in found.stdout.splitlines())
+    return sorted(
+        path
+        for path in transcripts.glob("*.jsonl")
+        if CARREL_TAG in path.read_text(encoding="utf-8", errors="replace")
+    )
+
+
+def _questions(path: Path) -> Counter:
+    """How many of carrel's questions in one transcript name each paper."""
+    counts = Counter()
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if CARREL_TAG not in line:
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if entry.get("type") != "user":
+            continue
+        content = (entry.get("message") or {}).get("content")
+        if isinstance(content, list):
+            content = "\n".join(
+                str(block.get("text", "")) for block in content if isinstance(block, dict)
+            )
+        paper = paper_named(content) if isinstance(content, str) else None
+        if paper:
+            counts[paper] += 1
+    return counts
+
+
+def discussed(library_root: Path, transcripts: Path | None = None) -> dict[str, int]:
+    """{paper file, relative to the library root: how many questions carrel's chats asked
+    about it}, from the transcripts. A transcript is read again only when it changed."""
+    transcripts = transcripts or transcripts_dir(library_root)
+    if not transcripts.is_dir():
+        return {}
+    total = Counter()
+    for path in _tagged(transcripts):
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        stamp = (stat.st_mtime_ns, stat.st_size)
+        known = _discussed.get(path)
+        if not known or known[0] != stamp:
+            known = _discussed[path] = (stamp, _questions(path))
+        total.update(known[1])
+    return dict(total)
 
 
 def report(library_root: Path) -> str:

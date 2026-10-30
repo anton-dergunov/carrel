@@ -6,9 +6,14 @@ PDF = "recsys/Wide & Deep. A Test Paper.pdf"
 
 
 def test_papers_lists_those_with_a_pdf(library):
-    papers = library.papers()
-    assert [p.title for p in papers] == ["Wide & Deep: A Test Paper"]
-    paper = papers[0]
+    papers = {p.title: p for p in library.papers()}
+    # The example's web article and "No PDF Yet" have no PDF.
+    assert sorted(papers) == [
+        "Direct Preference Optimization: Your Language Model is Secretly a Reward Model",
+        "Larimar: Large Language Models with Episodic Memory Control",
+        "Wide & Deep: A Test Paper",
+    ]
+    paper = papers["Wide & Deep: A Test Paper"]
     assert (paper.year, paper.topic, paper.pdf) == ("2016", "recsys", PDF)
     assert paper.text == "library/recsys/Wide & Deep. A Test Paper.txt"
 

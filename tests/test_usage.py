@@ -6,6 +6,7 @@ import pytest
 from carrel.usage import (
     bash_program,
     carrel_sessions,
+    discussed,
     permission_answers,
     record_permission,
     record_session,
@@ -94,3 +95,29 @@ def test_carrel_keeps_its_session_ids(tmp_path):
     record_session("b", log)
     log.write_text(log.read_text() + "not json\n")
     assert carrel_sessions(log) == {"a", "b"}
+
+
+@pytest.mark.parametrize("ripgrep", [True, False])
+def test_the_papers_carrel_s_chats_asked_about(tmp_path, monkeypatch, ripgrep):
+    if not ripgrep:
+        monkeypatch.setattr("carrel.usage.shutil.which", lambda name: None)
+
+    def line(text, entrypoint="carrel"):
+        entry = {"type": "user", "entrypoint": entrypoint, "message": {"content": text}}
+        return json.dumps(entry, separators=(",", ":"))
+
+    (tmp_path / "a.jsonl").write_text(
+        "\n".join(
+            [
+                line("[Reading library/x/A.txt, page 2]\nWhy?"),
+                line(
+                    "<command-name>/overview</command-name><command-args>[Reading library/x/B.txt]</command-args>"
+                ),
+                line("No paper open."),
+                "not json " + line("[Reading library/x/A.txt]"),
+            ]
+        )
+    )
+    (tmp_path / "b.jsonl").write_text(line("[Reading library/x/A.txt]\nWhy?", entrypoint="cli"))
+    assert discussed(Path("/nowhere"), tmp_path) == {"library/x/A.txt": 1, "library/x/B.txt": 1}
+    assert discussed(Path("/nowhere"), tmp_path / "missing") == {}

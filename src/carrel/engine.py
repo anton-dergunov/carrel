@@ -6,6 +6,7 @@ after the library is named.
 """
 
 import os
+import re
 import sys
 import unicodedata
 from dataclasses import dataclass
@@ -102,16 +103,87 @@ class Library:
                 folders.append(path)
         return folders
 
-    def papers(self) -> list[Paper]:
-        """Every paper that has a PDF, by topic and title. Web articles without a printed
-        PDF are left out: there is nothing to show above the chat."""
-        papers = []
+    @property
+    def reviews_dir(self) -> Path:
+        return Path(self.lib.REVIEWS_DIR).resolve()
+
+    @property
+    def topics_file(self) -> Path:
+        return Path(self.lib.TOPICS_FILE).resolve()
+
+    def entries(self) -> list[tuple[Paper, dict]]:
+        """Every paper that has a PDF, with its frontmatter (as JSON holds it: dates are
+        strings), by topic and title. Web articles without a printed PDF are left out: there
+        is nothing to show above the chat."""
+        entries = []
         for path, meta in self.lib.paper_index().items():
             pdf = Path(self.lib.pdf_path_for(path))
             if pdf.is_file():
                 rel = pdf.relative_to(self.lib.PDF_ROOT).as_posix()
-                papers.append(self._paper(Path(path), meta, rel))
-        return sorted(papers, key=lambda p: (p.topic, p.title.lower()))
+                entries.append((self._paper(Path(path), meta, rel), meta))
+        return sorted(entries, key=lambda entry: (entry[0].topic, entry[0].title.lower()))
+
+    def papers(self) -> list[Paper]:
+        return [paper for paper, _ in self.entries()]
+
+    def topics(self) -> dict[str, str]:
+        """The declared topic tree, {folder: scope}, in the file's order."""
+        return {str(path): str(scope or "") for path, scope in self.lib.load_topics().items()}
+
+    def paper_type(self, paper_text: str, meta: dict) -> str | None:
+        """The paper's type: its frontmatter's, else the one its note's reading gave.
+        The fallback goes when the engine's frontmatter always has it (its paper-types task)."""
+        kind = meta.get("type")
+        if kind in self.lib.TYPES:
+            return kind
+        return self.lib.note_fields(self.root / paper_text).get("type")
+
+    def overview_names(self) -> set[str]:
+        """The stems of the papers that have an overview note, from one listing of its folder."""
+        folder = self.overview_dir
+        if not folder or not folder.is_dir():
+            return set()
+        return {_nfc(path.stem) for path in folder.glob("*.md")}
+
+    def has_overview(self, paper: Paper, names: set[str]) -> bool:
+        return _nfc(self.lib.paper_stem(paper.text)) in names
+
+    def reviews(self) -> list[dict]:
+        """Every literature review: its scope, title, date, file, the first paragraph of its
+        abstract, and the paper files it cites (relative to the library root), by scope."""
+        found = []
+        for scope, review in sorted(self.lib.load_reviews().items()):
+            meta = review["meta"]
+            main = Path(review["main"]).resolve()
+            cites: list[str] = []
+            for path in review["files"]:
+                for _, resolved, exists in self.lib.review_links(path):
+                    rel = self._paper_file(Path(resolved)) if exists else None
+                    if rel and rel not in cites:
+                        cites.append(rel)
+            found.append(
+                {
+                    "scope": scope,
+                    "title": str(meta.get("title") or scope),
+                    "updated": _plain(meta["updated"]) if meta.get("updated") else "",
+                    "path": main.relative_to(self.root).as_posix()
+                    if main.is_relative_to(self.root)
+                    else str(main),
+                    "abstract": _abstract(main.read_text(encoding="utf-8")),
+                    "cites": cites,
+                }
+            )
+        return found
+
+    def _paper_file(self, path: Path) -> str | None:
+        """A link's target as a paper file relative to the library root, or None when it is
+        not a paper (another review, a doc)."""
+        path = path.resolve()
+        if path.suffix not in self.lib.PAPER_SUFFIXES or path.name == "README.md":
+            return None
+        if not path.is_relative_to(self.papers_dir):
+            return None
+        return path.relative_to(self.root).as_posix() if path.is_relative_to(self.root) else None
 
     def paper_for_pdf(self, rel: str) -> Paper | None:
         """The paper whose PDF is at `rel` under pdf_root, or None when the library has no
@@ -190,6 +262,21 @@ def _plain(value: object) -> str | list[str]:
     if isinstance(value, list):
         return [str(item) for item in value]
     return value.isoformat() if hasattr(value, "isoformat") else str(value)
+
+
+_CALLOUT = re.compile(r"^> \[!abstract\][^\n]*\n((?:>[^\n]*\n?)*)", re.M | re.I)
+_INLINE_LINK = re.compile(r"\[([^\]\n]+)\](?:\([^)\s]*\)|\[[^\]\n]*\])")
+
+
+def _abstract(text: str) -> str:
+    """The first paragraph of a review's `> [!abstract]` callout, as plain text."""
+    found = _CALLOUT.search(text)
+    if not found:
+        return ""
+    lines = [line[1:].strip() for line in found[1].splitlines()]
+    paragraph = " ".join(lines[: lines.index("")] if "" in lines else lines)
+    paragraph = _INLINE_LINK.sub(r"\1", paragraph)
+    return re.sub(r"\*\*|__|(?<!\w)[*_](?=\S)|(?<=\S)[*_](?!\w)|`", "", paragraph).strip()
 
 
 def _nfc(text: str) -> str:

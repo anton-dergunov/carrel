@@ -10,7 +10,7 @@ From the reader's sittings on the iPad, numbered as the steps below cite them. I
 
 14. **A citation goes to the exact spot**, not just the page: the rectangle, highlighted. This is the same technique as in vscode-pdf-viewer; see the engine's [precise-pdf-locations](../../agentic-paper-library/docs/tasks/precise-pdf-locations.md).
 
-**The library**, planned in [plan-library.md](plan-library.md)
+**The library**, planned in [plan-library.md](plan-library.md): built, awaiting its sitting
 
 16. **Notes and reviews**, readable in the app.
 17. **Add and remove papers**, through `paperlib add` and `paperlib remove`, showing their output.
@@ -25,7 +25,7 @@ From the reader's sittings on the iPad, numbered as the steps below cite them. I
 
 Each step ends with a sitting on the iPad, and its findings are added here. Steps 1–5 (the app and its chats; layout and tabs; the text layer; settings; the chat as the VS Code panel reads, with the overview and the properties) are built and described in [architecture.md](architecture.md).
 
-6. **The library** (items 16–18): its own plan, [plan-library.md](plan-library.md).
+6. **The library** (items 16–18): its own plan, [plan-library.md](plan-library.md). Its phases 1–3 are built and await the sitting; meaning search and the map are left.
 7. **The PDF's exact spots** (item 14), shared with vscode-pdf-viewer, and the paper's highlights listed in its contents.
 8. **Lectern's comforts and the NAS** (the old parts 6–7). Themes, e-ink (no animation, page turns, the stream shown in a few large updates), start at login with launchd, and a Docker image for the NAS.
 

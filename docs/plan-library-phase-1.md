@@ -1,5 +1,7 @@
 # Phase 1 of the library plan: Areas, All, reviews, text search
 
+**Built on 30 Oct 2026**, with phases 2 and 3 after it; what it changed is in [plan-library.md](plan-library.md), and how it works in [architecture.md](architecture.md#the-library). The engine's part is [paper-types](../../agentic-paper-library/docs/tasks/paper-types.md), still to do. This file stays until the sitting on the iPad.
+
 ## Context
 
 Today the library tab is one server-rendered list of titles and years under their topics (`server.py` `papers()`, `papers.js`). [docs/plan-library.md](../../projects/products/carrel/docs/plan-library.md) phase 1 turns it into a view of the whole collection (2,275 papers, 111 topics, 7 reviews):

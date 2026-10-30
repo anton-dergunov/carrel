@@ -11,9 +11,10 @@ keeps the Host the browser asked for, and says who is asking in `Tailscale-User-
 - for the WebSocket, and for anything but GET and HEAD, its Origin is the page's own.
 
 What a page can change on the laptop is a paper's PDF, with the highlights made in it
-(`PUT /pdf/…`), the chats' settings (`PUT /api/settings`), and a paper's overview note,
-which it can only move to the Trash (`DELETE /api/overview/…`); and a page can write a line
-to the server's log.
+(`PUT /pdf/…`), the chats' settings (`PUT /api/settings`), a paper's overview note, which it
+can only move to the Trash (`DELETE /api/overview/…`), and the library itself, through the
+engine's own add and remove (`POST /api/add`, `POST /api/remove`); and a page can write a
+line to the server's log.
 """
 
 import asyncio
@@ -38,13 +39,16 @@ from starlette.responses import (
     JSONResponse,
     PlainTextResponse,
     Response,
+    StreamingResponse,
 )
 from starlette.routing import Mount, Route, WebSocketRoute
 from starlette.staticfiles import StaticFiles
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from .catalog import Catalog
+from .edits import EditError, Edits, discard_upload, save_upload
 from .engine import Library
+from .search import SearchError, search
 from .session import Session, Sessions
 from .settings import DEFAULT_MODEL, LONGEST_NOTE, MODELS, Settings
 
@@ -174,23 +178,13 @@ def make_app(
     sessions: Sessions | None = None,
     settings: Settings | None = None,
     catalog: Catalog | None = None,
+    edits: Edits | None = None,
 ):
     sessions = sessions or Sessions(library, extra_folders, settings=settings)
     catalog = catalog or Catalog(library)
+    edits = edits or Edits(library)
     # One PDF written at a time: a save checks the file's version, then replaces it.
     writing = asyncio.Lock()
-
-    def papers() -> str:
-        topics: dict[str, list[str]] = {}
-        for paper in library.papers():
-            year = f' <span class="year">{html.escape(paper.year)}</span>' if paper.year else ""
-            topics.setdefault(paper.topic, []).append(
-                f'<li><a href="/read/{quote(paper.pdf)}">{html.escape(paper.title)}</a>{year}</li>'
-            )
-        return "\n".join(
-            f"<section><h2>{html.escape(topic)}</h2><ul>{''.join(items)}</ul></section>"
-            for topic, items in topics.items()
-        )
 
     def shell(
         request: Request, pdf: str = "", title: str = "", area: str = "", review: str = ""
@@ -201,7 +195,6 @@ def make_app(
             request,
             "app.html",
             library=html.escape(library.root.name),
-            papers=papers(),
             title=html.escape(title or library.root.name),
             pdf=html.escape(pdf, quote=True),
             pdf_title=html.escape(title, quote=True),
@@ -228,6 +221,76 @@ def make_app(
             return PlainTextResponse("No review of that area in the library.", status_code=404)
         title = str(reviews[scope]["meta"].get("title") or scope)
         return shell(request, title=title, review=scope)
+
+    async def review_document(request: Request) -> Response:
+        """A review's markdown, and where each of its links leads."""
+        found = await asyncio.to_thread(library.review, request.path_params["scope"].strip("/"))
+        if not found:
+            return JSONResponse({"error": "No review of that area."}, status_code=404)
+        return JSONResponse(found, headers={"Cache-Control": "no-cache"})
+
+    async def text_search(request: Request) -> Response:
+        """The papers whose text holds the words asked for, in the whole library or an area."""
+        topic = request.query_params.get("topic", "").strip("/")
+        folder = (library.papers_dir / topic).resolve()
+        if not folder.is_relative_to(library.papers_dir) or not folder.is_dir():
+            return JSONResponse({"error": "No such area."}, status_code=404)
+        built = await asyncio.to_thread(catalog.current)
+        try:
+            found = await asyncio.to_thread(
+                search, request.query_params.get("q", ""), folder, library.root, built.papers
+            )
+        except SearchError as error:
+            return JSONResponse({"error": str(error)}, status_code=error.status)
+        return JSONResponse(found)
+
+    def streamed(lines) -> StreamingResponse:
+        return StreamingResponse(
+            lines, media_type="application/x-ndjson", headers={"Cache-Control": "no-store"}
+        )
+
+    async def add_paper(request: Request) -> Response:
+        """A paper into the library: an arXiv id or a web page's address (JSON: {source, topic,
+        title}), or a PDF as the body (`?topic=&title=&name=`). The command's output streams back."""
+        query = request.query_params
+        upload = None
+        try:
+            if request.headers.get("content-type", "").startswith("application/pdf"):
+                upload = await save_upload(request.stream(), query.get("name", ""), MAX_PDF)
+                args = edits.pdf_args(upload, query.get("topic"), query.get("title"))
+            else:
+                try:
+                    asked = json.loads(await request.body())
+                except ValueError:
+                    asked = None
+                if not isinstance(asked, dict):
+                    raise EditError("Say what to add.")
+                args = edits.add_args(
+                    str(asked.get("source") or ""), asked.get("topic"), asked.get("title")
+                )
+            before = await asyncio.to_thread(edits.papers_now)
+            lines = await edits.run(args, cleanup=upload, outcome=lambda: edits.added_since(before))
+        except EditError as error:
+            discard_upload(upload)
+            return JSONResponse({"error": str(error)}, status_code=error.status)
+        log.info("adding: paperlib %s", " ".join(args))
+        return streamed(lines)
+
+    async def remove_paper(request: Request) -> Response:
+        """A paper out of the library, once the reader has confirmed it: {pdf, reason}."""
+        try:
+            try:
+                asked = json.loads(await request.body())
+            except ValueError:
+                asked = None
+            if not isinstance(asked, dict) or not isinstance(asked.get("pdf"), str):
+                raise EditError("Say which paper.")
+            args = edits.remove_args(asked["pdf"], asked.get("reason"))
+            lines = await edits.run(args, outcome=lambda: edits.gone(args))
+        except EditError as error:
+            return JSONResponse({"error": str(error)}, status_code=error.status)
+        log.info("removing: paperlib %s", " ".join(args))
+        return streamed(lines)
 
     async def library_document(request: Request) -> Response:
         """Every paper, topic and review, as one document. It changes only when the library
@@ -468,6 +531,10 @@ def make_app(
             Route("/area/{topic:path}", area),
             Route("/review/{scope:path}", review_page),
             Route("/api/library", library_document),
+            Route("/api/review/{scope:path}", review_document),
+            Route("/api/search", text_search),
+            Route("/api/add", add_paper, methods=["POST"]),
+            Route("/api/remove", remove_paper, methods=["POST"]),
             Route("/pdf/{path:path}", pdf, methods=["GET", "HEAD"]),
             Route("/pdf/{path:path}", save_pdf, methods=["PUT"]),
             Route("/api/log", page_log, methods=["POST"]),

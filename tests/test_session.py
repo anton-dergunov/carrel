@@ -465,6 +465,35 @@ def write_transcript(claude_home, root, session_id, turns=TRANSCRIPT):
     os.utime(path, (day_ago, day_ago))
 
 
+async def test_a_question_beside_a_review(library, state):
+    client = FakeClient()
+    talk, outbox = await attached(library, connect=connecting(client))
+    # The review is in view: the paper the page last showed is not what the question is about.
+    await talk.handle({"type": "ask", "text": "Why?", "paper": PDF, "review": "recsys"})
+    assert client.prompts == ["[Reading the review reviews/recsys.md]\nWhy?"]
+    assert (await outbox.next("Question"))["data"] == {
+        "text": "Why?",
+        "review": "reviews/recsys.md",
+    }
+    await outbox.next("ResultMessage")
+    # A scope with no review is no review.
+    await talk.handle({"type": "ask", "text": "And?", "review": "nowhere"})
+    assert client.prompts[-1] == "And?"
+    await outbox.next("ResultMessage")
+    await talk.close()
+
+
+def test_a_question_beside_a_review_in_a_transcript(library, claude_home):
+    session_id = str(uuid.uuid4())
+    turns = [
+        ("user", "[Reading the review reviews/recsys.md]\nWhat does it say?"),
+        ("assistant", [{"type": "text", "text": "That."}]),
+    ]
+    write_transcript(claude_home, library.root, session_id, turns)
+    drawn = history(session_id, library.root)
+    assert drawn[0] == ["Question", {"text": "What does it say?", "review": "reviews/recsys.md"}]
+
+
 def test_a_command_in_a_transcript(library, claude_home):
     session_id = str(uuid.uuid4())
     turns = [

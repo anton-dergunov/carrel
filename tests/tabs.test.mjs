@@ -6,9 +6,17 @@ import {
   PAPERS,
   closePaper,
   emptyTabs,
+  areaFromPath,
+  areaUrl,
   fileFromPath,
+  itemInView,
+  keyOf,
   openPaper,
+  openReview,
   paperInView,
+  reviewFromPath,
+  reviewKey,
+  reviewUrl,
   readingUrl,
   restoreTabs,
   show,
@@ -125,4 +133,38 @@ test('the split follows the finger', () => {
   assert.equal(shareAt('left', 200, 0, 800, 1000), 0.25);
   assert.equal(shareAt('right', 600, 0, 800, 1000), 0.25);
   assert.equal(shareAt('tab', 0, 0, 800, 1000), null);
+});
+
+const R = { review: 'llm/evaluation', title: 'Evaluating LLMs' };
+
+test('a review opens in a tab of its own, keyed by its scope', () => {
+  let state = openReview(openPaper(emptyTabs(), A), R);
+  assert.deepEqual(state.papers.map(keyOf), [A.pdf, 'review:llm/evaluation']);
+  assert.equal(state.active, reviewKey(R.review));
+  // Over the review, a question is about it, not the paper.
+  assert.equal(itemInView(state).review, R.review);
+  assert.equal(paperInView(state), null);
+  state = show(state, PAPERS);
+  assert.equal(itemInView(state).review, R.review);
+  state = withPlace(state, reviewKey(R.review), { top: 0.25 });
+  assert.deepEqual(state.papers[1].place, { top: 0.25 });
+  state = closePaper(show(state, reviewKey(R.review)), reviewKey(R.review));
+  assert.equal(state.active, A.pdf);
+});
+
+test('a remembered review tab comes back; old states still restore', () => {
+  const state = restoreTabs({ papers: [R, A, { review: '' }, { review: 'llm/evaluation' }], active: 'review:llm/evaluation' });
+  assert.deepEqual(state.papers, [{ ...R, place: null }, { ...A, place: null }]);
+  assert.equal(state.active, 'review:llm/evaluation');
+});
+
+test('the addresses of an area and a review', () => {
+  assert.equal(reviewUrl('llm/evaluation'), '/review/llm/evaluation');
+  assert.equal(reviewFromPath('/review/llm/evaluation'), 'llm/evaluation');
+  assert.equal(areaUrl('search-and-ranking/dense'), '/area/search-and-ranking/dense');
+  assert.equal(areaUrl(''), '/');
+  assert.equal(areaFromPath('/area/llm/'), 'llm');
+  assert.equal(areaFromPath('/read/x.pdf'), null);
+  assert.equal(fileFromPath('/review/x'), null);
+  assert.deepEqual(targetFromQuery('?page=4&search=position%20bias'), { page: 4, dest: undefined, search: 'position bias' });
 });

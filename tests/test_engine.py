@@ -82,3 +82,13 @@ def test_paper_for_overview_note_reads_the_path_the_skill_gives(library):
     assert library.paper_for_overview_note("Wide & Deep. A Test Paper.md") is None
     assert library.paper_for_overview_note(note.removesuffix(".md") + ".txt") is None
     assert library.paper_for_overview_note(str(library.overview_dir / "Another.md")) is None
+
+
+def test_paper_info_carries_the_agents_note(library):
+    dpo = next(p for p in library.papers() if p.title.startswith("Direct Preference"))
+    assert library.paper_info(dpo)["note"] == {
+        "type": "method",
+        "family": "preference optimisation",
+        "digest": "- a claim",
+    }
+    assert "note" not in library.paper_info(library.paper_for_pdf(PDF))

@@ -71,7 +71,7 @@ The chat's settings open from the model's name on its status line, as a small di
 
 ## Layout and tabs
 
-**One page.** `/` and `/read/<pdf>` are the same page, with the paper list on its own tab and a tab per open paper. Nothing reloads between them. The chat beside the list asks about the paper shown last, or about the library when none is open.
+**One page.** `/`, `/area/<topic>`, `/read/<pdf>` and `/review/<scope>` are the same page, with the library on its own tab and a tab per open paper or review. Nothing reloads between them. The chat beside the library asks about the paper or review shown last, or about the library when none is open.
 
 **Tabs.**
 - A paper opens in a tab after the one showing, and a citation to an open paper goes to its tab.
@@ -88,7 +88,7 @@ The chat's settings open from the model's name on its status line, as a small di
 A paper set to the page width is about as tall as the iPad's screen, so the controls take one row, and anything used rarely waits in a sheet.
 
 - **The bar** holds the tabs and a few small grey icons (Lucide's, ISC).
-  - The list is an icon that stays at the left while the papers' tabs scroll.
+  - The library is an icon that stays at the left while the papers' tabs scroll.
   - Every paper's tab has its close button, so any tab closes with one tap.
 - **Find** (for the paper showing) takes the place of the tabs while it is open.
 - **Layout** opens a sheet with where the chat sits.
@@ -155,6 +155,29 @@ The chat reads as the VS Code panel does: a dozen real VS Code chats from the li
 - **What a question is about.** The paper open when it was asked, which each question records. A paper only mentioned in a question does not count.
 - **Why the rule exists.** At the first sitting, the button asked in a chat about another paper whose cache had expired, and the reader met the expired-cache question.
 
-**The paper's properties** come from its frontmatter, with no model call: title, authors, year, arXiv, summary, type, topic, the date added, and the overview when there is one. They head the sheet the page badge opens. There is no `/paper-info` button.
+**The paper's properties** come from its frontmatter, with no model call: title, authors, year, arXiv, summary, type, topic, the date added, and the overview when there is one. Under them is the agent's reading from its note (family, evidence, and the digest, folded), and Remove. They head the sheet the page badge opens. There is no `/paper-info` button.
 
 **The PDF's links stay under the sheets.** PDF.js gives each link a z-index of its own, and at the first sitting they showed through the sheets over the paper. The viewer is now a stacking context of its own, under them.
+
+## The library
+
+The library tab is the reader's view of the whole collection: four views of one document, and one search box that narrows whichever is showing. It was planned in [plan-library.md](plan-library.md) and [plan-library-phase-1.md](plan-library-phase-1.md).
+
+**One document.** `GET /api/library` holds every paper that has a PDF, with its title, authors, dates, summary, topic, type and arXiv id, and its marks: the reader's overview note, the reviews that cite it, whether the agent has read it, and how many of carrel's questions were about it. With them come the topics (each with its own and its total count), the review scopes in their order, and the reviews.
+- **Built from the engine's reads**: `paper_index`, `load_topics`, `load_reviews` with `review_links`, `read_note`, `review_scopes`. The type is the frontmatter's, else the note's, until the engine's [paper-types task](../../agentic-paper-library/docs/tasks/paper-types.md) puts it in every frontmatter.
+- **Fresh without cost.** Building it takes about a second on 2,275 papers, mostly checking that each PDF is there and reading the notes' heads. Whether anything changed takes 16 ms: a walk that counts the files of the folders it comes from and finds the latest change. So it is kept with its gzip (1.8 MB, 0.5 MB compressed) and an ETag, and built again only when that changes. A page that has it gets a 304. A global gzip would have broken the PDFs' range requests, so only this answer is compressed.
+- **Chats discussed** come from the transcripts tagged `carrel`, found with `rg -l` among 150 MB in a tenth of a second and counted once per file until it changes.
+- **The page filters on the device**, every word against one haystack per paper; rows use `content-visibility: auto`.
+
+**The views.**
+- **Desk**: the papers and reviews open on this device and the papers of recent chats, the papers added lately, and each group of review scopes as pips (reviewed, read, to read).
+- **Areas**: the topic tree beside an area's page on a pane 860 px wide or more, and on a narrower one the page alone with a breadcrumb. An area's page has its scope, its review's card (or the review above that covers it), its subtopics as bars, a histogram of the years published that narrows the rows, and the rows. The library's own page is a squarified treemap of the areas, its labels measured to fit their tiles.
+- **All**: every paper, with chips for area, type (whose menu is the icons' legend), years and the papers touched.
+- **Timeline**: a row of dots a year, coloured by top-level area, or by month added; a year opens All at that year.
+- **Rows** are compact or rich and sorted by topic, date added or published; a TeX title reads as text (τ²-Bench).
+
+**Text search** (`GET /api/search`) is the box's second depth. Ripgrep counts the matches in every text layer in 0.03–0.25 s, where Python took 1.25 s; it reads hidden and ignored files as text (without that it misses papers) and matches across lines (`-U`, which costs nothing here and finds a phrase broken over a line). The 30 papers with the most matches are then read in Python for three snippets each, with the page from the nearest `[page N]` line above. A snippet opens the paper at that page with the words in find.
+
+**A review opens in a tab of its own** and keeps its place. It is drawn as the agent's answers are, with Obsidian's callouts as boxes. A paper's link opens a peek (its title, year, summary, Open, and Open at p. N for the pages the same paragraph cites); a page link opens the paper there; another review's link opens its tab. The server resolves the links (`/api/review/<scope>`), since a paper's link points at its text and the peek opens its PDF. A question asked beside a review carries `[Reading the review <file>]`.
+
+**Adding and removing** run the engine's own commands, one at a time, and stream their output into a sheet. An arXiv paper is filed by the engine (a model picks its area and writes its summary); a web page or an uploaded PDF goes into the area the reader picks. Remove, in the paper's sheet, deletes its text, PDF and the agent's note once the reader confirms, and with a reason records it as skipped. What happened is read from the library, not from the exit code: `paperlib add` exits 0 for a paper it already has, and `remove` exits 1 when the check afterwards finds a review still linking the paper it did remove.

@@ -65,7 +65,7 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     const { place, target } = pending ?? {};
     pending = null;
     if (place) restore(place);
-    else if (target) void goTo(target);
+    else if (target) void goTo(target).then(() => findTarget(target));
   });
   eventBus.on('pagechanging', ({ pageNumber }) => onPage(pageNumber, viewer.pagesCount));
   eventBus.on('updateviewarea', ({ location }) => {
@@ -191,11 +191,13 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
    * citation. The paper already shown only moves.
    */
   async function open(pdf, url, { place, target } = {}) {
-    target = target?.page || target?.dest ? target : null;
+    target = target?.page || target?.dest || target?.search ? target : null;
     if (pdf === file) {
       if (!pdfDocument) pending = { place, target }; // still loading
-      else if (target) await goTo(target);
-      else if (place) restore(place);
+      else if (target) {
+        await goTo(target);
+        findTarget(target);
+      } else if (place) restore(place);
       return;
     }
     file = pdf;
@@ -406,6 +408,11 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     const box = pageView.div.getBoundingClientRect();
     const rects = quads?.length ? quadRects(quads, pageView.viewport, box) : [found.rect];
     return wordsIn(textLayer, rects);
+  }
+
+  /** A target's words, found from the page it names: the first match there or after it. */
+  function findTarget(target) {
+    if (target?.search) find(target.search);
   }
 
   /** Finds `query` in the paper: the next match, or with `previous` the one before. */

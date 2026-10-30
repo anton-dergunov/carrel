@@ -130,13 +130,19 @@ class Library:
         """The declared topic tree, {folder: scope}, in the file's order."""
         return {str(path): str(scope or "") for path, scope in self.lib.load_topics().items()}
 
-    def paper_type(self, paper_text: str, meta: dict) -> str | None:
-        """The paper's type: its frontmatter's, else the one its note's reading gave.
-        The fallback goes when the engine's frontmatter always has it (its paper-types task)."""
+    def reading(self, paper_text: str, meta: dict) -> tuple[str | None, bool]:
+        """The paper's type, and whether the agent has read it (its note has a digest), from
+        one read of its note. The type is the frontmatter's, else the one the reading gave;
+        that fallback goes when the frontmatter always has it (the engine's paper-types task)."""
+        note = self.lib.read_note(self.root / paper_text)
         kind = meta.get("type")
-        if kind in self.lib.TYPES:
-            return kind
-        return self.lib.note_fields(self.root / paper_text).get("type")
+        if kind not in self.lib.TYPES:
+            kind = (note or {}).get("fields", {}).get("type")
+        return kind, bool(note and note["digest"] is not None)
+
+    def review_scopes(self) -> list[dict]:
+        """The areas to read and review, in their order: [{group, scopes: [scope]}]."""
+        return [{"group": group, "scopes": scopes} for group, scopes in self.lib.review_scopes()]
 
     def overview_names(self) -> set[str]:
         """The stems of the papers that have an overview note, from one listing of its folder."""
@@ -166,6 +172,7 @@ class Library:
                     "scope": scope,
                     "title": str(meta.get("title") or scope),
                     "updated": _plain(meta["updated"]) if meta.get("updated") else "",
+                    "checked": _plain(meta["checked"]) if meta.get("checked") else "",
                     "path": main.relative_to(self.root).as_posix()
                     if main.is_relative_to(self.root)
                     else str(main),
@@ -174,6 +181,42 @@ class Library:
                 }
             )
         return found
+
+    def review(self, scope: str) -> dict | None:
+        """A review to read: its markdown (each of its files without its frontmatter), and
+        what its links lead to, {target as written: {text, pdf} for a paper, {review: scope}
+        for another review}. None when the library has no review of `scope`."""
+        reviews = self.lib.load_reviews()
+        review = reviews.get(scope)
+        if not review:
+            return None
+        mains = {Path(each["main"]).resolve(): name for name, each in reviews.items()}
+        parts, links = [], {}
+        for path in review["files"]:
+            meta, body = self.lib.split_frontmatter(Path(path).read_text(encoding="utf-8"))
+            parts.append(body.strip("\n"))
+            for target, resolved, exists in self.lib.review_links(path):
+                if target in links or not exists:
+                    continue
+                resolved = Path(resolved).resolve()
+                if resolved in mains:
+                    links[target] = {"review": mains[resolved]}
+                    continue
+                text = self._paper_file(resolved)
+                pdf = Path(self.lib.pdf_path_for(resolved)) if text else None
+                if pdf and pdf.is_file():
+                    links[target] = {
+                        "text": text,
+                        "pdf": pdf.relative_to(self.lib.PDF_ROOT).as_posix(),
+                    }
+        meta = review["meta"]
+        return {
+            "scope": scope,
+            "title": str(meta.get("title") or scope),
+            "updated": _plain(meta["updated"]) if meta.get("updated") else "",
+            "markdown": "\n\n".join(parts) + "\n",
+            "links": links,
+        }
 
     def _paper_file(self, path: Path) -> str | None:
         """A link's target as a paper file relative to the library root, or None when it is
@@ -203,13 +246,16 @@ class Library:
         order = [key for key in self.lib.FIELDS if key in meta]
         order += [key for key in meta if key not in order]
         overview = self.overview_note(paper)
+        note = self.lib.read_note(self.root / paper.text)
         return {
             "fields": [
                 [key, _plain(meta[key])] for key in order if meta[key] not in (None, "", [])
             ],
             "topic": paper.topic,
-            "notes": Path(self.lib.note_path(paper.text)).is_file(),
+            "notes": note is not None,
             "overview": bool(overview and overview.is_file()),
+            # What the agent's reading wrote: its type, family and evidence, and the digest.
+            **({"note": {**note["fields"], "digest": note["digest"] or ""}} if note else {}),
         }
 
     def overview_note(self, paper: Paper) -> Path | None:

@@ -19,12 +19,11 @@ def client(library):
     )
 
 
-def test_index_lists_papers(client):
+def test_index_is_the_library(client):
     response = client.get("/")
     assert response.status_code == 200
-    assert f'href="/read/{PDF}"' in response.text
-    assert "Wide &amp; Deep: A Test Paper" in response.text
-    assert 'data-pdf=""' in response.text
+    assert 'id="papers-pane"' in response.text and 'id="review-pane"' in response.text
+    assert 'data-pdf=""' in response.text and 'data-area=""' in response.text
     assert "script-src 'self'" in response.headers["content-security-policy"]
 
 
@@ -33,7 +32,6 @@ def test_read_page_is_the_same_page_with_the_paper_showing(client):
     assert response.status_code == 200
     assert 'data-pdf="recsys/Wide &amp; Deep. A Test Paper.pdf"' in response.text
     assert 'data-pdf-title="Wide &amp; Deep: A Test Paper"' in response.text
-    assert f'href="/read/{PDF}"' in response.text  # the list, on its tab
     assert client.get("/read/recsys/missing.pdf").status_code == 404
 
 

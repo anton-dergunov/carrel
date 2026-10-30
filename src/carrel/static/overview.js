@@ -9,7 +9,7 @@
 // note's path on the laptop, opens the note too, with its paper when another one is open.
 
 import { decode, sameFile } from './links.js';
-import { drawMarkdown } from './markdown.js';
+import { drawCallouts, drawMarkdown } from './markdown.js';
 
 const COMMAND = '/overview';
 
@@ -82,6 +82,7 @@ export function startOverview({ ask, openPaper, onOpen = () => {} }) {
     const body = document.createElement('div');
     body.className = 'answer note';
     drawMarkdown(body, fromObsidian(note.text));
+    drawCallouts(body);
     sheet.replaceChildren(header, body);
     sheet.hidden = false;
     sheet.scrollTop = 0;
@@ -169,13 +170,12 @@ function plainButton(label, action) {
 }
 
 /**
- * An Obsidian note as plain markdown: without its properties (the paper's sheet shows them), a
- * callout's marker as its title, and [[links]] as the text they show, since the notes they name
- * are not here.
+ * An Obsidian note as markdown: without its properties (the paper's sheet shows them), and with
+ * [[links]] as the text they show, since the notes they name are not here. Its callouts stay,
+ * for drawCallouts.
  */
 export function fromObsidian(text) {
   return text
     .replace(/^---\n[\s\S]*?\n---\n/, '')
-    .replace(/^> \[!(\w+)\][+-]? *(.*)$/gm, (_, kind, title) => `> **${title || kind.charAt(0).toUpperCase() + kind.slice(1)}**\n>`)
     .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, name, alias) => alias ?? name);
 }

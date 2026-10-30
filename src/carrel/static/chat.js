@@ -28,13 +28,24 @@ const RECENT_S = 300;
 const QUOTE_SHOWN = 280;
 
 /**
- * `currentPaper()` and `currentPage()` say what a question is about; `openTarget` follows a
- * citation; `reveal()` brings the chat into view; `onActivity()` says an answer ended or a question for the reader came, so a chat out
- * of sight can say so. Returns `quote(passage)`, which sets the passage the next question
+ * `currentPaper()` and `currentPage()` say what a question is about, or `currentReview()` the
+ * review's scope when one is in view; `openTarget` follows a citation, `openReview(scope)`
+ * opens a review, and `reviewNamed(file)` says which review a file is ({scope, title}, or null);
+ * `reveal()` brings the chat into view; `onActivity()` says an answer ended or a question for
+ * the reader came, so a chat out of sight can say so. Returns `quote(passage)`, which sets the passage the next question
  * carries ({pdf, page, text}, or null for none), `quoted()`, the one it would carry, `focus()`,
  * `about(pdf)`, the paper the next question is about, and `showOverview()`.
  */
-export function startChat({ currentPaper, currentPage, openTarget, reveal, onActivity = () => {} }) {
+export function startChat({
+  currentPaper,
+  currentPage,
+  currentReview = () => null,
+  openTarget,
+  openReview = () => {},
+  reviewNamed = () => null,
+  reveal,
+  onActivity = () => {},
+}) {
   const log = document.getElementById('log');
   const form = document.getElementById('ask');
   const question = document.getElementById('question');
@@ -180,7 +191,15 @@ export function startChat({ currentPaper, currentPage, openTarget, reveal, onAct
     }
     await whenAttached();
     socket.send(
-      JSON.stringify({ type: 'ask', text, paper: currentPaper(), page: currentPage(), selection: passage, model: settings.model() }),
+      JSON.stringify({
+        type: 'ask',
+        text,
+        paper: currentPaper(),
+        page: currentPage(),
+        review: currentReview(),
+        selection: passage,
+        model: settings.model(),
+      }),
     );
     setBusy(true);
     quote(null);
@@ -291,13 +310,18 @@ export function startChat({ currentPaper, currentPage, openTarget, reveal, onAct
     }
   }
 
-  function startTurn({ text, paper, pdf, page, selection }) {
+  function startTurn({ text, paper, pdf, page, selection, review }) {
     endTurn();
     streamed.length = 0;
     const bubble = append('div', 'question');
     if (text.startsWith('/')) bubble.classList.add('command');
     // A question asked here names its PDF; one read back from a transcript, its paper's stem.
-    askedAbout.add(pdf ? stem(pdf) : (paper ?? ''));
+    askedAbout.add(review ? `review:${review}` : pdf ? stem(pdf) : (paper ?? ''));
+    if (review && `review:${review}` !== lastPaper) {
+      // The review it was asked beside: a tap opens its tab.
+      bubble.append(reviewLink(review));
+      lastPaper = `review:${review}`;
+    }
     if (paper && paper !== lastPaper) {
       // Which paper the question was about, when it changed: a tap opens it.
       bubble.append(placeLink('about', page ? `${paper} · p. ${page}` : paper, pdf, page));
@@ -314,6 +338,21 @@ export function startChat({ currentPaper, currentPage, openTarget, reveal, onAct
     }
     bubble.append(text);
     turn = { question: bubble, fold: null, steps: 0, texts: [], text };
+  }
+
+  /** A line naming the review a question was asked beside; a tap opens it. */
+  function reviewLink(file) {
+    const named = reviewNamed(file) ?? { scope: scopeOfReview(file), title: null };
+    const link = document.createElement('a');
+    link.className = 'about review';
+    link.href = '#';
+    link.textContent = `Review · ${named.title ?? named.scope}`;
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openReview(named.scope, named.title);
+    });
+    return link;
   }
 
   /** A line naming a place in a paper; a tap opens it there when the paper is known. */
@@ -718,6 +757,11 @@ export function startChat({ currentPaper, currentPage, openTarget, reveal, onAct
     about: (pdf) => overview.about(pdf),
     showOverview: () => overview.show(),
   };
+}
+
+/** A review's scope from its file, as the library lays reviews out: reviews/<scope>.md, or reviews/<scope>/index.md. */
+export function scopeOfReview(file) {
+  return file.replace(/^(?:.*\/)?reviews\//, '').replace(/(?:\/index)?\.md$/, '');
 }
 
 /** A paper's stem, which its PDF and its text share: "llm/x/A Paper.pdf" → "A Paper". */

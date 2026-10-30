@@ -2,11 +2,18 @@
 // chat already share a small one:
 //
 // - the page badge, faint in the PDF's corner, which opens what the library knows of the paper
-//   (from its frontmatter, with no model call), a field to go to a page, and its contents;
+//   (from its frontmatter and the agent's note, with no model call), a field to go to a page,
+//   and its contents;
 // - find, which takes the place of the tabs in the bar while it is open.
 
-/** `showOverview()` shows the paper's overview note, beside it. */
-export function startPaperTools({ reader, showOverview }) {
+import { commandLog, runCommand } from './library-edits.js';
+import { drawMarkdown } from './markdown.js';
+
+/**
+ * `showOverview()` shows the paper's overview note, beside it; `onRemoved(pdf)` follows a paper
+ * taken out of the library from its sheet.
+ */
+export function startPaperTools({ reader, showOverview, onRemoved = () => {} }) {
   const body = document.body;
   const badge = document.getElementById('page-badge');
   const sheet = document.getElementById('contents-sheet');
@@ -71,8 +78,9 @@ export function startPaperTools({ reader, showOverview }) {
     parts.push(byline);
     if (fields.summary) parts.push(element('p', 'summary', fields.summary));
     const facts = element('p', 'facts');
+    const note = paper.info.note;
     for (const [label, value] of [
-      ['Type', fields.type],
+      ['Type', fields.type ?? note?.type],
       ['Topic', paper.info.topic],
       ['Added', fields.added],
       ['Text layer', fields['text-layer']],
@@ -80,6 +88,7 @@ export function startPaperTools({ reader, showOverview }) {
       if (value) facts.append(element('span', 'fact', `${label}: ${value}`));
     }
     if (facts.childElementCount) parts.push(facts);
+    if (note) parts.push(agentNote(note));
     if (paper.info.overview) {
       const button = element('button', 'plain overview-link', 'Overview');
       button.type = 'button';
@@ -89,8 +98,86 @@ export function startPaperTools({ reader, showOverview }) {
       });
       parts.push(button);
     }
+    const remove = element('button', 'plain remove-paper', 'Remove from the library…');
+    remove.type = 'button';
+    remove.addEventListener('click', () => remove.replaceWith(confirmRemove(file, fields.title ?? paper.title)));
+    parts.push(remove);
     infoBox.replaceChildren(...parts);
     infoBox.hidden = false;
+  }
+
+  /** Removing, once the reader confirms it, with an optional reason to keep it out. */
+  function confirmRemove(file, title) {
+    const box = element('div', 'confirm-remove');
+    box.append(element('p', 'warning', "This deletes the paper's text, its PDF with your highlights, and the agent's note. Your overview note and the reviews stay."));
+    const reason = box.appendChild(element('input'));
+    reason.type = 'text';
+    reason.placeholder = 'Why (optional): keeps it from being proposed again';
+    reason.setAttribute('aria-label', 'Why it is removed');
+    const buttons = box.appendChild(element('div', 'buttons'));
+    const yes = buttons.appendChild(element('button', 'danger', 'Remove'));
+    yes.type = 'button';
+    const keep = buttons.appendChild(element('button', 'plain', 'Keep it'));
+    keep.type = 'button';
+    keep.addEventListener('click', () => void drawInfo(file));
+    const log = commandLog();
+    log.box.hidden = true;
+    box.append(log.box);
+    yes.addEventListener('click', async () => {
+      yes.disabled = keep.disabled = reason.disabled = true;
+      log.box.hidden = false;
+      log.say(`Removing “${title}”…`, 'working');
+      try {
+        const ended = await runCommand(
+          '/api/remove',
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pdf: file, reason: reason.value }) },
+          log.line,
+        );
+        if (ended.removed) {
+          // The engine's check afterwards fails while a review still links the paper.
+          log.say(ended.code ? 'Removed. A review still links it: the output above names it.' : 'Removed.', 'done');
+          setTimeout(
+            () => {
+              openContents(false);
+              onRemoved(file);
+            },
+            ended.code ? 4000 : 900,
+          );
+        } else {
+          log.say('Not removed: the output above says why.', 'error');
+          keep.disabled = false;
+        }
+      } catch (error) {
+        log.say(String(error.message || error), 'error');
+        keep.disabled = false;
+      }
+    });
+    return box;
+  }
+
+  /** What the agent's reading wrote: the family and the evidence, and the digest, folded. */
+  function agentNote(note) {
+    const box = element('div', 'agent-note');
+    box.append(element('div', 'note-title', "The agent's reading"));
+    for (const [label, value] of [
+      ['Family', note.family],
+      ['Evidence', note.evidence],
+    ]) {
+      if (!value) continue;
+      const line = box.appendChild(element('p', 'note-field'));
+      line.append(element('span', 'label', label), value);
+    }
+    if (note.digest) {
+      const fold = box.appendChild(element('details', 'digest'));
+      const points = (note.digest.match(/^- /gm) ?? []).length;
+      fold.append(element('summary', '', points ? `Digest · ${points} points` : 'Digest'));
+      const body = fold.appendChild(element('div', 'answer'));
+      // Drawn when first opened: a digest is twenty lines of markdown.
+      fold.addEventListener('toggle', () => {
+        if (fold.open && !body.childElementCount) drawMarkdown(body, note.digest);
+      });
+    }
+    return box;
   }
 
   /** The authors, the first few shown and the rest a tap away. */
@@ -189,6 +276,13 @@ export function startPaperTools({ reader, showOverview }) {
   document.getElementById('find-done').addEventListener('click', closeFind);
 
   return {
+    /** Opens find with `term` in it; the reader finds it once the paper is at its page. */
+    showFind(term) {
+      body.classList.add('finding');
+      findForm.hidden = false;
+      findInput.value = term;
+      findCount.textContent = '…';
+    },
     /** The page in view, on the badge. */
     showPage(page, count) {
       badge.hidden = !count;

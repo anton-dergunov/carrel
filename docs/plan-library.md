@@ -4,6 +4,16 @@ The library tab becomes the reader's overview of what they have: one collection 
 
 This plan is plan.md's step 6 and its feedback items 16 (notes and reviews), 17 (add and remove papers) and 18 (a better paper list). Notes belong to the paper's sheet, reviews to the library. How the built parts work is in [architecture.md](architecture.md); the rest of what is left is in [plan.md](plan.md).
 
+**Status (30 Oct 2026): phases 1–3 are built and await their sitting on the iPad**, where their notes below move to architecture.md, as the convention says. They were checked in WebKit at the iPad's size, in both orientations and both themes, on the real library (the views only read), and adding, removing and a question beside a review on a throwaway one, on Haiku. Meaning search and the map are still to do.
+
+**What the building changed:**
+- **The document** is 0.5 MB gzipped, not 250 KB: 2,275 papers with their summaries and authors. It is fetched once per page and then answered with a 304.
+- **Desk** is where a new device's library opens, Areas second.
+- **Text search** matches across lines (ripgrep's `-U`): a phrase breaks over a line in a layout text, and it costs nothing here (0.04 s).
+- **The type** is the frontmatter's, else the note's, until the engine's paper-types task lands; the engine gained `note_fields`, `read_note` and `review_scopes` for carrel.
+- **Adding** also takes a web page or a PDF, into an area the reader picks; an arXiv paper is filed by the engine. What an add or a remove did is read from the library afterwards, not from the exit code (architecture.md says why).
+- **Sitting checklist**: the treemap's labels at a finger's reach; the tree beside an area's page in landscape; the peek's placement near the screen's edges; a review's place after trips to its papers; Text search's snippets and find; Desk's Continue after a few days; adding a paper by pasting an arXiv link, and a PDF from Files.
+
 ## What the library holds
 
 What the views can draw on, counted in the reader's library (2026-10-27):
@@ -27,7 +37,7 @@ The engine already reads all of this (`paper_index`, `load_topics`, `load_review
 - **The page filters on the device.** Each paper gets one lower-case haystack, and rows use `content-visibility: auto`, so 2,256 rows stay quick on the iPad.
 - **Highlights are not a mark yet.** Counting them means opening every PDF. They can come later, from the saves carrel makes itself.
 
-## Phase 1: Areas, All, reviews, text search
+## Phase 1: Areas, All, reviews, text search (built)
 
 **The switcher.** The top of the library tab holds the search box and the views: *Areas · All* (Desk, Timeline and Map join later). Each device remembers its view and its area in `localStorage`. An area has an address, `/area/<topic>`.
 
@@ -116,7 +126,7 @@ Judging LLM-as-a-Judge…  2023
 
 **Checked** in WebKit at the iPad's size with `shots.py`: the views on the real library (they only read), and anything that writes on a throwaway one. The API has pytest cases on the engine's example library.
 
-## Phase 2: Desk, Timeline, the paper's notes
+## Phase 2: Desk, Timeline, the paper's notes (built)
 
 **Desk** gives the reader a reason to open the app.
 
@@ -147,7 +157,7 @@ Judging LLM-as-a-Judge…  2023
 
 **The agent's note** goes in the page badge's sheet, under the paper's properties: type, family, evidence and the digest.
 
-## Phase 3: add and remove papers (item 17)
+## Phase 3: add and remove papers (item 17) (built)
 
 - **Add.** "+ Add" in the library takes an arXiv id, a URL or a PDF. `paperlib add` files it and picks its topic, and its output streams into a sheet.
 - **Remove.** Remove, in the paper's sheet, runs `paperlib remove` once the reader confirms.

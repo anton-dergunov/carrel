@@ -83,3 +83,15 @@ def test_the_paper_a_question_names():
     assert paper_named(recorded) == "library/x/A Paper.txt"
     assert paper_named("Why? [Reading library/x/A Paper.txt]") is None
     assert paper_named(selection_block("A line.", 2, "library/y/B Paper.txt") + "And?") is None
+
+
+def test_the_review_a_question_is_asked_beside():
+    line = context_line("library/a.txt", 3, "reviews/llm/evaluation.md")
+    assert line == "[Reading the review reviews/llm/evaluation.md]\n"
+    assert split_question(line + "Why?") == {"text": "Why?", "review": "reviews/llm/evaluation.md"}
+    assert split_question(compose("/compact", line)) == {
+        "text": "/compact",
+        "review": "reviews/llm/evaluation.md",
+    }
+    # A question beside a review names no paper.
+    assert paper_named(line + "Why?") is None

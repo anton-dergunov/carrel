@@ -259,6 +259,7 @@ class Session:
                     message.get("page"),
                     message.get("selection"),
                     message.get("model"),
+                    message.get("review"),
                 )
             case "permission":
                 self.answer(str(message.get("id")), bool(message.get("allow")))
@@ -275,10 +276,12 @@ class Session:
         page: int | None = None,
         selection: dict | None = None,
         model: str | None = None,
+        review: str | None = None,
     ) -> None:
-        """A question about the paper open at `page`, with what the reader selected in a paper:
-        `selection` is {pdf, page, text}. `model` is the asking page's; it is used only when
-        the question starts Claude Code's process."""
+        """A question about the paper open at `page`, or beside the review of the scope
+        `review`, with what the reader selected in a paper: `selection` is {pdf, page, text}.
+        `model` is the asking page's; it is used only when the question starts Claude Code's
+        process."""
         if not text.strip():
             return
         if self.busy:
@@ -287,9 +290,12 @@ class Session:
         self.busy = True
         self.last_used = self._clock()
         try:
-            found = self._paper(paper)
+            beside = self._review(review)
+            found = None if beside else self._paper(paper)
             page = page if isinstance(page, int) and page > 0 else None
             question = {"text": text}
+            if beside:
+                question["review"] = beside
             if found:
                 question |= {
                     "paper": found.title,
@@ -310,7 +316,7 @@ class Session:
                 record_session(self.id)
                 self.started = True
             await self.client.query(
-                compose(text, context_line(found.text if found else None, page) + block)
+                compose(text, context_line(found.text if found else None, page, beside) + block)
             )
         except BaseException:
             self.busy = False
@@ -338,6 +344,20 @@ class Session:
         if other:
             quote["paper"] = found.title
         return quote, selection_block(text, page, found.text if other else None)
+
+    def _review(self, scope: object) -> str | None:
+        """The file of the review of `scope`, relative to the library root, when there is one."""
+        if not isinstance(scope, str) or not scope:
+            return None
+        review = self.library.lib.load_reviews().get(scope)
+        if not review:
+            return None
+        main = Path(review["main"]).resolve()
+        return (
+            main.relative_to(self.library.root).as_posix()
+            if main.is_relative_to(self.library.root)
+            else str(main)
+        )
 
     def _paper(self, pdf: str | None) -> Paper | None:
         """The paper whose PDF is open, when it is one of the library's."""

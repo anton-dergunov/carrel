@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { cellWidth, markdownHtml } from '../src/carrel/static/markdown.js';
+import { calloutTitle, cellWidth, markdownHtml } from '../src/carrel/static/markdown.js';
 
 const inline = (tex) => `<span class="maths">${tex}</span>`;
 const display = (tex) => `<span class="maths display">${tex}</span>`;
@@ -49,4 +49,11 @@ test('maths in a table', () => {
 test('a short table entry stays on one line, a longer one keeps a few words', () => {
   for (const entry of ['Fig. 1, p. 3', '§3.1–3.2, p. 4', ' Table 1, p. 3 ', 'sixteen letters!']) assert.equal(cellWidth(entry), 'short');
   for (const entry of ['seventeen letters', 'It compares LongMemEval with LoCoMo and other memory benchmarks.']) assert.equal(cellWidth(entry), 'wide');
+});
+
+test("a callout's title: its own, else its kind's", () => {
+  assert.equal(calloutTitle('abstract', ''), 'Abstract');
+  assert.equal(calloutTitle('note', '  Why it works '), 'Why it works');
+  // The marker reaches the page as a quote's first line, which drawCallouts turns into the box.
+  assert.match(markdownHtml('> [!abstract]\n> A memory.'), /<blockquote>\n<p>\[!abstract\]\nA memory.<\/p>/);
 });

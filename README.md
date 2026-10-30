@@ -2,6 +2,8 @@
 
 Read a paper on a tablet with Claude Code beside it. Tap a paper: its PDF opens in a tab with a chat beside it, ready for a question. A citation in the answer moves the PDF to its page, or opens the other paper in its own tab beside the same chat. Put the chat below, above or beside the paper, or on a tab of its own, and drag the split; each device remembers its tabs and its layout. Find words in the paper, or jump through its contents from the page number in its corner.
 
+The library has its own tab. Desk shows what you were reading and what came in lately; Areas shows the whole library as a map of its topics, each area with its review, its subtopics and its years; All lists every paper with filters for area, type, years and the ones you have worked with; Timeline shows the papers year by year. Search titles, or search the papers' full text and open one at the page that matches. Reviews open in tabs of their own, with a preview of each paper they cite, and the chat beside a review is asked about it. Add a paper from arXiv, a web page or a PDF, or remove one, from the tablet.
+
 A chat carries on through reloads and a sleeping tablet. Start a new one, or go back to an earlier one, including the chats you had in VS Code or the terminal in the library. Carrel's chats show up there too. A line under the chat shows how long the chat's prompt cache has left, and your usage limits.
 
 The Claude Code session runs on the laptop, where the library, the engine and the PDFs are; the tablet only shows it. The library is an [agentic-paper-library](https://github.com/anton-dergunov/agentic-paper-library) library, read through the engine's own `paperlib.py`.
@@ -13,6 +15,7 @@ Status: part 1 of the [plan](https://github.com/anton-dergunov/agentic-paper-lib
 It needs [uv](https://docs.astral.sh/uv/), Tailscale on the laptop and the tablet, a checkout of the engine (by default at `~/projects/products/agentic-paper-library`, else `--engine` or `CARREL_ENGINE`), and Claude Code logged in on the laptop: the session runs on your own plan.
 
 ```sh
+brew install ripgrep    # the library's text search
 uv sync
 ./scripts/vendor.sh     # once, and after a version change in it (needs npm)
 uv run carrel serve --library ~/papers

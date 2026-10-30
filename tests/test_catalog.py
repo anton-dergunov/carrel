@@ -72,6 +72,13 @@ def test_each_paper_with_its_fields(document):
     assert papers[DPO]["arxiv"] and papers[DPO]["topic"] == "llm/post-training/preference-learning"
 
 
+def test_the_scopes_and_what_the_agent_has_read(document):
+    # Without review_scopes in the config, the top-level folders.
+    assert document["scopes"] == [{"group": "", "scopes": ["deep-learning", "llm", "recsys"]}]
+    papers = by_text(document)
+    assert papers[DPO]["read"] and papers[LARIMAR]["read"] and "read" not in papers[WIDE]
+
+
 def test_the_type_from_the_frontmatter_else_the_note(document):
     papers = by_text(document)
     assert papers[DPO]["type"] == "method"  # its note's
@@ -115,6 +122,7 @@ def test_reviews(document):
             "scope": "recsys",
             "title": "Recommender systems",
             "updated": "2026-10-12",
+            "checked": "",
             "path": "reviews/recsys.md",
             "abstract": "Recommenders rank items for a person; Wide & Deep joins a memorising part and a generalising one.",
             "cites": 2,
@@ -174,3 +182,74 @@ def test_an_area_and_a_review_are_the_one_page(client):
     assert 'data-review="recsys"' in review.text
     assert "<title>Recommender systems</title>" in review.text
     assert client.get("/review/llm").status_code == 404
+
+
+def test_a_review_and_where_its_links_lead(client):
+    review = client.get("/api/review/recsys").json()
+    assert (review["scope"], review["title"], review["updated"]) == (
+        "recsys",
+        "Recommender systems",
+        "2026-10-12",
+    )
+    assert review["markdown"].startswith("# Recommender systems\n")
+    assert "scope:" not in review["markdown"]  # no frontmatter
+    wide = {"text": WIDE, "pdf": "recsys/Wide & Deep. A Test Paper.pdf"}
+    links = review["links"]
+    assert links["../library/recsys/Wide%20%26%20Deep.%20A%20Test%20Paper.txt"] == wide
+    assert (
+        links["http://pdf.invalid/recsys/Wide%20%26%20Deep.%20A%20Test%20Paper.pdf?page=1"] == wide
+    )
+    assert any(value.get("text") == DPO for value in links.values())
+    assert "https://example.com" not in links
+    assert client.get("/api/review/llm").status_code == 404
+
+
+@pytest.fixture
+def texts(library):
+    """Words in two papers' text layers, the second on its third page; put back afterwards."""
+    larimar = library.root / LARIMAR
+    wide = library.root / WIDE
+    kept = {path: path.read_text() for path in (larimar, wide)}
+    larimar.write_text(
+        kept[larimar] + "\n[page 2]\nnothing\n[page 3]\nA memory   of\nepisodes, kept.\n"
+    )
+    wide.write_text(kept[wide] + "Memory of episodes here, and memory of episodes again.\n")
+    yield
+    for path, text in kept.items():
+        path.write_text(text)
+
+
+def test_text_search(client, texts):
+    found = client.get("/api/search", params={"q": "memory of  episodes"}).json()
+    assert found["total"] == 2
+    first, second = found["papers"]
+    assert (first["pdf"], first["count"], first["title"]) == (
+        "recsys/Wide & Deep. A Test Paper.pdf",
+        2,
+        "Wide & Deep: A Test Paper",
+    )
+    assert [hit["page"] for hit in first["hits"]] == [1, 1]
+    # Across runs of spaces and a line break, on the page above it, with the spacing kept.
+    (hit,) = second["hits"]
+    assert (hit["page"], hit["match"], hit["after"]) == (3, "memory of episodes", ", kept. ")
+    assert hit["before"].endswith(" nothing A ")  # no page lines in it
+    # In an area only.
+    scoped = client.get("/api/search", params={"q": "memory of episodes", "topic": "llm"}).json()
+    assert [paper["topic"] for paper in scoped["papers"]] == ["llm/memory/parametric"]
+    # A paper without a PDF is not found, even when its text holds the words.
+    assert client.get("/api/search", params={"q": "A paper for the tests"}).json()["total"] == 1
+
+
+def test_text_search_refuses(client, monkeypatch):
+    assert client.get("/api/search", params={"q": "ab"}).status_code == 400
+    assert client.get("/api/search", params={"q": "x" * 201}).status_code == 400
+    assert client.get("/api/search", params={"q": "memory", "topic": "../.."}).status_code == 404
+    monkeypatch.setattr("carrel.search.shutil.which", lambda name: None)
+    response = client.get("/api/search", params={"q": "memory"})
+    assert response.status_code == 503 and "ripgrep" in response.json()["error"]
+
+
+def test_text_search_shows_the_papers_with_the_most_matches(library, client, monkeypatch, texts):
+    monkeypatch.setattr("carrel.search.MOST_PAPERS", 1)
+    found = client.get("/api/search", params={"q": "memory of episodes"}).json()
+    assert (found["total"], len(found["papers"])) == (2, 1)

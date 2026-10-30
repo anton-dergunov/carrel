@@ -1,7 +1,7 @@
 """The format of a question as carrel sends it to Claude Code, and reading it back.
 
-A question is the reader's text after a context line, `[Reading <paper text>, page N]`, and
-the passage they selected, `<selection page="N">…</selection>`. A slash command goes first,
+A question is the reader's text after a context line, `[Reading <paper text>, page N]` (or
+`[Reading the review <review file>]` beside a review), and the passage they selected, `<selection page="N">…</selection>`. A slash command goes first,
 or Claude Code does not run it, and the two follow it as the last lines of its arguments.
 Reading back serves a resumed chat's transcript, the chat list, and the library's count of
 the papers discussed. Only the current format is read.
@@ -11,9 +11,11 @@ import re
 from pathlib import Path
 
 
-def context_line(paper_text: str | None, page: int | None) -> str:
+def context_line(paper_text: str | None, page: int | None, review: str | None = None) -> str:
     """What the reader has open, in front of each question, so the agent does not search
-    for the paper."""
+    for the paper: a paper (the page it is at), or a review, by their files."""
+    if review:
+        return f"[Reading the review {review}]\n"
     if not paper_text:
         return ""
     where = f", page {page}" if page else ""
@@ -41,7 +43,10 @@ def compose(text: str, context: str) -> str:
 
 # The context line and the selection after it; a session list's first prompt has them on one
 # line with the question. Claude Code keeps a command's arguments without the last newline.
-_CONTEXT = re.compile(r"^\[Reading (?P<text>[^\n]+?)(?:, page (?P<page>\d+))?\](?:[\n ]|$)")
+_CONTEXT = re.compile(
+    r"^\[Reading (?:the review (?P<review>[^\n]+?)|(?P<text>[^\n]+?)(?:, page (?P<page>\d+))?)\]"
+    r"(?:[\n ]|$)"
+)
 _SELECTION = re.compile(
     r'<selection(?: paper="(?P<paper>[^"]*)")?(?: page="(?P<page>\d+)")?>[\n ]'
     r"(?P<text>.*?)[\n ]</selection>(?:[\n ]|$)",
@@ -69,18 +74,21 @@ def _command(prompt: str) -> tuple[str | None, str]:
 def paper_named(prompt: str) -> str | None:
     """The paper file a question's context line names, as the library root sees it."""
     found = _CONTEXT.match(_command(prompt)[1])
-    return found["text"] if found else None
+    return found["text"] if found and found["text"] else None
 
 
 def split_question(prompt: str) -> dict:
-    """A prompt as the reader asked it: the question, the paper its context line names, and
-    the passage it quotes."""
+    """A prompt as the reader asked it: the question, the paper (or the review file) its context
+    line names, and the passage it quotes."""
     command, prompt = _command(prompt)
     question = {}
     found = _CONTEXT.match(prompt)
     if found:
         prompt = prompt[found.end() :]
-        question["paper"] = Path(found["text"]).stem
+        if found["review"]:
+            question["review"] = found["review"]
+        else:
+            question["paper"] = Path(found["text"]).stem
         if found["page"]:
             question["page"] = int(found["page"])
     quoted = _SELECTION.match(prompt)

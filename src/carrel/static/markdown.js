@@ -105,6 +105,57 @@ export function drawMarkdown(element, text, { diagrams = true } = {}) {
   }
 }
 
+// Callouts: Obsidian's `> [!kind] Title` quotes, which the reviews and overview notes use.
+
+const CALLOUT = /^\[!([\w-]+)\][+-]?[^\S\n]*/;
+
+/** "abstract" → "Abstract". */
+export function calloutTitle(kind, title) {
+  const given = title.trim();
+  return given || kind.charAt(0).toUpperCase() + kind.slice(1);
+}
+
+/**
+ * Turns each sanitised `<blockquote>` that starts with `[!kind] Title` into a callout box,
+ * `.callout.callout-<kind>` with a `.callout-title`. The marker and the title are read from
+ * the DOM's text and written as text; what follows them stays the nodes DOMPurify left.
+ */
+export function drawCallouts(element) {
+  for (const quote of element.querySelectorAll('blockquote')) {
+    const first = quote.firstElementChild;
+    if (first?.tagName !== 'P') continue;
+    const marker = CALLOUT.exec(first.textContent);
+    if (!marker) continue;
+    const kind = marker[1].toLowerCase();
+    // The title: the rest of the paragraph's first line, read node by node.
+    let title = '';
+    let line = true;
+    for (const node of [...first.childNodes]) {
+      if (!line) break;
+      const text = node.textContent;
+      const breakAt = node.nodeType === Node.TEXT_NODE ? text.indexOf('\n') : node.nodeName === 'BR' ? 0 : -1;
+      if (breakAt < 0) {
+        title += text;
+        node.remove();
+      } else {
+        title += text.slice(0, breakAt);
+        if (node.nodeType === Node.TEXT_NODE) node.textContent = text.slice(breakAt + 1);
+        else node.remove();
+        line = false;
+      }
+    }
+    title = title.replace(CALLOUT, '');
+    if (!first.textContent.trim()) first.remove();
+    const box = document.createElement('div');
+    box.className = `callout callout-${kind.replace(/[^\w-]/g, '')}`;
+    const heading = box.appendChild(document.createElement('div'));
+    heading.className = 'callout-title';
+    heading.textContent = calloutTitle(kind, title);
+    box.append(...quote.childNodes);
+    quote.replaceWith(box);
+  }
+}
+
 // Diagrams.
 
 const DIAGRAM_TEXT = '14px';

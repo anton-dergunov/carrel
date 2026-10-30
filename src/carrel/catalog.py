@@ -28,6 +28,7 @@ class Built:
     body: bytes
     gzipped: bytes
     etag: str
+    papers: dict[str, dict]  # each paper's entry, by its file relative to the library root
 
 
 def _stamp(path: Path, deep: bool = True, suffix: str = "") -> tuple[int, int]:
@@ -91,12 +92,14 @@ class Catalog:
         with self._lock:
             signature = self.signature()
             if self._built is None or signature != self._signature:
-                body = json.dumps(self.document(), ensure_ascii=False, separators=(",", ":"))
+                document = self.document()
+                body = json.dumps(document, ensure_ascii=False, separators=(",", ":"))
                 data = body.encode("utf-8")
                 self._built = Built(
                     data,
                     gzip.compress(data, compresslevel=6, mtime=0),
                     '"' + hashlib.sha256(data).hexdigest()[:32] + '"',
+                    {paper["text"]: paper for paper in document["papers"]},
                 )
                 self._signature = signature
             return self._built
@@ -120,9 +123,11 @@ class Catalog:
                     entry[field] = value
             entry.setdefault("title", paper.title)
             entry["topic"] = paper.topic
-            kind = library.paper_type(paper.text, meta)
+            kind, read = library.reading(paper.text, meta)
             if kind:
                 entry["type"] = kind
+            if read:
+                entry["read"] = True
             if library.has_overview(paper, overviews):
                 entry["overview"] = True
             if paper.text in cited:
@@ -136,9 +141,12 @@ class Catalog:
             "library": library.root.name,
             "papers": papers,
             "topics": _topics(library.topics(), counts),
+            "scopes": library.review_scopes(),
             "reviews": [
                 {
-                    **{key: review[key] for key in ("scope", "title", "updated", "path")},
+                    **{
+                        key: review[key] for key in ("scope", "title", "updated", "checked", "path")
+                    },
                     "abstract": review["abstract"],
                     "cites": len(review["cites"]),
                 }

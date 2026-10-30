@@ -1,11 +1,17 @@
-"""Look at the reading page the way the iPad shows it, in WebKit at 820x1180.
+"""Look at carrel the way the iPad shows it, in WebKit at 820x1180.
 
-    uv run --group shots python scripts/shots.py URL --out DIR [--layout PLACE] [--tabs]
-        [--find QUERY] [--highlight] [--settings] [--note TEXT] [--info] [--overview]
-        [--type TEXT] [--chat ID] [--ask QUESTION] [--model M]
+    uv run --group shots python scripts/shots.py URL --out DIR [--size WxH | --landscape] [--dark]
+        [--layout PLACE] [--tabs] [--find QUERY] [--highlight] [--settings] [--note TEXT]
+        [--info] [--overview] [--type TEXT] [--chat ID] [--ask QUESTION] [--model M]
+        [--view areas|all] [--area TOPIC] [--rich] [--search Q [--text]] [--review SCOPE [--peek]]
 
-URL is a reading page of a running carrel, e.g. http://127.0.0.1:8517/read/<pdf>. Takes a
-shot once the PDF is drawn. --layout puts the chat below, above, left, right, on a tab, or
+URL is a page of a running carrel: a reading page, e.g. http://127.0.0.1:8517/read/<pdf>, or
+the library, http://127.0.0.1:8517/. Takes a shot once the PDF, or the library, is drawn.
+--size sets the window (--landscape: 1180x820), --dark the dark theme. The library: --view
+starts it in Areas or All, --area at a topic (--rich with rich rows); --search types Q into its
+search box, and with --text searches the papers' text and taps the first snippet, which opens
+the paper at that page with Q in find. --review opens the review of SCOPE in its tab; --peek
+taps a paper it cites, then the peek's first page. --layout puts the chat below, above, left, right, on a tab, or
 hides it, as this device's choice. With --tabs, it opens the list, a second paper, goes back
 to the first and checks it comes back at the page it was on, closes the second, and reloads
 to see the tabs come back. --find types QUERY into find a letter at a time and prints what it
@@ -37,6 +43,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 IPAD = {"width": 820, "height": 1180}
+LIBRARY_DRAWN = "#area-page .area-title, #all-view .rows, #all-view .list-note"
 LAYOUTS = ["bottom", "top", "left", "right", "tab", "hidden"]
 
 
@@ -58,7 +65,8 @@ def tabs_pass(page, out: Path) -> None:
     page.wait_for_timeout(300)
     print("list showing, address:", page.url)
     page.screenshot(path=out / "tabs-1-list.png")
-    links = page.locator("#papers li a")
+    page.wait_for_selector("#papers-pane .paper-row:visible", timeout=30_000)
+    links = page.locator("#papers-pane .paper-row:visible")
     for i in range(links.count()):
         href = links.nth(i).get_attribute("href")
         if href and href not in first:
@@ -81,7 +89,7 @@ def tabs_pass(page, out: Path) -> None:
     page.screenshot(path=out / "tabs-3-first-again.png")
     page.locator(".tab.paper .label").nth(1).click()
     page.wait_for_timeout(800)
-    page.locator(".tab.paper .close").click()
+    page.locator('.tab.paper[aria-selected="true"] .close').click()
     page.wait_for_timeout(800)
     print("closed the second; tabs:", page.locator(".tab.paper").count(), "| address:", page.url)
     page.reload()
@@ -325,6 +333,132 @@ def chat_pass(page, chat: str, out: Path) -> None:
         page.screenshot(path=out / f"chat-{chat[:8]}-01.png")
 
 
+def library_pass(page, args, out: Path) -> None:
+    """The library: its view, an area, a search by titles or by text."""
+    page.wait_for_selector(LIBRARY_DRAWN, timeout=30_000)
+    page.wait_for_timeout(600)
+    view = page.get_attribute("#papers-pane", "data-view")
+    title = page.locator("#area-page .area-title")
+    print(
+        "library:",
+        view,
+        "|",
+        title.inner_text() if view == "areas" and title.count() else "",
+        "|",
+        page.inner_text("#library-count") or page.inner_text("#area-page .area-count")
+        if view == "areas"
+        else page.inner_text("#library-count"),
+        "| rows:",
+        page.locator(".paper-row").count(),
+        "| tiles:",
+        page.locator(".treemap .tile").count(),
+        "| tree:",
+        page.locator("#area-tree").is_visible(),
+    )
+    page.screenshot(
+        path=out / f"library-{view}{'-' + args.area.replace('/', '-') if args.area else ''}.png"
+    )
+    if not args.search:
+        return
+    if args.text:
+        page.click('#depth [data-depth="text"]')
+    page.type("#filter", args.search, delay=60)
+    if args.text:
+        page.wait_for_selector(".text-result, .text-head, .list-note.error", timeout=20_000)
+        page.wait_for_timeout(400)
+        print(
+            "text search:",
+            page.locator(".text-head").first.inner_text()
+            if page.locator(".text-head").count()
+            else "",
+            "| papers shown:",
+            page.locator(".text-result").count(),
+        )
+    else:
+        page.wait_for_timeout(600)
+        print(
+            "searched titles:",
+            page.inner_text("#library-count") or "",
+            "| rows:",
+            page.locator(".paper-row").count(),
+        )
+    page.screenshot(path=out / f"library-search{'-text' if args.text else ''}.png")
+    if args.text and page.locator(".snippet").count():
+        snippet = page.locator(".snippet").first
+        print("tapping:", " ".join(snippet.inner_text().split())[:120])
+        snippet.click()
+        page.wait_for_selector(".pdfViewer .page canvas", timeout=30_000)
+        page.wait_for_timeout(2500)
+        print(
+            "opened at:",
+            page.inner_text("#page-badge"),
+            "| find:",
+            page.input_value("#find-input"),
+            page.inner_text("#find-count"),
+            "| marked:",
+            page.locator(".textLayer .highlight").count(),
+        )
+        page.screenshot(path=out / "library-search-opened.png")
+
+
+def review_pass(page, peek: bool, out: Path) -> None:
+    """A review in its tab, and the peek at a paper it cites."""
+    page.wait_for_selector(".review-body", timeout=30_000)
+    page.wait_for_timeout(1500)  # diagrams
+    print(
+        "review:",
+        page.locator(".review-body h1").first.inner_text()
+        if page.locator(".review-body h1").count()
+        else "",
+        "| callouts:",
+        page.locator(".review-body .callout").count(),
+        "| diagrams drawn:",
+        page.locator(".review-body .diagram.drawn").count(),
+        "| links to papers:",
+        page.locator('.review-body a[data-kind="paper"]').count(),
+        "| to pages:",
+        page.locator('.review-body a[data-kind="page"]').count(),
+        "| tab:",
+        page.locator(".tab.review").count(),
+    )
+    page.screenshot(path=out / "review-1-open.png")
+    if not peek:
+        return
+    # A paper cited with a page in the same paragraph, so the peek offers both.
+    link = page.locator(
+        '.review-body :is(p, li):has(a[data-kind="page"]) a[data-kind="paper"]'
+    ).first
+    if not link.count():
+        link = page.locator('.review-body a[data-kind="paper"]').first
+    link.scroll_into_view_if_needed()
+    page.evaluate("document.getElementById('review-pane').scrollBy(0, -200)")
+    page.wait_for_timeout(300)
+    link.click()
+    page.wait_for_selector("#peek:not([hidden])")
+    page.wait_for_timeout(200)
+    print("peek:", " | ".join(page.inner_text("#peek").splitlines()))
+    page.screenshot(path=out / "review-2-peek.png")
+    pages = page.locator("#peek .secondary")
+    if pages.count():
+        pages.first.click()
+        page.wait_for_selector(".pdfViewer .page canvas", timeout=30_000)
+        page.wait_for_timeout(1500)
+        print(
+            "opened at:",
+            page.inner_text("#page-badge"),
+            "| tabs:",
+            page.locator(".tab.paper").count(),
+        )
+        page.screenshot(path=out / "review-3-page.png")
+        page.locator(".tab.review .label").first.click()
+        page.wait_for_timeout(800)
+        print(
+            "back to the review, scrolled to:",
+            page.evaluate("document.getElementById('review-pane').scrollTop"),
+        )
+        page.screenshot(path=out / "review-4-back.png")
+
+
 def wait_for_answer(page, timeout: int, allow: bool, out: Path) -> None:
     """Waits for the turn's end, printing each permission request (and tapping Allow)."""
     seen = 0
@@ -373,6 +507,18 @@ def main() -> None:
         "--model", default="haiku", help="the model this browser's chats start on (default: haiku)"
     )
     parser.add_argument("--browser", default="webkit", choices=["webkit", "chromium"])
+    parser.add_argument("--size", help="the window, WxH (default: the iPad in portrait, 820x1180)")
+    parser.add_argument("--landscape", action="store_true", help="the iPad in landscape, 1180x820")
+    parser.add_argument("--dark", action="store_true", help="the dark theme")
+    parser.add_argument("--view", choices=["areas", "all"], help="the library's view")
+    parser.add_argument("--area", help="the library open at this topic")
+    parser.add_argument("--rich", action="store_true", help="the library's rows, rich")
+    parser.add_argument("--search", help="type this into the library's search box")
+    parser.add_argument(
+        "--text", action="store_true", help="with --search, search the papers' text"
+    )
+    parser.add_argument("--review", help="open the review of this scope")
+    parser.add_argument("--peek", action="store_true", help="with --review, peek at a cited paper")
     parser.add_argument("--timeout", type=int, default=240, help="seconds to wait for an answer")
     parser.add_argument("--allow", action="store_true", help="tap Allow on each permission request")
     args = parser.parse_args()
@@ -380,7 +526,18 @@ def main() -> None:
 
     with sync_playwright() as p:
         browser = getattr(p, args.browser).launch()
-        page = browser.new_page(viewport=IPAD, device_scale_factor=2, has_touch=True)
+        viewport = dict(IPAD)
+        if args.landscape:
+            viewport = {"width": 1180, "height": 820}
+        if args.size:
+            width, height = (int(n) for n in args.size.lower().split("x"))
+            viewport = {"width": width, "height": height}
+        page = browser.new_page(
+            viewport=viewport,
+            device_scale_factor=2,
+            has_touch=True,
+            color_scheme="dark" if args.dark else "light",
+        )
         page.on(
             "console",
             lambda m: (
@@ -393,11 +550,29 @@ def main() -> None:
             page.add_init_script(layout_script(args.layout))
         if args.chat:
             page.add_init_script(f"localStorage.setItem('carrel.chat', {json.dumps(args.chat)});")
-        page.goto(args.url)
-        page.wait_for_selector(".pdfViewer .page canvas", timeout=30_000)
-        page.wait_for_timeout(800)
-        print("opened:", page.inner_text("#page-badge"))
-        page.screenshot(path=args.out / f"1-open{'-' + args.layout if args.layout else ''}.png")
+        if args.view or args.area or args.rich:
+            state = {
+                "view": args.view or "areas",
+                "area": args.area or "",
+                "density": "rich" if args.rich else "compact",
+            }
+            page.add_init_script(
+                f"localStorage.setItem('carrel.library', {json.dumps(json.dumps(state))});"
+            )
+        url = args.url
+        if args.review:
+            url = url.split("/", 3)[:3]
+            url = "/".join(url) + "/review/" + args.review
+        page.goto(url)
+        if args.review:
+            review_pass(page, args.peek, args.out)
+        elif "/read/" in url:
+            page.wait_for_selector(".pdfViewer .page canvas", timeout=30_000)
+            page.wait_for_timeout(800)
+            print("opened:", page.inner_text("#page-badge"))
+            page.screenshot(path=args.out / f"1-open{'-' + args.layout if args.layout else ''}.png")
+        else:
+            library_pass(page, args, args.out)
 
         if args.tabs:
             tabs_pass(page, args.out)

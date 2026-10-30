@@ -131,14 +131,11 @@ class Library:
         return {str(path): str(scope or "") for path, scope in self.lib.load_topics().items()}
 
     def reading(self, paper_text: str, meta: dict) -> tuple[str | None, bool]:
-        """The paper's type, and whether the agent has read it (its note has a digest), from
-        one read of its note. The type is the frontmatter's, else the one the reading gave;
-        that fallback goes when the frontmatter always has it (the engine's paper-types task)."""
+        """The paper's type (its frontmatter's, which the engine fills when a paper is filed
+        and replaces when it is read), and whether the agent has read it (its note has a digest)."""
         note = self.lib.read_note(self.root / paper_text)
         kind = meta.get("type")
-        if kind not in self.lib.TYPES:
-            kind = (note or {}).get("fields", {}).get("type")
-        return kind, bool(note and note["digest"] is not None)
+        return (kind if kind in self.lib.TYPES else None), bool(note and note["digest"] is not None)
 
     def review_scopes(self) -> list[dict]:
         """The areas to read and review, in their order: [{group, scopes: [scope]}]."""

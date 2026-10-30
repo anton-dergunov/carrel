@@ -81,7 +81,7 @@ def test_the_scopes_and_what_the_agent_has_read(document):
 
 def test_the_type_from_the_frontmatter_else_the_note(document):
     papers = by_text(document)
-    assert papers[DPO]["type"] == "method"  # its note's
+    assert papers[DPO]["type"] == "method"  # its frontmatter's
     assert papers[LARIMAR]["type"] == "system"  # its frontmatter's, not its note's "study"
     assert "type" not in papers[WIDE]
 

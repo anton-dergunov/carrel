@@ -10,7 +10,7 @@ This plan is plan.md's step 6 and its feedback items 16 (notes and reviews), 17 
 - **The document** is 0.5 MB gzipped, not 250 KB: 2,275 papers with their summaries and authors. It is fetched once per page and then answered with a 304.
 - **Desk** is where a new device's library opens, Areas second.
 - **Text search** matches across lines (ripgrep's `-U`): a phrase breaks over a line in a layout text, and it costs nothing here (0.04 s).
-- **The type** is the frontmatter's, else the note's, until the engine's paper-types task lands; the engine gained `note_fields`, `read_note` and `review_scopes` for carrel.
+- **The type** is the frontmatter's: since 30 Oct 2026 the engine writes it when a paper is filed and replaces it when the paper is read ([experiments/paper-type](../../agentic-paper-library/experiments/paper-type/README.md)); the engine gained `note_fields`, `read_note` and `review_scopes` for carrel.
 - **Adding** also takes a web page or a PDF, into an area the reader picks; an arXiv paper is filed by the engine. What an add or a remove did is read from the library afterwards, not from the exit code (architecture.md says why).
 - **Sitting checklist**: the treemap's labels at a finger's reach; the tree beside an area's page in landscape; the peek's placement near the screen's edges; a review's place after trips to its papers; Text search's snippets and find; Desk's Continue after a few days; adding a paper by pasting an arXiv link, and a PDF from Files.
 

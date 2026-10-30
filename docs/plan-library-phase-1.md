@@ -1,6 +1,6 @@
 # Phase 1 of the library plan: Areas, All, reviews, text search
 
-**Built on 30 Oct 2026**, with phases 2 and 3 after it; what it changed is in [plan-library.md](plan-library.md), and how it works in [architecture.md](architecture.md#the-library). The engine's part is [paper-types](../../agentic-paper-library/docs/tasks/paper-types.md), still to do. This file stays until the sitting on the iPad.
+**Built on 30 Oct 2026**, with phases 2 and 3 after it; what it changed is in [plan-library.md](plan-library.md), and how it works in [architecture.md](architecture.md#the-library). The engine's part, every paper's type in its frontmatter, landed the same day ([experiments/paper-type](../../agentic-paper-library/experiments/paper-type/README.md)). This file stays until the sitting on the iPad.
 
 ## Context
 

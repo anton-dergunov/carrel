@@ -75,7 +75,7 @@ def library(tmp_path_factory) -> Library:
     # The example's two arXiv papers have PDFs here; its web article has none.
     for stem in (DPO, LARIMAR):
         empty_pdf(root / "pdfs" / f"{stem}.pdf")
-    # The type: from a note's head (DPO); the frontmatter's before its note's (Larimar).
+    # The type is the frontmatter's, never the note's: Larimar's note says study.
     notes = root / "notes"
     notes.mkdir(exist_ok=True)
     (notes / f"{Path(DPO).name}.md").write_text(
@@ -84,7 +84,7 @@ def library(tmp_path_factory) -> Library:
     (notes / f"{Path(LARIMAR).name}.md").write_text("# Larimar\n\ntype: study\n\n## Digest\n")
     larimar = root / "library" / f"{LARIMAR}.txt"
     larimar.write_text(
-        larimar.read_text().replace("\nsource: pdf\n", "\nsource: pdf\ntype: system\n", 1)
+        larimar.read_text().replace("\ntype: method\n", "\ntype: system\n", 1)
     )
 
     topic = root / "library" / "recsys"

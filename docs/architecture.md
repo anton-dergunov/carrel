@@ -96,6 +96,15 @@ A paper set to the page width is about as tall as the iPad's screen, so the cont
 - **The page number** is a faint badge in the PDF's corner. A tap opens the paper's contents and a field to go to a page.
 - **The chat has no header.** Its status line names the model, which opens the settings, and holds two icons, for earlier chats and a new chat. The box says which paper a question is about.
 
+## A citation's mark
+
+A citation the agent writes with the engine's `paperlib locate` carries the rectangles where the PDF prints what it cites (`rect=`, in points from the page's top-left). `cite-mark.js` draws them over the page, as vscode-pdf-viewer does, and the rectangles decide where the page scrolls: the mark is put in the middle of the pane. How `locate` finds a place, and how well, is the engine's [experiments/pdf-locations](../../agentic-paper-library/experiments/pdf-locations/README.md).
+- **An overlay, never an annotation.** A layer inside the page's div, placed in percentages of the page, so zoom and rotation need no work. PDF.js empties the page's div when it draws the page again (a pinch, a new zoom), so the layer is put back on `pagerender`. Nothing reaches the PDF, so the saves (`PUT /pdf`) never carry it.
+- **It arrives, then rests.** A ring contracts onto the mark once its page is drawn, then the mark stays while the reader scrolls. A tap on the page, Escape, another citation, or leaving the paper's tab takes it away. A mark that faded on its own would be gone by the time the reader looked up from the chat, and e-ink shows no animation; with reduced motion there is none.
+- **Two shapes.** A phrase or a value (a box up to 24 pt tall) gets a soft wash with a hairline under it, as if underlined in ink; a table, a figure or an equation gets a thin outline. One ink, `#2a6f97`, in both themes, as the page stays white; it is none of the six highlight colours, so a mark never looks like a saved highlight.
+- **In the address.** `/read/<pdf>?page=7&rect=…` opens the paper with the mark, as a link in the chat does, until the place the reader scrolls to replaces it.
+- **The agent's sandbox.** `paperlib` runs through `uv run`, which writes its cache on every run, so the session's environment points `UV_CACHE_DIR` into the engine's cache folder, which the sandbox lets it write. Without it, `paperlib locate` failed here on uv's cache, and the agent had to work around it.
+
 ## The text layer
 
 Find, highlights and the selection all work on PDF.js's text layer.

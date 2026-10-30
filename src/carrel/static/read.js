@@ -9,6 +9,7 @@
 
 import './polyfill.js'; // before PDF.js
 import * as pdfjsLib from './vendor/pdfjs/pdf.min.mjs';
+import { createCiteMark } from './cite-mark.js';
 import { HIGHLIGHT_COLORS, lineBoxes } from './highlight.js';
 import { pinchToZoom, stopPageZoom } from './pinch.js';
 
@@ -47,6 +48,8 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     annotationEditorHighlightColors: HIGHLIGHT_COLORS.map((color) => `${color.name}=${color.value}`).join(','),
   });
   linkService.setViewer(viewer);
+  // The mark a citation's rectangles draw.
+  const citeMark = createCiteMark({ viewer, eventBus, container });
   // Links inside the PDF go through this too.
   linkService.goToDestination = (dest) => scrollToDestination(dest);
 
@@ -54,7 +57,7 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   let pdfDocument = null;
   // The paper as loaded, for saving it: {file, url, document, version, base}.
   let paper = null;
-  // Where to go once the document's pages are laid out: a place, or a target {page, dest}.
+  // Where to go once the document's pages are laid out: a place, or a target {page, dest, rect}.
   let pending = null;
   let lastPlace = null;
   let uiManager = null;
@@ -151,8 +154,13 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     });
   }
 
-  /** A named destination wins over a page when the PDF has it; the page is the fallback. */
-  async function goTo({ page, dest }) {
+  /**
+   * A citation's rectangles are the most exact place there is, and are marked; otherwise a named
+   * destination wins over a page when the PDF has it, and the page is the fallback.
+   */
+  async function goTo({ page, dest, rect }) {
+    if (rect && page && pdfDocument && (await citeMark.show(pdfDocument, page, rect))) return;
+    citeMark.clear(false);
     const found = dest ? await scrollToDestination(dest) : false;
     if (!found && page && page <= viewer.pagesCount) {
       viewer.currentPageNumber = page;
@@ -187,8 +195,8 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   let openTask = null;
 
   /**
-   * Shows a paper: `place` puts back where the reader was, `target` ({page, dest}) goes to a
-   * citation. The paper already shown only moves.
+   * Shows a paper: `place` puts back where the reader was, `target` ({page, dest, search, rect})
+   * goes to a citation. The paper already shown only moves.
    */
   async function open(pdf, url, { place, target } = {}) {
     target = target?.page || target?.dest || target?.search ? target : null;
@@ -201,6 +209,7 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
       return;
     }
     file = pdf;
+    citeMark.clear(false);
     pending = { place, target };
     const ticket = ++loading;
     // The paper showing is saved before it goes: its editors go with it.
@@ -442,6 +451,7 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     endFind: () => eventBus.dispatch('findbarclose', { source: null }),
     outline,
     goToDestination: (dest) => scrollToDestination(dest),
+    clearMark: () => citeMark.clear(true),
     file: () => file,
     pagesCount: () => (pdfDocument ? viewer.pagesCount : 0),
     currentPage: () => (pdfDocument ? viewer.currentPageNumber || null : null),

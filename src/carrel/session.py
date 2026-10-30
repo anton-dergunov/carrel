@@ -83,6 +83,9 @@ def agent_settings(library: Library) -> dict:
     """The settings layer a session runs with, on top of the library's own."""
     writable = [library.root, library.pdf_root, library.cache_dir, *note_folders(library)]
     return {
+        # `paperlib` runs through `uv run`, which writes to its cache on every run; the sandbox
+        # lets it write only here.
+        "env": {"UV_CACHE_DIR": str(library.cache_dir / "uv")},
         "permissions": {
             "allow": [
                 "WebSearch",

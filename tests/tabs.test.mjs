@@ -168,3 +168,11 @@ test('the addresses of an area and a review', () => {
   assert.equal(fileFromPath('/review/x'), null);
   assert.deepEqual(targetFromQuery('?page=4&search=position%20bias'), { page: 4, dest: undefined, search: 'position bias' });
 });
+
+test("a citation's rectangles are kept in the address, with their page", () => {
+  const target = { page: 7, rect: [[130, 306, 479, 397]] };
+  const address = readingUrl('llm/Zep.pdf', target);
+  assert.equal(address, '/read/llm/Zep.pdf?page=7&rect=130%2C306%2C479%2C397');
+  assert.deepEqual(targetFromQuery(address.split('?')[1]), { page: 7, dest: undefined, rect: [[130, 306, 479, 397]] });
+  assert.equal(targetFromQuery('?rect=1,2,3,4'), null);
+});

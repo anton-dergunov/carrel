@@ -215,6 +215,7 @@ function addressOf(paper, target) {
 /** Shows a tab: the library, the chat, a paper or a review, at its remembered place or at `target`. */
 function go(key, { target = null, push = true } = {}) {
   if (key !== state.active) {
+    reader.clearMark();
     tools.leave();
     highlights.leave();
     reviews.leave();
@@ -353,7 +354,7 @@ window.addEventListener('popstate', () => {
   const target = targetFromQuery(location.search);
   const open = state.papers.find((entry) => entry.pdf && sameFile(entry.pdf, file));
   // Back to a tab: where the reader left it, not the page the address kept.
-  if (open) go(open.pdf, { target: target?.dest || !open.place ? target : null, push: false });
+  if (open) go(open.pdf, { target: target?.dest || target?.rect || !open.place ? target : null, push: false });
   else void openFile(file, target, { push: false });
 });
 
@@ -370,7 +371,7 @@ if (body.dataset.review) {
   const target = targetFromQuery(location.search);
   const place = shownPaper().place;
   // An address this page wrote itself names the page of the place it keeps; the place is exact.
-  go(given, { target: target?.dest || target?.page !== place?.page ? target : null, push: false });
+  go(given, { target: target?.dest || target?.rect || target?.page !== place?.page ? target : null, push: false });
 } else {
   go(state.active, { push: false });
 }

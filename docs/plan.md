@@ -4,11 +4,11 @@ Carrel puts a paper's PDF and a Claude Code chat side by side on a tablet. The c
 
 ## Feedback still open
 
-From the reader's sittings on the iPad, numbered as the steps below cite them. Items 1–13, 15, 19 and 20 are built.
+From the reader's sittings on the iPad, numbered as the steps below cite them. Items 1–13, 15, 19 and 20 are built, and 14 awaits its sitting.
 
 **The PDF**
 
-14. **A citation goes to the exact spot**, not just the page: the rectangle, highlighted. This is the same technique as in vscode-pdf-viewer; see the engine's [precise-pdf-locations](../../agentic-paper-library/docs/tasks/precise-pdf-locations.md).
+14. **A citation goes to the exact spot**, not just the page: the rectangle, marked. Built, as in vscode-pdf-viewer ([architecture](architecture.md#a-citations-mark)); for the sitting: does the mark read well on the iPad, at a glance from the chat, and does a tap on the page clear it without getting in the way of the pen.
 
 **The library**, planned in [plan-library.md](plan-library.md): built, awaiting its sitting
 
@@ -26,7 +26,7 @@ From the reader's sittings on the iPad, numbered as the steps below cite them. I
 Each step ends with a sitting on the iPad, and its findings are added here. Steps 1–5 (the app and its chats; layout and tabs; the text layer; settings; the chat as the VS Code panel reads, with the overview and the properties) are built and described in [architecture.md](architecture.md).
 
 6. **The library** (items 16–18): its own plan, [plan-library.md](plan-library.md). Its phases 1–3 are built and await the sitting; meaning search and the map are left.
-7. **The PDF's exact spots** (item 14), shared with vscode-pdf-viewer, and the paper's highlights listed in its contents.
+7. **The paper's highlights listed in its contents.** The exact spots (item 14) are built.
 8. **Lectern's comforts and the NAS** (the old parts 6–7). Themes, e-ink (no animation, page turns, the stream shown in a few large updates), start at login with launchd, and a Docker image for the NAS.
 
 ## Open questions

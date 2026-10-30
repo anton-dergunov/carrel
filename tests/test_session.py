@@ -4,6 +4,7 @@ import os
 import re
 import time
 import uuid
+from pathlib import Path
 
 import pytest
 from claude_agent_sdk import (
@@ -76,6 +77,8 @@ def test_an_unknown_message_is_passed_as_its_repr():
 
 def test_settings(library):
     settings = agent_settings(library)
+    # paperlib's `uv run` writes its cache inside a folder the sandbox lets it write.
+    assert Path(settings["env"]["UV_CACHE_DIR"]).is_relative_to(library.cache_dir)
     assert settings["sandbox"]["enabled"]
     assert str(library.root) in settings["sandbox"]["filesystem"]["allowWrite"]
     # An absolute path in a permission rule starts with "//".

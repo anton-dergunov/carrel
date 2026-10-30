@@ -7,6 +7,8 @@
 // key, and `last` the key of the entry shown last, which is the one a question is about while
 // the library or the chat is showing. The functions here return a new state.
 
+import { formatRects, parseRects } from './links.js';
+
 export const PAPERS = 'papers';
 export const CHAT = 'chat';
 const TABS_KEY = 'carrel.tabs';
@@ -125,6 +127,7 @@ export function readingUrl(file, target) {
   const query = new URLSearchParams();
   if (target?.page) query.set('page', String(target.page));
   if (target?.dest) query.set('dest', target.dest);
+  if (target?.rect) query.set('rect', formatRects(target.rect));
   return `/read/${pathOf(file)}${query.size ? `?${query}` : ''}`;
 }
 
@@ -164,15 +167,17 @@ export function areaFromPath(pathname) {
   return after(pathname, '/area/');
 }
 
-/** A target given in an address: /read/<file>?page=7&dest=table.2&search=… */
+/** A target given in an address: /read/<file>?page=7&dest=table.2&search=…&rect=… */
 export function targetFromQuery(search) {
   const query = new URLSearchParams(search);
   const page = Number.parseInt(query.get('page') ?? '', 10);
   const dest = query.get('dest') || undefined;
   const find = query.get('search') || undefined;
+  const rect = parseRects(query.get('rect') ?? '');
   if (!(page > 0) && !dest && !find) return null;
   const target = { page: page > 0 ? page : undefined, dest };
   if (find) target.search = find;
+  if (rect && page > 0) target.rect = rect;
   return target;
 }
 

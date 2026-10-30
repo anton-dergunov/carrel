@@ -58,6 +58,17 @@ const maths = {
 
 const markdown = new Marked({ gfm: true }, maths);
 
+// A table's text wraps, and the browser shares the width out by how much each column holds,
+// which leaves a column of short entries ("Fig. 1, p. 3") its longest word beside one of
+// sentences. So a short entry stays on one line, and a longer one keeps a few words to a line
+// (8em, about as wide as a short one); a table that cannot fit then scrolls. Lectern's rule.
+const SHORT_CELL = 16;
+
+/** How a table's cell of `text` is laid out: 'short' on one line, 'wide' at least 8em wide. */
+export function cellWidth(text) {
+  return text.trim().length <= SHORT_CELL ? 'short' : 'wide';
+}
+
 /** The markdown as HTML, with each formula a placeholder holding its TeX. Not yet sanitised. */
 export function markdownHtml(text) {
   return markdown.parse(text);
@@ -69,7 +80,10 @@ export function markdownHtml(text) {
  */
 export function drawMarkdown(element, text, { diagrams = true } = {}) {
   element.innerHTML = DOMPurify.sanitize(markdownHtml(text));
-  for (const table of element.querySelectorAll('table')) wrap(table, 'table');
+  for (const table of element.querySelectorAll('table')) {
+    wrap(table, 'table');
+    for (const cell of table.querySelectorAll('th, td')) cell.classList.add(cellWidth(cell.textContent));
+  }
   for (const placeholder of element.querySelectorAll('.maths')) {
     katex.render(placeholder.textContent, placeholder, {
       displayMode: placeholder.classList.contains('display'),

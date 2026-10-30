@@ -31,6 +31,49 @@ const SETTLE_MS = 800;
 const PASSAGE_MS = 300;
 const NOTICE_MS = 6000;
 
+/**
+ * A selection's boxes as PDF.js measures them for a highlight, joined line by line: one box from
+ * a line's first word to its last, as tall as its tallest. PDF.js measures the text layer's
+ * spans, and a space the PDF sets as an item of its own gets a span one space of the browser's
+ * font wide, however wide the paper made it, so the highlight would have a hole there; small
+ * capitals and the like give spans of other heights. Boxes further apart than the line is high
+ * stay apart: the gutter between two columns is not highlighted. `boxes` are `{x, y, width,
+ * height}` as fractions of the page, whose width over height is `aspect`. vscode-pdf-viewer's
+ * `src/webview/lineBoxes.ts` is the same; keep the two in step.
+ */
+export function lineBoxes(boxes, aspect) {
+  if (!boxes?.length) return boxes;
+  const lines = [];
+  for (const box of [...boxes].sort((a, b) => a.y + a.height / 2 - (b.y + b.height / 2))) {
+    const line = lines.find((each) => overlap(each, box) >= Math.min(each.height, box.height) / 2);
+    if (line) {
+      line.boxes.push(box);
+      const bottom = Math.max(line.y + line.height, box.y + box.height);
+      line.y = Math.min(line.y, box.y);
+      line.height = bottom - line.y;
+    } else {
+      lines.push({ y: box.y, height: box.height, boxes: [box] });
+    }
+  }
+  const joined = [];
+  for (const line of lines) {
+    let run = null;
+    for (const box of line.boxes.sort((a, b) => a.x - b.x)) {
+      if (run && (box.x - (run.x + run.width)) * aspect <= line.height) {
+        run.width = Math.max(run.width, box.x + box.width - run.x);
+      } else {
+        run = { x: box.x, y: line.y, width: box.width, height: line.height };
+        joined.push(run);
+      }
+    }
+  }
+  return joined;
+}
+
+function overlap(a, b) {
+  return Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+}
+
 /** Selected text as a question carries it: on one line, and not too long. */
 export function passage(text) {
   const line = text.replace(/\s+/g, ' ').trim();

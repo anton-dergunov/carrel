@@ -9,7 +9,7 @@
 
 import './polyfill.js'; // before PDF.js
 import * as pdfjsLib from './vendor/pdfjs/pdf.min.mjs';
-import { HIGHLIGHT_COLORS } from './highlight.js';
+import { HIGHLIGHT_COLORS, lineBoxes } from './highlight.js';
 import { pinchToZoom, stopPageZoom } from './pinch.js';
 
 // The viewer component reads the library from `globalThis.pdfjsLib` when its module is
@@ -84,6 +84,7 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   eventBus.on('annotationeditoruimanager', ({ uiManager: manager }) => {
     uiManager = manager;
     trackCommands(manager, edited);
+    joinLines(manager);
   });
 
   // A change of height alone leaves the scale as it is: setting the page again would move the
@@ -450,6 +451,19 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
 function textLayerOf(node) {
   const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
   return element?.closest('.textLayer') ?? null;
+}
+
+/** A highlight made from a selection is drawn line by line, without holes (`lineBoxes`). */
+function joinLines(uiManager) {
+  const boxes = uiManager.getSelectionBoxes.bind(uiManager);
+  uiManager.getSelectionBoxes = (textLayer) => {
+    const found = boxes(textLayer);
+    if (!found) return found;
+    // The boxes are fractions of the page as it is unrotated.
+    const { width, height } = textLayer.getBoundingClientRect();
+    const turned = ['90', '270'].includes(textLayer.getAttribute('data-main-rotation'));
+    return lineBoxes(found, turned ? height / width : width / height);
+  };
 }
 
 /**

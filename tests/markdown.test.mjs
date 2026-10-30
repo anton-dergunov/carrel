@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { markdownHtml } from '../src/carrel/static/markdown.js';
+import { cellWidth, markdownHtml } from '../src/carrel/static/markdown.js';
 
 const inline = (tex) => `<span class="maths">${tex}</span>`;
 const display = (tex) => `<span class="maths display">${tex}</span>`;
@@ -44,4 +44,9 @@ test('maths in a table', () => {
   const html = markdownHtml('| a | $x$ |\n|---|---|\n| 1 | \\(y\\) |');
   assert.match(html, /<th><span class="maths">x<\/span><\/th>/);
   assert.match(html, /<td><span class="maths">y<\/span><\/td>/);
+});
+
+test('a short table entry stays on one line, a longer one keeps a few words', () => {
+  for (const entry of ['Fig. 1, p. 3', '§3.1–3.2, p. 4', ' Table 1, p. 3 ', 'sixteen letters!']) assert.equal(cellWidth(entry), 'short');
+  for (const entry of ['seventeen letters', 'It compares LongMemEval with LoCoMo and other memory benchmarks.']) assert.equal(cellWidth(entry), 'wide');
 });

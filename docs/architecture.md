@@ -106,6 +106,7 @@ Find, highlights and the selection all work on PDF.js's text layer.
 
 **Highlights go into the paper's PDF.** They are ordinary Highlight annotations written the way vscode-pdf-viewer writes them: PDF.js's highlight editor, appended to the file as an incremental update. Both apps, and any other PDF app, show and edit the same ones. Highlights carry no notes.
 - **The pen.** It sits in the bar, beside find. While it is on, a selection is highlighted once it settles. Nothing is offered beside a selection, because iOS puts its Copy / Look Up menu below it near the top of the screen and above it near the bottom, and Android the other way round.
+- **One band per line.** PDF.js measures a selection by the text layer's spans, and a space the PDF sets apart from its words gets a span one space of the browser's font wide, so its highlight had holes, and small capitals made a line ragged. A line's boxes are joined into one, from its first word to its last and as tall as its tallest; boxes further apart than the line is high stay apart, so the gutter between columns is left alone. Where a highlight starts and ends inside a span is still PDF.js's estimate, from a stand-in font stretched to the span's width.
 - **The panel.** A tap on a highlight opens a small panel under it (above it near the bottom of the pane). It holds the six colours (vscode-pdf-viewer's), Remove, and Ask. A new highlight takes the colour used last.
 - **Saved at once, with no Save.** iOS may close the app in the background, and what was not saved is gone. Each change is sent to the laptop as the paper as loaded plus PDF.js's update.
 - **When it is written.** The server writes the change only if the file is still the version the page loaded or last saved, and still begins with the bytes the page loaded. It replaces the file in one step.
@@ -124,6 +125,8 @@ The chat reads as the VS Code panel does: a dozen real VS Code chats from the li
 **Maths** comes in the four forms the agent writes: `$…$`, `\(…\)`, `$$…$$` and `\[…\]`.
 - **When it is drawn.** KaTeX draws it after the answer is sanitised, into placeholders that hold the TeX, never through DOMPurify.
 - **Prices stay text.** A `$` follows Pandoc's rule: an opening `$` is not followed by a space, a closing one not preceded by one, and not followed by a digit.
+
+**Tables** wrap their text, as lectern's do. A short entry (16 characters or fewer, such as "Fig. 1, p. 3") stays on one line, and a longer one keeps at least 8em, so a column of references is not squeezed to its longest word beside a column of sentences. A table that cannot fit even so scrolls sideways.
 
 **Code.** A block that names its language is coloured by highlight.js, and every block has a copy button.
 

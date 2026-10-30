@@ -670,6 +670,9 @@ button.plain {
 .answer table { border-collapse: collapse; font-size: 15px; }
 .answer th, .answer td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; vertical-align: top; }
 .answer th { background: var(--bg); font-weight: 600; }
+/* markdown.js marks each cell: a short entry stays on one line, a longer one keeps a few words. */
+.answer th.short, .answer td.short { white-space: nowrap; }
+.answer th.wide, .answer td.wide { min-width: 8em; }
 
 .row {
   margin: 2px 0;

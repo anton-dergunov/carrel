@@ -4,7 +4,9 @@ import argparse
 import json
 import logging
 import os
+import signal
 import sys
+import threading
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -69,12 +71,14 @@ def serve(args) -> None:
         if not folder.is_dir():
             raise LibraryError(f"--add-dir {folder}: no such folder")
     settings = Settings(settings_file())
+    published = bool(name) and tailnet.serves(HTTPS_PORT, args.port)
     app = make_app(
         library,
         hosts={name} if name else set(),
         logins=logins,
         extra_folders=extra,
         settings=settings,
+        tablet_url=f"https://{name}:{HTTPS_PORT}/" if published else None,
     )
 
     print(f"{APP_NAME} {__version__}: {library.root} (PDFs in {library.pdf_root})")
@@ -86,14 +90,28 @@ def serve(args) -> None:
         print(
             f"  on the tailnet: https://{name}:{HTTPS_PORT}/  for {', '.join(sorted(logins)) or 'nobody'}"
         )
-        if not tailnet.serves(HTTPS_PORT, args.port):
+        if not published:
             print(
                 f"  not published yet; once, run:  tailscale serve --bg --https={HTTPS_PORT} "
                 f"http://127.0.0.1:{args.port}"
             )
     else:
         print("  Tailscale is not running: this Mac only")
+    if args.exit_with_stdin:
+        exit_with_stdin()
     uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning", ws_max_size=4 * 2**20)
+
+
+def exit_with_stdin() -> None:
+    """Stops the server, as Ctrl-C does, once stdin closes: the Mac app holds the other end,
+    so a carrel it started never outlives it, even when the app is killed."""
+
+    def wait() -> None:
+        while sys.stdin.buffer.read(4096):
+            pass
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    threading.Thread(target=wait, name="stdin", daemon=True).start()
 
 
 def serve_arguments(args) -> list[str]:
@@ -176,12 +194,22 @@ def serve_options(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def run_options(parser: argparse.ArgumentParser) -> None:
+    """Options for running `serve` in the foreground, which the login agent never takes."""
+    parser.add_argument(
+        "--exit-with-stdin",
+        action="store_true",
+        help="stop when stdin closes (the Mac app runs carrel this way)",
+    )
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog=APP_NAME, description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
 
     run = commands.add_parser("serve", help="serve the library to the tablet")
     serve_options(run)
+    run_options(run)
     run.set_defaults(func=serve)
 
     login = commands.add_parser(

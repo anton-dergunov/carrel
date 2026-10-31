@@ -4,6 +4,7 @@
 
 import './report.js'; // first, so it hears what goes wrong in the others
 import { startChat } from './chat.js';
+import { startCommands, stepTab } from './commands.js';
 import { startHighlights } from './highlight.js';
 import { restoreLayout, shareOf, startLayout } from './layout.js';
 import { sameFile } from './links.js';
@@ -339,6 +340,39 @@ function icon(name) {
 function shorten(text, length) {
   return text.length > length ? `${text.slice(0, length - 1).trimEnd()}…` : text;
 }
+
+/** The tabs in the order the strip shows them. */
+function tabKeys() {
+  return [PAPERS, ...state.papers.map(keyOf), ...(layout.place === 'tab' ? [CHAT] : [])];
+}
+
+startCommands({
+  find() {
+    if (shownPaper()) tools.openFind();
+    else if (state.active === PAPERS) library.focusSearch();
+    else return false;
+  },
+  'close-tab'() {
+    if (state.active === PAPERS || state.active === CHAT) return false;
+    close(state.active);
+  },
+  library: () => go(PAPERS),
+  'next-tab': () => go(stepTab(tabKeys(), state.active, 1)),
+  'previous-tab': () => go(stepTab(tabKeys(), state.active, -1)),
+  ask() {
+    revealChat();
+    chat.focus();
+  },
+  'toggle-chat'() {
+    if (layout.place !== 'tab') chatToggle.click();
+    else if (state.active === CHAT) go(itemInView(state) ? keyOf(itemInView(state)) : PAPERS);
+    else go(CHAT);
+  },
+  add() {
+    go(PAPERS);
+    document.getElementById('library-add').click();
+  },
+});
 
 tabStrip.addEventListener('click', (event) => {
   const tab = event.target.closest('[data-key]');

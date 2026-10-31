@@ -119,3 +119,31 @@ def test_a_running_carrel_is_recognised_and_anything_else_is_not(monkeypatch):
 def test_nothing_on_the_port():
     assert cli.running(1) is None
     assert Path(agent.log_path()).name == "carrel.log"
+
+
+def test_the_agent_never_runs_carrel_tied_to_stdin():
+    # launchd gives the agent no stdin, so the option would stop it at once.
+    args = parsed("--library", "/papers")
+    assert "--exit-with-stdin" not in cli.serve_arguments(args)
+    assert not hasattr(args, "exit_with_stdin")
+
+
+def test_exit_with_stdin_stops_the_process_when_stdin_closes():
+    import signal
+    import subprocess
+    import sys
+
+    child = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import time; from carrel import cli; cli.exit_with_stdin(); "
+            "print('ready', flush=True); time.sleep(30)",
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    assert child.stdout.readline().strip() == "ready"
+    child.stdin.close()
+    assert child.wait(timeout=10) == -signal.SIGTERM

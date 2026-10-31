@@ -16,10 +16,27 @@ The server listens on 127.0.0.1 and is published to the tailnet by `tailscale se
 
 `carrel agent install` (with serve's own options) writes a launchd agent, `~/Library/LaunchAgents/com.anton.carrel.plist`, that runs `carrel serve` from login onwards, logging to `~/Library/Logs/carrel.log`; `status` and `uninstall` check and remove it. It is Lectern's `lectern agent`, with three changes:
 - **Everything named.** launchd knows nothing of the shell's folder or environment, so the agent runs with the library, the engine and the extra folders as absolute paths, and with the installing shell's `PATH` (and `XDG_STATE_HOME`, when set): launchd's own lacks Homebrew's `rg` and `uv`, which runs `paperlib`, and the `tailscale` command. The program is the checkout's `.venv/bin/carrel`, which `uv sync` keeps in place.
-- **One carrel per port.** `serve` first asks the port's `GET /api/ping` (`{app, version, library}`). When a carrel answers, it says so and exits 0, and launchd, which restarts it only after a failure (`KeepAlive: {SuccessfulExit: false}`), leaves it stopped. So a hand-typed `carrel serve` tells where carrel already runs.
+- **One carrel per port.** `serve` first asks the port's `GET /api/ping` (`{app, version, library, tablet}`, the last its tailnet address when `tailscale serve` publishes it). When a carrel answers, it says so and exits 0, and launchd, which restarts it only after a failure (`KeepAlive: {SuccessfulExit: false}`), leaves it stopped. So a hand-typed `carrel serve` tells where carrel already runs.
 - **Waiting for the old one.** `launchctl bootout` returns while carrel is still closing its chats, and loading the agent again before then fails, so `install` waits until the old one is gone.
 
 The agent keeps running the code it started with: after a change, or `uv sync`, `launchctl kickstart -k gui/$UID/com.anton.carrel` restarts it. Chats under launchd use the same Claude Code login, from the login keychain.
+
+## The Mac app
+
+`macos/` is Carrel in a window of its own: carrel's page in a WKWebView, at `http://127.0.0.1:<port>/`, with the server found or started behind it. It is a shell: the page is the same one the tablet loads, and admission is unchanged (a loopback Host with no Tailscale login, and the page's own Origin).
+- **Swift, not Tauri.** Tauri would draw in the same WKWebView on the Mac and adds a Rust toolchain; its gain is Windows and Linux builds, which the browser covers. The shell is a few hundred lines, easy to rewrite if they are ever wanted.
+- **From Acervo's app** (`acervo-llm-dictionary/macos`): moving between a window and the menu bar (`AppActivation`), staying in the menu bar after a launch at login (`LaunchContext`), the login item read from the system, the Edit menu, the file panel, outside links in the browser, and the project in XcodeGen's `project.yml`. Not taken: its own static server and scheme (carrel's server serves the page, on a fixed port, so the page's storage keeps its origin), its own updater, and turning the login item on at first launch.
+
+**Finding the server.** The app asks the port's `/api/ping`. A carrel answering (the login agent's, or one typed in a terminal) is shown and never stopped. With none, the app starts `carrel serve --exit-with-stdin` itself, logging to `~/Library/Logs/carrel-app.log`, and shows the page once the ping answers.
+- **Its own server goes with it.** On quit the app sends SIGTERM, which closes the chats, and waits for it (SIGKILL after 15 s). The server also stops when its stdin closes, and the app holds the other end, so a server the app started never outlives it, even when the app is killed.
+- **The setup, first found wins:** the app's Settings; the login agent's plist (its `carrel`, `--library`, `--engine`, `--port` and the rest of its options); the login shell (`carrel` on its PATH, `PAPER_LIBRARY`, `CARREL_ENGINE`). With the agent installed, nothing needs setting. An app opened from the Finder has launchd's bare PATH, as the agent does, so the app reads the login shell's environment once (`$SHELL -l -i -c 'env -0'`, 5 s at most) and passes on its PATH, `XDG_STATE_HOME`, `PAPER_LIBRARY` and `CARREL_ENGINE`.
+- **When it cannot start one**, the window says why, with the last lines of the log and buttons for Settings, Try Again and the log.
+
+**The window.** Its title is the page's. Carrel's own addresses stay in it; any other web address opens in the browser, `window.open` included; a paper link (`pdf.invalid`) never navigates, since the page handles it. Adding a PDF opens the Mac's file panel.
+
+**Menus call the page.** Each menu item that acts on the library runs one of the page's commands, `window.carrel.command(name)` (`commands.js`), and gets back whether it did anything: Add Paper (⌘N), Close Tab (⌘W, which closes the window on the library), Find (⌘F: the paper's find, or the library's search box), Library (⌘1), Next and Previous Tab (⇧⌘] and ⇧⌘[), Ask (⌘L), Show or Hide Chat (⇧⌘L). Zoom (⌘0, ⌘=, ⌘−) is the WebView's. In a browser the page takes ⌘F (Ctrl+F) for itself, since the browser's find cannot search the pages PDF.js has not drawn.
+
+**The menu bar item** is off until Settings turns it on. A click shows or hides the window; a right click has the server's status, Copy Tablet Address, Start or Stop Server (the app's own), Settings and Quit. With it on, closing the window leaves Carrel in the menu bar with no Dock icon, and a launch at login stays there.
 
 ## What the agent may do
 
@@ -72,6 +89,7 @@ The chat's settings open from the model's name on its status line, as a small di
 - **Why not as PDF.js does it.** PDF.js's `TouchManager` rescales the viewer at every step of a pinch and moves the scroll to keep the point under the fingers. Safari scrolled the same container with the same fingers at the same time, and the two added up, so the paper flew.
 - **During the pinch.** The container can't scroll, and the pages are only scaled as a picture.
 - **When the fingers lift.** The viewer takes the new scale once, and the scroll is set so the same spot of the page sits under them. Pinching back to the page's width snaps to fit-width.
+- **On a Mac's trackpad.** A pinch arrives as wheel events with `ctrlKey`, as ctrl and a mouse wheel do, and nothing says the fingers lifted. It is the same pinch: the pages scaled as a picture, and the viewer rescaled once no wheel event has come for 200 ms. The steps are the meaning map's.
 - **On the chat.** iOS ignores `user-scalable=no`, and it ignored `touch-action` on `body`, so a pinch there still zoomed the whole page. Cancelling Safari's `gesturestart`/`gesturechange` events stops it.
 
 **The keyboard.**
@@ -87,7 +105,7 @@ The chat's settings open from the model's name on its status line, as a small di
 - **One viewer.** All papers share one PDF viewer, because several viewers would each keep their rendered pages, which is what makes iPad Safari drop a page. Each tab keeps its place (page, zoom, scroll), so coming back to a tab puts the paper back where it was.
 - **The address.** It names the tab showing. The Home Screen app always starts at `/`, so it opens the tab that was showing last.
 
-**Where the chat sits.** The chat sits below, above, left or right of the paper, or on a tab of its own, and it can be hidden. Each device remembers its choice.
+**Where the chat sits.** The chat sits below, above, left or right of the paper, or on a tab of its own, and it can be hidden. Each device remembers its choice. Until it has chosen, the chat is beside the paper on a wide screen (1100 px or more, and 1.3 times as wide as tall: the Mac, a tablet held sideways) and below it otherwise.
 - **The split is dragged,** and each side keeps its own size; a double tap puts it back at 40%.
 - **While dragging.** The panes resize as the finger moves, a step a frame. The PDF keeps its scale meanwhile and fits the new width when the finger lifts, since drawing every page at a new scale at each step is what made it slow.
 - **Why not move only a line.** Moving a line and resizing at the end was quicker, but it looked broken and left the reader guessing how big the chat would be.

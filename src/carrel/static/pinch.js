@@ -1,4 +1,4 @@
-// Two fingers zoom the PDF, and only the PDF.
+// Two fingers zoom the PDF, and only the PDF: on the screen, or on a Mac's trackpad.
 //
 // PDF.js's own pinch rescales the viewer at every step of the gesture and moves the scroll to keep
 // the point under the fingers; Safari scrolls the same container at the same time with the same
@@ -6,6 +6,9 @@
 // viewer until it ends: while the fingers move, the container cannot scroll and the pages are only
 // scaled as a picture, around the point the pinch began on; when the fingers lift, the viewer
 // takes the new scale once and the scroll is set so that point of the page sits under the fingers.
+//
+// A trackpad's pinch reaches the page as wheel events with ctrlKey (as ctrl and a mouse wheel do),
+// with no event for the fingers lifting: the pinch ends when no wheel event has come for a moment.
 //
 // Safari would also zoom the whole page on a pinch anywhere else (the chat, the bars), whatever
 // the viewport meta says; its own gesture events are cancelled for that.
@@ -15,6 +18,16 @@ const MAX_SCALE = 6;
 // Lifting the fingers this close to the width that fits snaps to it, and the PDF fits again
 // when the pane changes size.
 const SNAP_TO_FIT = 0.06;
+// A trackpad pinch has ended when no wheel event has come for this long.
+const WHEEL_END_MS = 200;
+
+/** How much one wheel event with ctrlKey zooms: a trackpad pinch sends small fractional steps, a
+ * mouse wheel whole notches (by line, or in large whole pixels). The rates are the meaning map's. */
+export function wheelFactor({ deltaY, deltaX = 0, deltaMode = 0 }) {
+  const notch = deltaX === 0 && (deltaMode === 1 || (Math.abs(deltaY) >= 50 && Number.isInteger(deltaY)));
+  const rate = deltaMode === 1 ? 0.025 : notch ? 0.0025 : 0.012;
+  return Math.exp(-deltaY * rate);
+}
 
 export function stopPageZoom() {
   for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
@@ -36,7 +49,7 @@ export function pinchToZoom({ container, viewer, eventBus }) {
     (event) => {
       if (event.touches.length === 2 && !pinch && viewer.pagesCount) {
         event.preventDefault();
-        begin(event.touches);
+        begin(middle(event.touches), distance(event.touches));
       }
     },
     { passive: false },
@@ -47,30 +60,48 @@ export function pinchToZoom({ container, viewer, eventBus }) {
       if (!pinch) return;
       // Only a non-passive touchmove keeps Safari from scrolling with the same fingers.
       event.preventDefault();
-      if (event.touches.length >= 2) move(event.touches);
+      if (event.touches.length >= 2 && pinch.touch) move(middle(event.touches), distance(event.touches) / pinch.start);
     },
     { passive: false },
   );
   for (const type of ['touchend', 'touchcancel']) {
     container.addEventListener(type, (event) => {
-      if (pinch && event.touches.length < 2) end();
+      if (pinch?.touch && event.touches.length < 2) end();
     });
   }
 
-  function begin(touches) {
+  let wheelTimer = 0;
+  container.addEventListener(
+    'wheel',
+    (event) => {
+      if (!event.ctrlKey || !viewer.pagesCount || pinch?.touch) return;
+      event.preventDefault();
+      const at = { x: event.clientX, y: event.clientY };
+      if (!pinch) begin(at, null);
+      move(pinch.center.client, pinch.spread * wheelFactor(event));
+      clearTimeout(wheelTimer);
+      wheelTimer = setTimeout(end, WHEEL_END_MS);
+    },
+    { passive: false },
+  );
+
+  /** A pinch begins around `at` (in the window), with the fingers `start` apart; none for a wheel. */
+  function begin(at, start) {
     const box = container.getBoundingClientRect();
-    const center = middle(touches, box);
+    const center = { x: at.x - box.left, y: at.y - box.top, client: at };
     // The point of the content the pinch is about, in the scrolled content's coordinates.
     const point = { x: container.scrollLeft + center.x, y: container.scrollTop + center.y };
     pinch = {
+      touch: start !== null,
       box,
-      start: distance(touches),
+      start,
+      spread: 1,
       center,
       last: center,
       factor: 1,
       scale: viewer.currentScale,
       point,
-      anchor: anchorAt(touches),
+      anchor: anchorAt(at),
     };
     // No native scrolling, and no momentum left over from a scroll the first finger began.
     container.style.overflow = 'hidden';
@@ -78,9 +109,12 @@ export function pinchToZoom({ container, viewer, eventBus }) {
     pages.style.willChange = 'transform';
   }
 
-  function move(touches) {
-    const now = middle(touches, pinch.box);
-    const scale = clamp(pinch.scale * (distance(touches) / pinch.start), MIN_SCALE, MAX_SCALE);
+  /** The fingers now at `at` (in the window), `spread` times as far apart as they began. */
+  function move(at, spread) {
+    const now = { x: at.x - pinch.box.left, y: at.y - pinch.box.top };
+    const scale = clamp(pinch.scale * spread, MIN_SCALE, MAX_SCALE);
+    // A wheel's steps multiply, and stop adding up at the scale's limits.
+    pinch.spread = scale / pinch.scale;
     pinch.factor = scale / pinch.scale;
     pinch.last = now;
     const dx = now.x - pinch.center.x;
@@ -89,6 +123,8 @@ export function pinchToZoom({ container, viewer, eventBus }) {
   }
 
   function end() {
+    if (!pinch) return;
+    clearTimeout(wheelTimer);
     const { factor, scale, point, anchor, last, box } = pinch;
     pinch = null;
     pages.style.transform = '';
@@ -116,9 +152,7 @@ export function pinchToZoom({ container, viewer, eventBus }) {
   }
 
   /** The page under the fingers, and where on it they are, as fractions of its size. */
-  function anchorAt(touches) {
-    const x = (touches[0].clientX + touches[1].clientX) / 2;
-    const y = (touches[0].clientY + touches[1].clientY) / 2;
+  function anchorAt({ x, y }) {
     const page = document.elementFromPoint(x, y)?.closest('.page');
     const number = Number(page?.dataset.pageNumber);
     if (!number) return null;
@@ -127,10 +161,11 @@ export function pinchToZoom({ container, viewer, eventBus }) {
   }
 }
 
-function middle(touches, box) {
+/** The point between two fingers, in the window. */
+function middle(touches) {
   return {
-    x: (touches[0].clientX + touches[1].clientX) / 2 - box.left,
-    y: (touches[0].clientY + touches[1].clientY) / 2 - box.top,
+    x: (touches[0].clientX + touches[1].clientX) / 2,
+    y: (touches[0].clientY + touches[1].clientY) / 2,
   };
 }
 

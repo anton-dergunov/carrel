@@ -684,7 +684,12 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   showClear();
   render();
   void reload();
-  return { showArea, address, reload, area: () => state.area, view: () => state.view };
+  function focusSearch() {
+    filter.focus({ preventScroll: true });
+    filter.select();
+  }
+
+  return { showArea, address, reload, focusSearch, area: () => state.area, view: () => state.view };
 }
 
 /** The depth the box is at, of the two the laptop answers; the other is stopped. */

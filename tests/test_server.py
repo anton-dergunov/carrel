@@ -33,7 +33,15 @@ def test_ping_says_which_carrel_answers(client, library):
         "app": "carrel",
         "version": __version__,
         "library": str(library.root),
+        "tablet": None,
     }
+
+
+def test_ping_names_the_tablet_address_when_the_tailnet_publishes_it(library):
+    tablet = f"https://{TAILNET}:8443/"
+    app = make_app(library, hosts={TAILNET}, logins={READER}, tablet_url=tablet)
+    client = TestClient(app, base_url="http://127.0.0.1:8517")
+    assert client.get("/api/ping").json()["tablet"] == tablet
 
 
 def test_read_page_is_the_same_page_with_the_paper_showing(client):

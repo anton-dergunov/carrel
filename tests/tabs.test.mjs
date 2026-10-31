@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { clampShare, restoreLayout, shareAt, shareOf } from '../src/carrel/static/layout.js';
+import { clampShare, defaultPlace, restoreLayout, shareAt, shareOf } from '../src/carrel/static/layout.js';
 import {
   CHAT,
   PAPERS,
@@ -175,4 +175,14 @@ test("a citation's rectangles are kept in the address, with their page", () => {
   assert.equal(address, '/read/llm/Zep.pdf?page=7&rect=130%2C306%2C479%2C397');
   assert.deepEqual(targetFromQuery(address.split('?')[1]), { page: 7, dest: undefined, rect: [[130, 306, 479, 397]] });
   assert.equal(targetFromQuery('?rect=1,2,3,4'), null);
+});
+
+test('a device that has not chosen gets the chat beside a wide screen and below a narrow one', () => {
+  assert.equal(defaultPlace(1280, 820), 'right'); // the Mac's window, an iPad held sideways
+  assert.equal(defaultPlace(820, 1180), 'bottom'); // an iPad held upright
+  assert.equal(defaultPlace(1024, 700), 'bottom'); // not wide enough for two panes
+  assert.equal(defaultPlace(1366, 1024), 'right');
+  assert.equal(restoreLayout(null, { width: 1440, height: 900 }).place, 'right');
+  // A choice the device made is kept, whatever the screen.
+  assert.equal(restoreLayout({ place: 'bottom' }, { width: 1440, height: 900 }).place, 'bottom');
 });

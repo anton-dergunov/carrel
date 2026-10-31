@@ -185,7 +185,10 @@ def make_app(
     edits: Edits | None = None,
     meaning: Meaning | None = None,
     meaning_map: MeaningMap | None = None,
+    tablet_url: str | None = None,
 ):
+    """`tablet_url`: where the tablet opens this server on the tailnet, if it is published
+    there, for the Mac app's menu."""
     sessions = sessions or Sessions(library, extra_folders, settings=settings)
     catalog = catalog or Catalog(library)
     edits = edits or Edits(library)
@@ -450,8 +453,16 @@ def make_app(
         )
 
     async def ping(request: Request) -> Response:
-        """Who answers on this port: a second `carrel serve` steps aside for it."""
-        return JSONResponse({"app": APP_NAME, "version": __version__, "library": str(library.root)})
+        """Who answers on this port: a second `carrel serve` steps aside for it, and the Mac
+        app shows its page."""
+        return JSONResponse(
+            {
+                "app": APP_NAME,
+                "version": __version__,
+                "library": str(library.root),
+                "tablet": tablet_url,
+            }
+        )
 
     async def get_settings(request: Request) -> Response:
         return settings_reply(sessions.settings.get())

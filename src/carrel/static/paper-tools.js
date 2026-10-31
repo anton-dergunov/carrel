@@ -185,6 +185,8 @@ export function startPaperTools({ reader, showOverview, openPaper = () => {}, on
   document.getElementById('find-done').addEventListener('click', closeFind);
 
   return {
+    /** Opens find, with what was found last selected. */
+    openFind,
     /** Opens find with `term` in it; the reader finds it once the paper is at its page. */
     showFind(term) {
       body.classList.add('finding');

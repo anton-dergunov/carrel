@@ -1,0 +1,64 @@
+# The Mac app, described for XcodeGen; scripts/mac-app.sh generates Carrel.xcodeproj from it.
+name: Carrel
+options:
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+targets:
+  Carrel:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+      - path: Resources
+        excludes: [Info.plist]
+    dependencies:
+      - sdk: ServiceManagement.framework
+    info:
+      # Generated from these properties, and not in git.
+      path: Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Carrel
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.education
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSHighResolutionCapable: true
+        NSHumanReadableCopyright: MIT licence
+        # The page and its ping are plain HTTP on 127.0.0.1.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.anton.carrel.app
+        PRODUCT_NAME: Carrel
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: minimal
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Signed to run on this Mac; a Developer ID for handing it to others is step 9's.
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: NO
+        # It runs carrel, so it is not sandboxed.
+        ENABLE_APP_SANDBOX: NO
+    scheme:
+      testTargets:
+        - CarrelTests
+  CarrelTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: Carrel
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: minimal
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Carrel.app/Contents/MacOS/Carrel"
+        BUNDLE_LOADER: "$(TEST_HOST)"

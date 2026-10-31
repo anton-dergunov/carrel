@@ -35,3 +35,14 @@ uv run carrel agent uninstall
 Its output goes to `~/Library/Logs/carrel.log`. It keeps running the version it started with: after updating carrel, restart it with `launchctl kickstart -k gui/$(id -u)/com.anton.carrel`. A `carrel serve` typed while it runs says where carrel already is instead of starting a second one.
 
 The folders your library's `paper-library.yaml` names outside it, such as `pdf_root` and `overview_dir`, are open to the agent; `--add-dir FOLDER` opens another for reading.
+
+### On the Mac
+
+Carrel also comes as a Mac app, with the same pages in a window of its own and menus for its keys (⌘F find, ⌘W close the tab, ⌘L ask, ⇧⌘[ and ⇧⌘] move between tabs). It needs Xcode and XcodeGen to build:
+
+```sh
+brew install xcodegen
+./scripts/mac-app.sh --install    # into ~/Applications
+```
+
+It shows the carrel already running, such as the login agent's. When none is running, it starts one itself, with the library and the `carrel` command it finds in the login agent or your shell, or that you name in its Settings, and stops it when you quit. Settings can also put it in the menu bar and open it at login.

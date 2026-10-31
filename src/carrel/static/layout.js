@@ -15,9 +15,16 @@ const SHARE_MIN = 0.15;
 const SHARE_MAX = 0.85;
 const LAYOUT_KEY = 'carrel.layout';
 
-/** A remembered layout, checked: whatever does not fit is the default. */
-export function restoreLayout(stored) {
+/** Where the chat sits on a device that has not chosen: beside the paper on a wide screen (the
+ * Mac's window, a tablet held sideways), below it on anything narrower. */
+export function defaultPlace(width, height) {
+  return width >= 1100 && width >= height * 1.3 ? 'right' : 'bottom';
+}
+
+/** A remembered layout, checked: whatever does not fit is the default, for a screen of `size`. */
+export function restoreLayout(stored, size = null) {
   const layout = { ...DEFAULT_LAYOUT, shares: { ...DEFAULT_LAYOUT.shares } };
+  if (size) layout.place = defaultPlace(size.width, size.height);
   if (!stored || typeof stored !== 'object') return layout;
   if (PLACES.includes(stored.place)) layout.place = stored.place;
   if (typeof stored.hidden === 'boolean') layout.hidden = stored.hidden;
@@ -152,9 +159,9 @@ export function startLayout({ onChange, onResize, onDragEnd }) {
 
 function load() {
   try {
-    return restoreLayout(JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? 'null'));
+    return restoreLayout(JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? 'null'), screenSize());
   } catch {
-    return restoreLayout(null);
+    return restoreLayout(null, screenSize());
   }
 }
 
@@ -164,4 +171,8 @@ function save(layout) {
   } catch {
     // Private browsing: the layout lasts as long as the page.
   }
+}
+
+function screenSize() {
+  return { width: window.innerWidth, height: window.innerHeight };
 }

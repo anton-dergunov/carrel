@@ -4,7 +4,7 @@ Carrel puts a paper's PDF and a Claude Code chat side by side on a tablet. The c
 
 ## Steps
 
-Each step ends with a sitting on the iPad (and the e-ink tablet, where it says so); what the sitting finds goes into the step, or into architecture.md when it settles something. Steps 1–5, the library's views, and starting at login are built and described in [architecture.md](architecture.md).
+Each step ends with a sitting on the iPad (and the e-ink tablet, where it says so); what the sitting finds goes into the step, or into architecture.md when it settles something. Steps 1–5, the library's views, starting at login and the Mac app are built and described in [architecture.md](architecture.md).
 
 6. **The area map.** Entering an area opens a map of its own subtopics, and more if the sitting asks ([plan-area-map.md](plan-area-map.md)).
 
@@ -16,15 +16,21 @@ Each step ends with a sitting on the iPad (and the e-ink tablet, where it says s
    - themes and font sizes for the page, the chat and the library;
    - e-ink, as Lectern does it: no animation, pages turned rather than scrolled, the chat's stream shown in a few large updates. Try both the chat below the PDF and the chat as a sheet over the page.
 
-9. **The NAS.** A Docker image, and the instructions to install it:
-   - logging in to the Claude subscription there (a long-lived token from `claude setup-token`, kept out of the image);
-   - Tailscale, on the NAS or in the container, and who is let in;
-   - the library, the PDFs, the engine checkout and the model cache as volumes, with ripgrep in the image.
+9. **The NAS, and a Mac app that stands alone.** Both package carrel with its engine, so they are one step.
+   - A Docker image, and the instructions to install it:
+     - logging in to the Claude subscription there (a long-lived token from `claude setup-token`, kept out of the image);
+     - Tailscale, on the NAS or in the container, and who is let in;
+     - the library, the PDFs, the engine checkout and the model cache as volumes, with ripgrep in the image.
+   - The Mac app with everything inside, for someone with no terminal and no checkout. Today it shows a running carrel or starts an installed one ([architecture.md](architecture.md#the-mac-app)). Standing alone, it needs:
+     - Python, carrel and the engine in the bundle, the same as the image: about 1.5 GB, most of it torch for meaning search (a smaller encoder runtime would help both);
+     - ripgrep and uv inside, since `paperlib` runs through `uv run`;
+     - signing in to Claude from the app (or a `claude setup-token` token), kept in the Keychain;
+     - a first run that chooses a library or makes a new one;
+     - a Developer ID, with every bundled binary signed and the app notarized, to hand it to others;
+     - updates, through Sparkle rather than an updater of our own;
+     - the app's setup choosing the bundled `carrel` when there is one, ahead of the agent's and the shell's.
 
-10. **A Mac app.** Carrel in a window of its own on the Mac, built on the same pages, with a menu bar item as an option for having it always to hand.
-    - A thin native shell around a WebView (Swift and WKWebView), or a framework like Tauri.
-    - Does the app start the server itself, or rely on the login agent and only show its page?
-    - The layout and the keyboard on a wide screen, and the pinch on a trackpad.
+10. **The Mac app, after a sitting.** What a week of use on the Mac settles: the chat's width beside the paper on a large screen, the keys worth adding to the menus, whether the menu bar item earns its place.
 
 11. **Offline on the tablet.** A copy of the library on the iPad or an Android phone (the PDFs are 7 GB now), so carrel works with no server: the library, the papers, their highlights and overviews. The chat is not available offline, and the page says so.
     - A Home Screen web app with a service worker and storage on the device, or a native wrapper; Safari's storage quota and when it evicts.

@@ -21,12 +21,19 @@ Built since the last sitting, and to be checked on the iPad (and the e-ink table
 
 ## Feedback still open
 
-From the reader's sittings on the iPad, numbered as the steps below cite them. Items 1–20 are built (14 and 16–18 await their sitting, above).
+From the reader's sittings on the iPad, numbered as the steps below cite them. Items 1–20 are built (14 and 16–18 await their sitting, above); 21–23 are open.
 
 **The chat**
 
 21. **A resumed chat shows no output for a local command** such as `/context`: its transcript keeps it where the SDK does not read.
 22. **A background task's notification in a VS Code chat** is drawn as a question.
+
+**The paper's sheet** (the page badge's: what the library knows of the paper)
+
+23. **Room for all it now holds.** The properties, the agent's reading and the similar papers are all wanted, in their present style, but together they crowd the sheet. A task of its own, in a session of its own, with the UI polished to the standard of the library's views:
+    - **Sections that fold**: the agent's reading, the similar papers, and any other that grows long, each shown or hidden with a tap, the choice kept per device.
+    - **A larger view**: the sheet can open out to take much more of the screen. On a phone (carrel already runs on one), the whole page; on the iPad, a part of it, such as a side panel or most of the pane.
+    - **Checked** with `shots.py --info` at the iPad's sizes and at a phone's (`--size 390x844`), in both themes.
 
 ## Steps
 

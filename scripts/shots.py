@@ -22,7 +22,8 @@ checking each save. It writes into the served PDF: run it against a carrel servi
 library, never the reader's own. --settings opens the chat's settings from the model's name and
 takes a shot; --note also types TEXT into the note about the reader and checks it is saved,
 which changes the note every chat carries: serve with XDG_STATE_HOME set to a scratch folder
-for it. --info opens the page badge's sheet, with what the library knows of the paper.
+for it. --info opens the page badge's sheet, with what the library knows of the paper, then
+opens every section and opens the sheet out over the pane (on a phone it is over the page already).
 --overview looks at the chat's Overview button, opens the paper's overview note and deletes it,
 which moves the note to the Trash: a throwaway library again, with a note put in its
 overview_dir by hand (no model is asked). --type types TEXT into the question box and takes a
@@ -220,13 +221,42 @@ def settings_pass(page, note: str | None, out: Path) -> None:
 
 
 def info_pass(page, out: Path) -> None:
-    """The page badge's sheet: what the library knows of the paper, then its pages."""
+    """The page badge's sheet: as it opens, with every section open, then opened out."""
+
+    def folds() -> str:
+        return " | ".join(
+            page.eval_on_selector_all(
+                "#contents-sheet .fold-head",
+                """(heads) => heads.map((head) => `${head.getAttribute('aria-expanded') === 'true' ? '▾' : '▸'} `
+                    + `${head.querySelector('.fold-title').textContent} (${head.querySelector('.fold-note').textContent})`)""",
+            )
+        )
+
     page.click("#page-badge")
     page.wait_for_selector("#paper-info:not([hidden])", timeout=10_000)
-    page.wait_for_timeout(300)
-    print("paper info:", " | ".join(page.inner_text("#paper-info").splitlines()))
+    page.wait_for_timeout(800)  # the similar papers and the outline come later
+    print("paper sheet:", page.inner_text("#contents-sheet .paper-head").replace("\n", " | "))
+    print("sections:", folds())
     page.screenshot(path=out / "info.png")
-    page.click("#page-badge")
+    for head in page.query_selector_all('#contents-sheet .fold-head[aria-expanded="false"]'):
+        head.click()
+    page.wait_for_timeout(400)
+    page.screenshot(path=out / "info-open.png")
+    if page.is_visible("#sheet-size"):
+        page.click("#sheet-size")
+        page.wait_for_timeout(300)
+        page.screenshot(path=out / "info-large.png")
+        page.mouse.click(5, page.viewport_size["height"] - 5)  # a tap outside the pane's sheet
+        page.wait_for_timeout(200)
+        print(
+            "opened out, after a tap elsewhere:",
+            "open" if page.is_visible("#contents-sheet") else "closed",
+        )
+    else:
+        print("on a phone: over the whole page from the start")
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(200)
+    print("after Escape:", "open" if page.is_visible("#contents-sheet") else "closed")
 
 
 def overview_pass(page, out: Path) -> None:

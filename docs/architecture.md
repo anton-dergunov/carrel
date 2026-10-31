@@ -93,7 +93,7 @@ A paper set to the page width is about as tall as the iPad's screen, so the cont
 - **Find** (for the paper showing) takes the place of the tabs while it is open.
 - **Layout** opens a sheet with where the chat sits.
 - **The chat button** draws where the chat is, dashed when it is hidden, and shows and hides it. A dot on it marks an answer or a permission request that came while the chat was out of sight.
-- **The page number** is a faint badge in the PDF's corner. A tap opens the paper's contents and a field to go to a page.
+- **The page number** is a faint badge in the PDF's corner. A tap opens the paper's sheet: a field to go to a page, what the library knows of the paper, and its contents ([below](#the-overview-and-the-properties)).
 - **The chat has no header.** Its status line names the model, which opens the settings, and holds two icons, for earlier chats and a new chat. The box says which paper a question is about.
 
 ## A citation's mark
@@ -172,7 +172,22 @@ The chat reads as the VS Code panel does: a dozen real VS Code chats from the li
 - **What a question is about.** The paper open when it was asked, which each question records. A paper only mentioned in a question does not count.
 - **Why the rule exists.** At the first sitting, the button asked in a chat about another paper whose cache had expired, and the reader met the expired-cache question.
 
-**The paper's properties** come from its frontmatter, with no model call: title, authors, year, arXiv, summary, type, topic, the date added, and the overview when there is one. Under them is the agent's reading from its note (family, evidence, and the digest, folded), and Remove. They head the sheet the page badge opens. There is no `/paper-info` button.
+**The paper's sheet** opens from the page badge. Everything in it comes with no model call, from the paper's frontmatter and the agent's note. There is no `/paper-info` button.
+- **On top**, a bar that stays as the sheet scrolls: the field to go to a page, and the button that opens the sheet out.
+- **The head**: the title in the reading serif, the authors (the first three, the rest a tap away), the year and the arXiv link.
+- **Sections that fold**, each under a header row with its Lucide icon, its title and a note on what it holds, so a folded one still says whether it is worth opening. They had crowded the sheet as one scroll, with the page field and the contents far down.
+  - About (`info`): the summary, then the type with its icon, the topic, the date added and the text layer. Its note is the type and the area.
+  - The agent's reading (`book-open-check`): the family and the evidence. Its note is the family.
+  - Digest (`scroll-text`): the digest, drawn the first time it opens. Its note counts the points.
+  - Similar papers (`orbit`), [below](#the-library). Its note counts them.
+  - Contents (`list-tree`): the PDF's outline. Its note counts its top level.
+  - **What each device remembers.** A tap folds or opens a section, and the device keeps the choice. A new device opens About and Contents.
+  - **Notes that repeat.** About's and the reading's notes show only while folded, since the open section says the same.
+- **At the foot**, the overview when there is one, and Remove.
+- **Small, as before**: by the badge, closed by a tap anywhere else.
+- **Opened out** for reading the details: over the page below the tabs, chat and all, with larger type. A tap elsewhere leaves it open; ×, Escape or making it small again close it. The pane alone was too small in portrait, with the chat below the paper.
+  - Once it is 760 px wide (the iPad in both orientations), it has two columns: the head and the paper's sections on the left, Similar papers and Contents on the right.
+- **On a phone** (under 600 px wide), the badge opens it over the whole page at once, inside the safe areas. The pane keeps its layout to itself, so a sheet over the page is moved out of it while open.
 
 **The PDF's links stay under the sheets.** PDF.js gives each link a z-index of its own, and at the first sitting they showed through the sheets over the paper. The viewer is now a stacking context of its own, under them.
 
@@ -205,7 +220,7 @@ The library tab is the reader's view of the whole collection: four views of one 
   - The server holds 150 MB at rest.
   - The first Meaning search after a rest waits about 7 s while torch and the model load; later ones answer in about 80 ms.
 - **The agent's `paperlib meaning`** loads its own copy for each call, in Claude Code's sandbox, which hides the GPU. On the CPU in float32 a call takes 8–9 s, as it does on the GPU: most of it is importing torch and loading the model, and a query itself is 174 ms against 65 ms.
-- **Similar papers**: the paper's sheet lists the eight nearest papers under the agent's reading (`GET /api/similar/<pdf>`), and a tap opens one in its tab.
+- **Similar papers**: the paper's sheet lists the eight nearest papers in a section of its own (`GET /api/similar/<pdf>`), and a tap opens one in its tab.
 
 **A review opens in a tab of its own** and keeps its place. It is drawn as the agent's answers are, with Obsidian's callouts as boxes. A paper's link opens a peek (its title, year, summary, Open, and Open at p. N for the pages the same paragraph cites); a page link opens the paper there; another review's link opens its tab. The server resolves the links (`/api/review/<scope>`), since a paper's link points at its text and the peek opens its PDF. A question asked beside a review carries `[Reading the review <file>]`.
 

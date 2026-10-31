@@ -1,13 +1,14 @@
 // What acts on the paper showing, kept off the screen until asked for, since the paper and the
 // chat already share a small one:
 //
-// - the page badge, faint in the PDF's corner, which opens what the library knows of the paper
-//   (from its frontmatter and the agent's note, with no model call), a field to go to a page,
-//   and its contents;
+// - the page badge, faint in the PDF's corner, which opens the paper's sheet: a field to go to a
+//   page, what the library knows of the paper (paper-sheet.js), and its contents. The sheet is
+//   small, by the badge, and closes with a tap anywhere else; it opens out over the page below the
+//   tabs, chat and all, and then stays until it is closed. On a phone it opens over the whole page
+//   at once.
 // - find, which takes the place of the tabs in the bar while it is open.
 
-import { commandLog, runCommand } from './library-edits.js';
-import { drawMarkdown } from './markdown.js';
+import { contentsNote, foldSection, startPaperSheet } from './paper-sheet.js';
 
 /**
  * `showOverview()` shows the paper's overview note, beside it; `openPaper({pdf, title})` opens
@@ -16,219 +17,91 @@ import { drawMarkdown } from './markdown.js';
  */
 export function startPaperTools({ reader, showOverview, openPaper = () => {}, onRemoved = () => {} }) {
   const body = document.body;
+  const pane = document.getElementById('pdf-pane');
   const badge = document.getElementById('page-badge');
   const sheet = document.getElementById('contents-sheet');
+  const sizeButton = document.getElementById('sheet-size');
+  const closeButton = document.getElementById('sheet-close');
   const pageForm = document.getElementById('go-to-page');
   const pageNumber = document.getElementById('page-number');
   const pageCount = document.getElementById('page-count');
   const outlineNav = document.getElementById('outline');
-  const infoBox = document.getElementById('paper-info');
   const findButton = document.getElementById('find-button');
   const findForm = document.getElementById('find');
   const findInput = document.getElementById('find-input');
   const findCount = document.getElementById('find-count');
+  // A phone's screen is too small for the sheet beside the badge: it takes the whole page.
+  const phone = matchMedia('(max-width: 599px)');
 
-  // The contents.
+  const paperSheet = startPaperSheet({
+    info: document.getElementById('paper-info'),
+    similar: document.getElementById('paper-similar'),
+    actions: document.getElementById('paper-actions'),
+    isCurrent: (file) => file === reader.file(),
+    close: () => openContents(false),
+    showOverview,
+    openPaper,
+    onRemoved,
+  });
 
+  // The sheet.
+
+  let large = false; // opened out, over the pane (or the page, on a phone)
   let outlineOf = null; // the paper whose outline is drawn
+  const outlineList = document.createElement('div');
+  const contents = foldSection('contents', 'list-tree', 'Contents', outlineList);
+  outlineNav.append(contents.box);
 
-  function openContents(open) {
+  function openContents(open, { wide = phone.matches } = {}) {
     sheet.hidden = !open;
     badge.setAttribute('aria-expanded', String(open));
+    setLarge(open && wide);
     if (!open) return;
+    sheet.scrollTop = 0;
     const count = reader.pagesCount();
     pageNumber.max = String(count);
     pageNumber.value = String(reader.currentPage() ?? '');
     pageCount.textContent = `of ${count}`;
     // Asked each time: the overview note comes and goes.
-    void drawInfo(reader.file());
+    void paperSheet.draw(reader.file());
     if (outlineOf !== reader.file()) {
       outlineOf = reader.file();
       void drawOutline(outlineOf);
     }
   }
 
+  function setLarge(on) {
+    large = on;
+    sheet.classList.toggle('large', on);
+    sheet.classList.toggle('full', on && phone.matches);
+    // The pane contains its layout, so a sheet over the whole page has to leave it.
+    const home = on ? body : pane;
+    if (sheet.parentElement !== home) {
+      home.insertBefore(sheet, on ? null : badge.nextSibling);
+      sheet.scrollTop = 0;
+    }
+    sizeButton.hidden = phone.matches;
+    closeButton.hidden = !on;
+    const label = on ? 'Make it small' : 'Open out';
+    sizeButton.setAttribute('aria-label', label);
+    sizeButton.title = label;
+    sizeButton.querySelector('use').setAttribute('href', on ? '#i-minimize-2' : '#i-maximize-2');
+  }
+
   async function drawOutline(file) {
-    outlineNav.replaceChildren();
+    outlineList.replaceChildren();
+    contents.setNote('');
     const items = await reader.outline();
     if (file !== reader.file()) return;
+    contents.setNote(contentsNote(items));
     if (!items.length) {
-      outlineNav.append(Object.assign(document.createElement('p'), { className: 'none', textContent: 'This PDF has no contents.' }));
+      outlineList.append(Object.assign(document.createElement('p'), { className: 'none', textContent: 'This PDF has no contents.' }));
       return;
     }
-    outlineNav.append(outlineList(items));
+    outlineList.append(outlineTree(items));
   }
 
-  // What the library knows of the paper.
-
-  async function drawInfo(file) {
-    const response = await fetch(`/api/paper/${file.split('/').map(encodeURIComponent).join('/')}`).catch(() => null);
-    const paper = response?.ok ? await response.json().catch(() => null) : null;
-    if (file !== reader.file()) return;
-    if (!paper?.info) {
-      infoBox.hidden = true;
-      return;
-    }
-    const fields = Object.fromEntries(paper.info.fields);
-    const parts = [element('h2', 'title', fields.title ?? paper.title)];
-    const byline = element('p', 'byline');
-    if (fields.authors?.length) byline.append(authors([fields.authors].flat()));
-    if (fields.published) byline.append(element('span', 'year', String(fields.published).slice(0, 4)));
-    const where = source(fields);
-    if (where) byline.append(where);
-    parts.push(byline);
-    if (fields.summary) parts.push(element('p', 'summary', fields.summary));
-    const facts = element('p', 'facts');
-    const note = paper.info.note;
-    for (const [label, value] of [
-      ['Type', fields.type ?? note?.type],
-      ['Topic', paper.info.topic],
-      ['Added', fields.added],
-      ['Text layer', fields['text-layer']],
-    ]) {
-      if (value) facts.append(element('span', 'fact', `${label}: ${value}`));
-    }
-    if (facts.childElementCount) parts.push(facts);
-    if (note) parts.push(agentNote(note));
-    parts.push(similarPapers(file));
-    if (paper.info.overview) {
-      const button = element('button', 'plain overview-link', 'Overview');
-      button.type = 'button';
-      button.addEventListener('click', () => {
-        openContents(false);
-        showOverview();
-      });
-      parts.push(button);
-    }
-    const remove = element('button', 'plain remove-paper', 'Remove from the library…');
-    remove.type = 'button';
-    remove.addEventListener('click', () => remove.replaceWith(confirmRemove(file, fields.title ?? paper.title)));
-    parts.push(remove);
-    infoBox.replaceChildren(...parts);
-    infoBox.hidden = false;
-  }
-
-  /** Removing, once the reader confirms it, with an optional reason to keep it out. */
-  function confirmRemove(file, title) {
-    const box = element('div', 'confirm-remove');
-    box.append(element('p', 'warning', "This deletes the paper's text, its PDF with your highlights, and the agent's note. Your overview note and the reviews stay."));
-    const reason = box.appendChild(element('input'));
-    reason.type = 'text';
-    reason.placeholder = 'Why (optional): keeps it from being proposed again';
-    reason.setAttribute('aria-label', 'Why it is removed');
-    const buttons = box.appendChild(element('div', 'buttons'));
-    const yes = buttons.appendChild(element('button', 'danger', 'Remove'));
-    yes.type = 'button';
-    const keep = buttons.appendChild(element('button', 'plain', 'Keep it'));
-    keep.type = 'button';
-    keep.addEventListener('click', () => void drawInfo(file));
-    const log = commandLog();
-    log.box.hidden = true;
-    box.append(log.box);
-    yes.addEventListener('click', async () => {
-      yes.disabled = keep.disabled = reason.disabled = true;
-      log.box.hidden = false;
-      log.say(`Removing “${title}”…`, 'working');
-      try {
-        const ended = await runCommand(
-          '/api/remove',
-          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pdf: file, reason: reason.value }) },
-          log.line,
-        );
-        if (ended.removed) {
-          // The engine's check afterwards fails while a review still links the paper.
-          log.say(ended.code ? 'Removed. A review still links it: the output above names it.' : 'Removed.', 'done');
-          setTimeout(
-            () => {
-              openContents(false);
-              onRemoved(file);
-            },
-            ended.code ? 4000 : 900,
-          );
-        } else {
-          log.say('Not removed: the output above says why.', 'error');
-          keep.disabled = false;
-        }
-      } catch (error) {
-        log.say(String(error.message || error), 'error');
-        keep.disabled = false;
-      }
-    });
-    return box;
-  }
-
-  /** The papers nearest this one by meaning, filled in when the laptop answers. */
-  function similarPapers(file) {
-    const box = element('div', 'similar');
-    box.hidden = true;
-    void (async () => {
-      const response = await fetch(`/api/similar/${file.split('/').map(encodeURIComponent).join('/')}`).catch(() => null);
-      const found = response?.ok ? await response.json().catch(() => null) : null;
-      if (!found?.papers?.length || file !== reader.file()) return;
-      box.append(element('div', 'note-title', 'Similar papers'));
-      const list = box.appendChild(element('ul'));
-      for (const paper of found.papers) {
-        const button = list.appendChild(element('li')).appendChild(element('button', 'plain'));
-        button.type = 'button';
-        button.append(element('span', 'name', paper.title));
-        if (paper.year) button.append(element('span', 'year', paper.year));
-        button.addEventListener('click', () => {
-          openContents(false);
-          openPaper({ pdf: paper.pdf, title: paper.title });
-        });
-      }
-      box.hidden = false;
-    })();
-    return box;
-  }
-
-  /** What the agent's reading wrote: the family and the evidence, and the digest, folded. */
-  function agentNote(note) {
-    const box = element('div', 'agent-note');
-    box.append(element('div', 'note-title', "The agent's reading"));
-    for (const [label, value] of [
-      ['Family', note.family],
-      ['Evidence', note.evidence],
-    ]) {
-      if (!value) continue;
-      const line = box.appendChild(element('p', 'note-field'));
-      line.append(element('span', 'label', label), value);
-    }
-    if (note.digest) {
-      const fold = box.appendChild(element('details', 'digest'));
-      const points = (note.digest.match(/^- /gm) ?? []).length;
-      fold.append(element('summary', '', points ? `Digest · ${points} points` : 'Digest'));
-      const body = fold.appendChild(element('div', 'answer'));
-      // Drawn when first opened: a digest is twenty lines of markdown.
-      fold.addEventListener('toggle', () => {
-        if (fold.open && !body.childElementCount) drawMarkdown(body, note.digest);
-      });
-    }
-    return box;
-  }
-
-  /** The authors, the first few shown and the rest a tap away. */
-  function authors(names) {
-    const SHOWN = 3;
-    if (names.length <= SHOWN + 1) return element('span', 'authors', names.join(', '));
-    const fold = element('details', 'authors');
-    fold.append(element('summary', '', `${names.slice(0, SHOWN).join(', ')} and ${names.length - SHOWN} more`));
-    fold.append(element('span', 'all', names.join(', ')));
-    return fold;
-  }
-
-  /** Where the paper comes from: its arXiv page, or its address. */
-  function source(fields) {
-    const href = fields.arxiv ? `https://arxiv.org/abs/${fields.arxiv}` : fields.url;
-    if (!href || !/^https?:/.test(href)) return null;
-    const link = element('a', 'source', fields.arxiv ? `arXiv ${fields.arxiv}` : new URL(href).hostname);
-    link.href = href;
-    link.target = '_blank';
-    link.rel = 'noopener';
-    return link;
-  }
-
-  function outlineList(items) {
+  function outlineTree(items) {
     const list = document.createElement('ul');
     for (const item of items) {
       const entry = list.appendChild(document.createElement('li'));
@@ -240,12 +113,17 @@ export function startPaperTools({ reader, showOverview, openPaper = () => {}, on
         openContents(false);
         void reader.goToDestination(item.dest);
       });
-      if (item.items?.length) entry.append(outlineList(item.items));
+      if (item.items?.length) entry.append(outlineTree(item.items));
     }
     return list;
   }
 
   badge.addEventListener('click', () => openContents(sheet.hidden));
+  sizeButton.addEventListener('click', () => setLarge(!large));
+  closeButton.addEventListener('click', () => openContents(false));
+  phone.addEventListener('change', () => {
+    if (!sheet.hidden) setLarge(large || phone.matches);
+  });
   pageForm.addEventListener('submit', (event) => {
     event.preventDefault();
     const page = Number.parseInt(pageNumber.value, 10);
@@ -255,8 +133,12 @@ export function startPaperTools({ reader, showOverview, openPaper = () => {}, on
       void reader.goTo({ page });
     }
   });
+  // The small sheet closes with a tap anywhere else; opened out, it stays until it is closed.
   document.addEventListener('pointerdown', (event) => {
-    if (!sheet.hidden && !sheet.contains(event.target) && !badge.contains(event.target)) openContents(false);
+    if (!sheet.hidden && !large && !sheet.contains(event.target) && !badge.contains(event.target)) openContents(false);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !sheet.hidden && !event.defaultPrevented) openContents(false);
   });
 
   // Find.
@@ -327,11 +209,4 @@ export function startPaperTools({ reader, showOverview, openPaper = () => {}, on
       openContents(false);
     },
   };
-}
-
-function element(tag, className, text) {
-  const made = document.createElement(tag);
-  if (className) made.className = className;
-  if (text != null) made.textContent = text;
-  return made;
 }

@@ -180,7 +180,7 @@ The chat reads as the VS Code panel does: a dozen real VS Code chats from the li
   - The agent's reading (`book-open-check`): the family and the evidence. Its note is the family.
   - Digest (`scroll-text`): the digest, drawn the first time it opens. Its note counts the points.
   - Similar papers (`orbit`), [below](#the-library). Its note counts them.
-  - Contents (`list-tree`): the PDF's outline. Its note counts its top level.
+  - Contents (`list-tree`): the PDF's table of contents, its outline. Its note counts the top level, or says the PDF has none.
   - **What each device remembers.** A tap folds or opens a section, and the device keeps the choice. A new device opens About and Contents.
   - **Notes that repeat.** About's and the reading's notes show only while folded, since the open section says the same.
 - **At the foot**, the overview when there is one, and Remove.

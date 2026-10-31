@@ -35,7 +35,7 @@ export function digestPoints(digest) {
 
 /** "9 entries": the contents' top level. */
 export function contentsNote(items) {
-  if (!items.length) return 'none';
+  if (!items.length) return 'no table';
   return items.length === 1 ? '1 entry' : `${items.length} entries`;
 }
 

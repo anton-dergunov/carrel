@@ -22,7 +22,7 @@ test("a digest's points are its top-level bullets", () => {
 });
 
 test("the contents' note counts its top level", () => {
-  assert.equal(contentsNote([]), 'none');
+  assert.equal(contentsNote([]), 'no table');
   assert.equal(contentsNote([{ title: 'Introduction' }]), '1 entry');
   assert.equal(contentsNote([{ items: [{}, {}] }, {}, {}]), '3 entries');
 });

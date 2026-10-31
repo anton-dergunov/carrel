@@ -95,7 +95,7 @@ export function startPaperTools({ reader, showOverview, openPaper = () => {}, on
     if (file !== reader.file()) return;
     contents.setNote(contentsNote(items));
     if (!items.length) {
-      outlineList.append(Object.assign(document.createElement('p'), { className: 'none', textContent: 'This PDF has no contents.' }));
+      outlineList.append(Object.assign(document.createElement('p'), { className: 'none', textContent: 'This PDF has no table of contents.' }));
       return;
     }
     outlineList.append(outlineTree(items));

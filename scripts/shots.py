@@ -3,14 +3,15 @@
     uv run --group shots python scripts/shots.py URL --out DIR [--size WxH | --landscape] [--dark]
         [--layout PLACE] [--tabs] [--find QUERY] [--highlight] [--settings] [--note TEXT]
         [--info] [--overview] [--type TEXT] [--chat ID] [--ask QUESTION] [--model M]
-        [--view areas|all] [--area TOPIC] [--rich] [--search Q [--text]] [--review SCOPE [--peek]]
+        [--view areas|all] [--area TOPIC] [--rich] [--search Q [--text | --meaning]] [--review SCOPE [--peek]]
 
 URL is a page of a running carrel: a reading page, e.g. http://127.0.0.1:8517/read/<pdf>, or
 the library, http://127.0.0.1:8517/. Takes a shot once the PDF, or the library, is drawn.
 --size sets the window (--landscape: 1180x820), --dark the dark theme. The library: --view
 starts it in Areas or All, --area at a topic (--rich with rich rows); --search types Q into its
 search box, and with --text searches the papers' text and taps the first snippet, which opens
-the paper at that page with Q in find. --review opens the review of SCOPE in its tab; --peek
+the paper at that page with Q in find; with --meaning it describes Q to meaning search and prints
+the nearest papers. --review opens the review of SCOPE in its tab; --peek
 taps a paper it cites, then the peek's first page. --layout puts the chat below, above, left, right, on a tab, or
 hides it, as this device's choice. With --tabs, it opens the list, a second paper, goes back
 to the first and checks it comes back at the page it was on, closes the second, and reloads
@@ -334,7 +335,7 @@ def chat_pass(page, chat: str, out: Path) -> None:
 
 
 def library_pass(page, args, out: Path) -> None:
-    """The library: its view, an area, a search by titles or by text."""
+    """The library: its view, an area, a search by titles, by text or by meaning."""
     page.wait_for_selector(LIBRARY_DRAWN, timeout=30_000)
     page.wait_for_timeout(600)
     view = page.get_attribute("#papers-pane", "data-view")
@@ -360,10 +361,22 @@ def library_pass(page, args, out: Path) -> None:
     )
     if not args.search:
         return
-    if args.text:
-        page.click('#depth [data-depth="text"]')
+    if args.text or args.meaning:
+        page.click(f'#depth [data-depth="{"text" if args.text else "meaning"}"]')
     page.type("#filter", args.search, delay=60)
-    if args.text:
+    if args.meaning:
+        page.wait_for_selector(".text-head, .list-note.error", timeout=60_000)
+        page.wait_for_timeout(400)
+        titles = page.locator(".paper-row .title")
+        print(
+            "meaning search:",
+            page.locator(".text-head").first.inner_text()
+            if page.locator(".text-head").count()
+            else page.inner_text(".list-note.error"),
+            "| first:",
+            [titles.nth(i).inner_text()[:60] for i in range(min(5, titles.count()))],
+        )
+    elif args.text:
         page.wait_for_selector(".text-result, .text-head, .list-note.error", timeout=20_000)
         page.wait_for_timeout(400)
         print(
@@ -382,7 +395,8 @@ def library_pass(page, args, out: Path) -> None:
             "| rows:",
             page.locator(".paper-row").count(),
         )
-    page.screenshot(path=out / f"library-search{'-text' if args.text else ''}.png")
+    depth = "-text" if args.text else "-meaning" if args.meaning else ""
+    page.screenshot(path=out / f"library-search{depth}.png")
     if args.text and page.locator(".snippet").count():
         snippet = page.locator(".snippet").first
         print("tapping:", " ".join(snippet.inner_text().split())[:120])
@@ -516,6 +530,9 @@ def main() -> None:
     parser.add_argument("--search", help="type this into the library's search box")
     parser.add_argument(
         "--text", action="store_true", help="with --search, search the papers' text"
+    )
+    parser.add_argument(
+        "--meaning", action="store_true", help="with --search, search the papers by meaning"
     )
     parser.add_argument("--review", help="open the review of this scope")
     parser.add_argument("--peek", action="store_true", help="with --review, peek at a cited paper")

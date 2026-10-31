@@ -5,6 +5,7 @@ import pytest
 from starlette.testclient import TestClient
 
 from carrel.catalog import Catalog
+from carrel.meaning import Meaning
 from carrel.server import make_app
 
 WIDE = "library/recsys/Wide & Deep. A Test Paper.txt"
@@ -150,8 +151,9 @@ def test_it_is_built_again_only_when_the_library_changes(library, transcripts):
 
 
 @pytest.fixture
-def client(library, transcripts):
-    app = make_app(library, catalog=Catalog(library, transcripts))
+def client(library, transcripts, words):
+    catalog = Catalog(library, transcripts)
+    app = make_app(library, catalog=catalog, meaning=Meaning(library, catalog, encoder=words))
     return TestClient(app, base_url="http://127.0.0.1:8517")
 
 
@@ -253,3 +255,63 @@ def test_text_search_shows_the_papers_with_the_most_matches(library, client, mon
     monkeypatch.setattr("carrel.search.MOST_PAPERS", 1)
     found = client.get("/api/search", params={"q": "memory of episodes"}).json()
     assert (found["total"], len(found["papers"])) == (2, 1)
+
+
+def test_meaning_search(client):
+    found = client.get("/api/meaning", params={"q": "direct preference optimization reward"}).json()
+    assert found["query"] == "direct preference optimization reward"
+    first = found["papers"][0]
+    assert first["text"] == DPO and first["pdf"].endswith("Secretly a Reward Model.pdf")
+    assert 0 < first["score"] <= 1
+    # Only papers with a PDF, each once, nearest first.
+    texts = [paper["text"] for paper in found["papers"]]
+    assert len(texts) == len(set(texts)) == 3 and "No PDF Yet" not in " ".join(texts)
+    scores = [paper["score"] for paper in found["papers"]]
+    assert scores == sorted(scores, reverse=True)
+    # In an area and below it.
+    scoped = client.get("/api/meaning", params={"q": "preference reward", "topic": "llm/memory"})
+    assert [paper["text"] for paper in scoped.json()["papers"]] == [LARIMAR]
+
+
+def test_meaning_search_refuses(client):
+    assert client.get("/api/meaning", params={"q": "ab"}).status_code == 400
+    assert client.get("/api/meaning", params={"q": "x" * 201}).status_code == 400
+    assert client.get("/api/meaning", params={"q": "memory", "topic": "../.."}).status_code == 404
+
+
+def test_similar_papers(client):
+    pdf = DPO.removeprefix("library/").removesuffix(".txt") + ".pdf"
+    found = client.get(f"/api/similar/{pdf}").json()
+    assert found["pdf"] == pdf
+    assert {paper["text"] for paper in found["papers"]} == {LARIMAR, WIDE}
+    assert client.get("/api/similar/recsys/No PDF Yet.pdf").status_code == 404
+    assert client.get("/api/similar/nothing.pdf").status_code == 404
+
+
+def test_meaning_follows_the_library(client, library, words):
+    """A changed summary is embedded again when the document is built again; nothing else is."""
+    client.get("/api/meaning", params={"q": "anything at all"})
+    words.texts.clear()
+    paper = library.root / WIDE
+    kept = paper.read_text()
+    try:
+        paper.write_text(
+            kept.replace("summary: A paper for the tests.", "summary: Episodic memory.")
+        )
+        found = client.get("/api/meaning", params={"q": "episodic memory"}).json()
+        assert len(words.texts) == 2  # the changed paper, then the question
+        assert found["papers"][0]["text"] in (WIDE, LARIMAR)
+    finally:
+        paper.write_text(kept)
+
+
+def test_meaning_frees_its_model_when_idle(library, transcripts, words):
+    """The model is freed after a while without a question, and a question loads it again."""
+    freed = []
+    words.unload = lambda: freed.append(True) or True
+    meaning = Meaning(library, Catalog(library, transcripts), encoder=words)
+    meaning.search("episodic memory")
+    assert not meaning.release_idle()  # just used
+    assert meaning.release_idle(idle_s=0) and freed == [True]
+    words.unload = lambda: False  # nothing loaded: nothing to free
+    assert not meaning.release_idle(idle_s=0)

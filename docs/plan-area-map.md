@@ -1,15 +1,6 @@
 # Plan: the area map
 
-The treemap at the root of Areas shows the whole library at once: each top-level area a tile sized by its papers, and its subtopics inside it. It is the library's most telling picture, and the reader wants more from it. This plan is what to try next, and how to judge it; [architecture.md](architecture.md#the-library) has how the map works now.
-
-## What it does now (30 Oct 2026)
-
-- **Every tile is named, with its count.** A label is measured with the page's font before it is drawn. The name wraps between words at the largest size from 15 px down to 11 px at which it fits. The count follows on its last line, or on a line of its own. No label is cut.
-- **An area's header takes what its label needs**, up to a third of the tile, and the subtopics start under it.
-- **The rest is merged.** At each level the largest tiles that can be named are kept, and the others become one hatched tile, "+N more", laid out last, in the corner where the small tiles are.
-  - Inside an area, it opens the area's page, whose bars list every subtopic.
-  - At the top, "+N more areas" goes to "Every area", a list of every area as bars under the map.
-- **An area too small to name even one subtopic** shows its own label alone.
+The treemap at the root of Areas shows the whole library at once: each top-level area a tile sized by its papers, and its subtopics inside it. It is the library's most telling picture, and the reader wants more from it. This plan is what to try next, and how to judge it; [architecture.md](architecture.md#the-library) has how the map works now (every tile named with its count, the rest merged into "+N more").
 
 ## What is still short of it
 

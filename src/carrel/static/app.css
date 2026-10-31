@@ -755,6 +755,13 @@ h3.group .count { font-weight: 400; font-variant-numeric: tabular-nums; opacity:
 .snippet .page { flex: none; min-width: 3.4em; font: 12px var(--ui); color: var(--accent); font-variant-numeric: tabular-nums; }
 .snippet .words { font: 14.5px/1.45 var(--reading); }
 mark, .snippet mark { background: var(--mark-on-bg); color: var(--text); border-radius: 3px; padding: 0 1px; }
+.paper-row .near { flex: none; display: inline-flex; align-items: flex-end; gap: 2px; height: 11px; }
+.paper-row .near span { width: 3px; border-radius: 1px; background: var(--line); }
+.paper-row .near span:nth-child(1) { height: 4px; }
+.paper-row .near span:nth-child(2) { height: 6px; }
+.paper-row .near span:nth-child(3) { height: 8.5px; }
+.paper-row .near span:nth-child(4) { height: 11px; }
+.paper-row .near span.on { background: var(--accent); }
 .snippets .more { padding: 2px 0 2px calc(3.4em + 10px); font-size: 12.5px; color: var(--muted); }
 
 /* A review, in its tab: the reading serif at a comfortable measure. */
@@ -1317,6 +1324,13 @@ button.tl-label { color: var(--accent); }
 #paper-info .digest .answer ul { padding-left: 18px; margin: 4px 0 6px; }
 #paper-info .digest .answer li + li { margin-top: 4px; }
 #paper-info .digest summary { list-style: none; }
+#paper-info .similar { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+#paper-info .similar[hidden] { display: none; }
+#paper-info .similar ul { list-style: none; margin: 0; padding: 0; }
+#paper-info .similar button { display: flex; align-items: baseline; gap: 10px; width: 100%; min-height: 36px; padding: 6px 0; text-align: left; color: var(--text); border-radius: 0; white-space: normal; }
+#paper-info .similar button:active { background: var(--question); }
+#paper-info .similar .name { flex: 1; min-width: 0; font: 14.5px/1.35 var(--reading); }
+#paper-info .similar .year { flex: none; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 #paper-info .digest summary::-webkit-details-marker { display: none; }
 #paper-info .digest summary::before { content: "▸ "; }
 #paper-info .digest[open] summary::before { content: "▾ "; }

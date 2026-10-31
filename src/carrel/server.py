@@ -48,6 +48,7 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 from .catalog import Catalog
 from .edits import EditError, Edits, discard_upload, save_upload
 from .engine import Library
+from .meaning import Meaning, MeaningError
 from .search import SearchError, search
 from .session import Session, Sessions
 from .settings import DEFAULT_MODEL, LONGEST_NOTE, MODELS, Settings
@@ -179,10 +180,12 @@ def make_app(
     settings: Settings | None = None,
     catalog: Catalog | None = None,
     edits: Edits | None = None,
+    meaning: Meaning | None = None,
 ):
     sessions = sessions or Sessions(library, extra_folders, settings=settings)
     catalog = catalog or Catalog(library)
     edits = edits or Edits(library)
+    meaning = meaning or Meaning(library, catalog)
     # One PDF written at a time: a save checks the file's version, then replaces it.
     writing = asyncio.Lock()
 
@@ -242,6 +245,27 @@ def make_app(
             )
         except SearchError as error:
             return JSONResponse({"error": str(error)}, status_code=error.status)
+        return JSONResponse(found)
+
+    async def meaning_search(request: Request) -> Response:
+        """The papers nearest a description by meaning, in the whole library or an area."""
+        topic = request.query_params.get("topic", "").strip("/")
+        folder = (library.papers_dir / topic).resolve()
+        if not folder.is_relative_to(library.papers_dir) or not folder.is_dir():
+            return JSONResponse({"error": "No such area."}, status_code=404)
+        try:
+            found = await asyncio.to_thread(
+                meaning.search, request.query_params.get("q", ""), topic
+            )
+        except MeaningError as error:
+            return JSONResponse({"error": str(error)}, status_code=error.status)
+        return JSONResponse(found)
+
+    async def similar_papers(request: Request) -> Response:
+        """A paper's nearest papers by meaning, named by its PDF."""
+        found = await asyncio.to_thread(meaning.similar, request.path_params["path"])
+        if found is None:
+            return JSONResponse({"error": "No such paper in the library."}, status_code=404)
         return JSONResponse(found)
 
     def streamed(lines) -> StreamingResponse:
@@ -515,13 +539,22 @@ def make_app(
                 code,
             )
 
+    async def free_meaning_forever() -> None:
+        """The meaning model is freed once idle: it is about 1.2 GB, and most visits ask nothing."""
+        while True:
+            await asyncio.sleep(60)
+            await asyncio.to_thread(meaning.release_idle)
+
     @contextlib.asynccontextmanager
     async def lifespan(app):
         reaper = asyncio.create_task(sessions.reap_forever())
+        meaning.warm()
+        freer = asyncio.create_task(free_meaning_forever())
         try:
             yield
         finally:
             reaper.cancel()
+            freer.cancel()
             await sessions.close()
 
     app = Starlette(
@@ -533,6 +566,8 @@ def make_app(
             Route("/api/library", library_document),
             Route("/api/review/{scope:path}", review_document),
             Route("/api/search", text_search),
+            Route("/api/meaning", meaning_search),
+            Route("/api/similar/{path:path}", similar_papers),
             Route("/api/add", add_paper, methods=["POST"]),
             Route("/api/remove", remove_paper, methods=["POST"]),
             Route("/pdf/{path:path}", pdf, methods=["GET", "HEAD"]),

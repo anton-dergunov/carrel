@@ -5,9 +5,11 @@ committed, so empty ones stand in), with carrel's own test papers, notes and a r
 """
 
 import os
+import re
 import shutil
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from carrel.engine import Library, engine_path
@@ -83,9 +85,7 @@ def library(tmp_path_factory) -> Library:
     )
     (notes / f"{Path(LARIMAR).name}.md").write_text("# Larimar\n\ntype: study\n\n## Digest\n")
     larimar = root / "library" / f"{LARIMAR}.txt"
-    larimar.write_text(
-        larimar.read_text().replace("\ntype: method\n", "\ntype: system\n", 1)
-    )
+    larimar.write_text(larimar.read_text().replace("\ntype: method\n", "\ntype: system\n", 1))
 
     topic = root / "library" / "recsys"
     topic.mkdir(parents=True)
@@ -110,3 +110,26 @@ def state(tmp_path, monkeypatch) -> Path:
     """Permission answers are logged here, not in the reader's own state folder."""
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     return tmp_path / "state"
+
+
+class Words:
+    """A stand-in for the meaning model: each word hashed into one of 256 places, a unit vector
+    a text, so a paper's own words find it. No model, no torch."""
+
+    model = "test/words"
+
+    def __init__(self):
+        self.texts: list[str] = []
+
+    def encode(self, texts, query=False):
+        self.texts += texts
+        out = np.zeros((len(texts), 256), dtype=np.float32)
+        for row, text in enumerate(texts):
+            for word in re.findall(r"[a-z]{4,}", text.lower()):
+                out[row, sum(map(ord, word)) % 256] += 1
+        return out / np.maximum(np.linalg.norm(out, axis=1, keepdims=True), 1e-9)
+
+
+@pytest.fixture
+def words() -> Words:
+    return Words()

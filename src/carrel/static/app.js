@@ -84,6 +84,10 @@ const reader = createReader({
 });
 const tools = startPaperTools({
   reader,
+  openPaper(paper) {
+    state = openPaper(state, paper);
+    go(paper.pdf);
+  },
   onRemoved(pdf) {
     close(pdf);
     void library.reload();

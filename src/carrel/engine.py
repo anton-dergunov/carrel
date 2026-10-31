@@ -60,6 +60,12 @@ class Library:
         self.engine = engine_path(engine)
         self.lib = _import_paperlib(self.root, self.engine)
 
+    def meaning(self) -> ModuleType:
+        """The engine's meaning.py, beside paperlib.py, whose library it reads."""
+        import meaning
+
+        return meaning
+
     @property
     def pdf_root(self) -> Path:
         return Path(self.lib.PDF_ROOT).resolve()

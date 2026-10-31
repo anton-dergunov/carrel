@@ -5,9 +5,10 @@
 // - All: every paper, with filter chips (area, type, years, touched).
 // - Timeline: the papers by year published, or by month added, a dot each (timeline.js).
 //
-// The box searches at two depths: Titles narrows the rows on the device, by every word, in the
+// The box searches at three depths: Titles narrows the rows on the device, by every word, in the
 // title, the authors, the summary, the topic and the type; Text searches the papers' text on the
-// laptop (text-search.js). Rows are compact or rich, sorted by topic, date added or published.
+// laptop (text-search.js), and Meaning ranks the papers there by what they are about
+// (meaning-search.js). Rows are compact or rich, sorted by topic, date added or published.
 // Each device remembers its view, area, rows, sort, chips and depth.
 
 import { drawAreaPage, drawTree, plural } from './areas.js';
@@ -33,9 +34,15 @@ import {
 } from './library.js';
 import { element, groupHeading, icon, paperRow } from './rows.js';
 import { areaUrl } from './tabs.js';
+import { startMeaningSearch } from './meaning-search.js';
 import { startTextSearch } from './text-search.js';
 
 const TYPING_MS = 120;
+const PLACEHOLDERS = {
+  titles: 'Search titles, authors, summaries',
+  text: "Search the papers' text",
+  meaning: 'Describe what you are looking for',
+};
 const number = new Intl.NumberFormat('en');
 const TOUCHED_LABELS = { overview: ['notebook-text', 'Has your overview note'], review: ['book-open-text', 'Cited in a review'], chat: ['chat', 'Asked about in carrel'] };
 
@@ -68,7 +75,7 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   let year = null; // the year an area's histogram narrows the rows to
   const expanded = new Set(); // the tree's folders the reader opened
   const rows = new Map(); // rows made, by paper and look, used again at each draw
-  const text = startTextSearch({ openTarget });
+  const laptop = laptopSearch(startTextSearch({ openTarget }), startMeaningSearch(), () => state.depth);
   let chats = { at: 0, list: [] }; // carrel's recent chats, for the desk
 
   function save() {
@@ -80,7 +87,7 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   function render() {
     viewControl.querySelectorAll('[data-view]').forEach((button) => button.setAttribute('aria-checked', String(button.dataset.view === state.view)));
     depthControl.querySelectorAll('[data-depth]').forEach((button) => button.setAttribute('aria-checked', String(button.dataset.depth === state.depth)));
-    filter.placeholder = state.depth === 'text' ? "Search the papers' text" : 'Search titles, authors, summaries';
+    filter.placeholder = PLACEHOLDERS[state.depth];
     pane.dataset.view = state.view;
     for (const [name, view] of Object.entries(views)) view.hidden = name !== state.view;
     chipsBar.hidden = state.view !== 'all';
@@ -93,12 +100,12 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
 
   /** The desk; with words in the box, the papers that match, as All lists them. */
   function drawDeskView() {
-    if (searchingText()) {
+    if (searchingLaptop()) {
       countLabel.textContent = '';
-      text.search(deskView, filter.value, '', lookup(doc.papers), { rich: state.density === 'rich' });
+      laptop.search(deskView, filter.value, '', lookup(doc.papers), { rich: state.density === 'rich' });
       return;
     }
-    text.stop();
+    laptop.stop();
     if (titleQuery().trim()) {
       const matches = filterPapers(doc.papers, titleQuery());
       countLabel.textContent = `${number.format(matches.length)} of ${plural(doc.papers.length, 'paper')}`;
@@ -120,12 +127,12 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   }
 
   function drawTimelineView() {
-    if (searchingText()) {
+    if (searchingLaptop()) {
       countLabel.textContent = '';
-      text.search(timelineView, filter.value, '', lookup(doc.papers), { rich: state.density === 'rich' });
+      laptop.search(timelineView, filter.value, '', lookup(doc.papers), { rich: state.density === 'rich' });
       return;
     }
-    text.stop();
+    laptop.stop();
     const matches = filterPapers(doc.papers, titleQuery());
     const narrowed = matches.length !== doc.papers.length;
     countLabel.textContent = narrowed ? `${number.format(matches.length)} of ${plural(doc.papers.length, 'paper')}` : plural(doc.papers.length, 'paper');
@@ -137,8 +144,9 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   }
 
-  function searchingText() {
-    return state.depth === 'text' && filter.value.trim().length > 0;
+  /** Whether the laptop answers the box: Text and Meaning, with words in it. */
+  function searchingLaptop() {
+    return state.depth !== 'titles' && filter.value.trim().length > 0;
   }
 
   function titleQuery() {
@@ -148,12 +156,12 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   function drawAll() {
     drawChips();
     const matches = filterPapers(doc.papers, titleQuery(), state.chips);
-    if (searchingText()) {
+    if (searchingLaptop()) {
       countLabel.textContent = '';
-      text.search(allView, filter.value, '', lookup(matches), { rich: state.density === 'rich' });
+      laptop.search(allView, filter.value, '', lookup(matches), { rich: state.density === 'rich' });
       return;
     }
-    text.stop();
+    laptop.stop();
     const narrowed = matches.length !== doc.papers.length;
     countLabel.textContent = narrowed ? `${number.format(matches.length)} of ${plural(doc.papers.length, 'paper')}` : plural(doc.papers.length, 'paper');
     fillRows(allView, matches, { topic: state.sort !== 'topic' });
@@ -166,16 +174,16 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
     const matches = query ? filterPapers(doc.papers, query) : doc.papers;
     drawTree(tree, doc, { area, counts: query ? areaCounts(matches) : null, expanded });
     countLabel.textContent = '';
-    const slot = drawAreaPage(areaPage, doc, { area, matches, query, year, searching: searchingText() });
+    const slot = drawAreaPage(areaPage, doc, { area, matches, query, year, searching: searchingLaptop() });
     if (!slot) {
-      text.stop();
+      laptop.stop();
       return;
     }
-    if (searchingText()) {
-      text.search(slot, filter.value, area, lookup(doc.papers), { rich: state.density === 'rich' });
+    if (searchingLaptop()) {
+      laptop.search(slot, filter.value, area, lookup(doc.papers), { rich: state.density === 'rich' });
       return;
     }
-    text.stop();
+    laptop.stop();
     let papers = matches.filter((paper) => inArea(paper, area));
     if (year) papers = papers.filter((paper) => Number(paper.year) === year);
     fillRows(slot, papers, { topic: false, under: area });
@@ -448,7 +456,7 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   let typing = 0;
   filter.addEventListener('input', () => {
     clearTimeout(typing);
-    typing = setTimeout(render, state.depth === 'text' ? 0 : TYPING_MS);
+    typing = setTimeout(render, state.depth === 'titles' ? TYPING_MS : 0);
   });
   filter.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') filter.blur();
@@ -597,4 +605,19 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   render();
   void reload();
   return { showArea, address, reload, area: () => state.area, view: () => state.view };
+}
+
+/** The depth the box is at, of the two the laptop answers; the other is stopped. */
+function laptopSearch(text, meaning, depth) {
+  return {
+    search(...args) {
+      const [on, off] = depth() === 'meaning' ? [meaning, text] : [text, meaning];
+      off.stop();
+      on.search(...args);
+    },
+    stop() {
+      text.stop();
+      meaning.stop();
+    },
+  };
 }

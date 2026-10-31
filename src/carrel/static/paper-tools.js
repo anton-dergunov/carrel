@@ -10,10 +10,11 @@ import { commandLog, runCommand } from './library-edits.js';
 import { drawMarkdown } from './markdown.js';
 
 /**
- * `showOverview()` shows the paper's overview note, beside it; `onRemoved(pdf)` follows a paper
- * taken out of the library from its sheet.
+ * `showOverview()` shows the paper's overview note, beside it; `openPaper({pdf, title})` opens
+ * another paper in its tab (a similar one); `onRemoved(pdf)` follows a paper taken out of the
+ * library from its sheet.
  */
-export function startPaperTools({ reader, showOverview, onRemoved = () => {} }) {
+export function startPaperTools({ reader, showOverview, openPaper = () => {}, onRemoved = () => {} }) {
   const body = document.body;
   const badge = document.getElementById('page-badge');
   const sheet = document.getElementById('contents-sheet');
@@ -89,6 +90,7 @@ export function startPaperTools({ reader, showOverview, onRemoved = () => {} }) 
     }
     if (facts.childElementCount) parts.push(facts);
     if (note) parts.push(agentNote(note));
+    parts.push(similarPapers(file));
     if (paper.info.overview) {
       const button = element('button', 'plain overview-link', 'Overview');
       button.type = 'button';
@@ -152,6 +154,31 @@ export function startPaperTools({ reader, showOverview, onRemoved = () => {} }) 
         keep.disabled = false;
       }
     });
+    return box;
+  }
+
+  /** The papers nearest this one by meaning, filled in when the laptop answers. */
+  function similarPapers(file) {
+    const box = element('div', 'similar');
+    box.hidden = true;
+    void (async () => {
+      const response = await fetch(`/api/similar/${file.split('/').map(encodeURIComponent).join('/')}`).catch(() => null);
+      const found = response?.ok ? await response.json().catch(() => null) : null;
+      if (!found?.papers?.length || file !== reader.file()) return;
+      box.append(element('div', 'note-title', 'Similar papers'));
+      const list = box.appendChild(element('ul'));
+      for (const paper of found.papers) {
+        const button = list.appendChild(element('li')).appendChild(element('button', 'plain'));
+        button.type = 'button';
+        button.append(element('span', 'name', paper.title));
+        if (paper.year) button.append(element('span', 'year', paper.year));
+        button.addEventListener('click', () => {
+          openContents(false);
+          openPaper({ pdf: paper.pdf, title: paper.title });
+        });
+      }
+      box.hidden = false;
+    })();
     return box;
   }
 

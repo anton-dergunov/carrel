@@ -5,6 +5,7 @@
 
 import { element, paperRow } from './rows.js';
 import { plural } from './areas.js';
+import { note, startAsking } from './server-search.js';
 
 const WAIT_MS = 300;
 export const SHORTEST = 3;
@@ -15,53 +16,17 @@ export const SHORTEST = 3;
  * paper's entry in the library, or null for one the chips leave out), and `stop()`.
  */
 export function startTextSearch({ openTarget }) {
-  let timer = 0;
-  let asking = null; // the request in flight, aborted by the next
-  let last = null; // {key, results}: the last answer, drawn again without asking
-  let slotNow = null;
-
-  function stop() {
-    clearTimeout(timer);
-    asking?.abort();
-    asking = null;
-  }
+  const asking = startAsking({ wait: WAIT_MS });
 
   function search(slot, query, topic, lookup = (found) => found, { rich = false } = {}) {
-    slotNow = slot;
     query = query.trim();
     if (query.length < SHORTEST) {
-      stop();
+      asking.stop();
       slot.replaceChildren(note(`Type ${SHORTEST} letters or more to search the papers' text.`));
       return;
     }
-    const key = `${topic}\n${query}`;
-    if (last?.key === key) {
-      stop();
-      draw(slot, last.results, topic, lookup, rich);
-      return;
-    }
-    stop();
-    slot.replaceChildren(note('Searching the papers…', 'searching'));
-    timer = setTimeout(async () => {
-      const controller = new AbortController();
-      asking = controller;
-      let response;
-      try {
-        response = await fetch(`/api/search?${new URLSearchParams({ q: query, topic })}`, { signal: controller.signal });
-      } catch (error) {
-        if (error.name !== 'AbortError' && slotNow === slot) slot.replaceChildren(note('Could not reach the laptop.', 'error'));
-        return;
-      }
-      const results = await response.json().catch(() => ({ error: response.statusText }));
-      if (asking !== controller) return;
-      asking = null;
-      if (!response.ok) {
-        slot.replaceChildren(note(results.error ?? 'The search failed.', 'error'));
-        return;
-      }
-      last = { key, results };
-      if (slotNow === slot) draw(slot, results, topic, lookup, rich);
-    }, WAIT_MS);
+    const url = `/api/search?${new URLSearchParams({ q: query, topic })}`;
+    asking.ask(slot, `${topic}\n${query}`, url, (results) => draw(slot, results, topic, lookup, rich), 'Searching the papers…');
   }
 
   function draw(slot, results, topic, lookup, rich) {
@@ -97,9 +62,5 @@ export function startTextSearch({ openTarget }) {
     return box;
   }
 
-  return { search, stop };
-}
-
-function note(text, className = '') {
-  return element('p', `list-note ${className}`.trim(), text);
+  return { search, stop: asking.stop };
 }

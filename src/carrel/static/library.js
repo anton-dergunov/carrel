@@ -235,7 +235,7 @@ export function restoreLibrary(stored) {
   if (typeof stored.area === 'string') state.area = stored.area.replace(/^\/+|\/+$/g, '');
   if (['compact', 'rich'].includes(stored.density)) state.density = stored.density;
   if (SORTS.includes(stored.sort)) state.sort = stored.sort;
-  if (['titles', 'text'].includes(stored.depth)) state.depth = stored.depth;
+  if (['titles', 'text', 'meaning'].includes(stored.depth)) state.depth = stored.depth;
   const chips = stored.chips && typeof stored.chips === 'object' ? stored.chips : {};
   const strings = (list, allowed) => (Array.isArray(list) ? list.filter((item) => typeof item === 'string' && (!allowed || allowed.includes(item))) : []);
   state.chips.areas = strings(chips.areas);

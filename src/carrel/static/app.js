@@ -161,6 +161,7 @@ const chat = startChat({
     const found = libraryDocument?.reviews.find((review) => review.path === file);
     return found ? { scope: found.scope, title: found.title } : null;
   },
+  papers: () => libraryDocument?.papers ?? [],
   currentPage: () => {
     const paper = paperInView(state);
     if (!paper) return null;

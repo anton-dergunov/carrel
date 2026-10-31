@@ -105,6 +105,14 @@ A citation the agent writes with the engine's `paperlib locate` carries the rect
 - **In the address.** `/read/<pdf>?page=7&rect=…` opens the paper with the mark, as a link in the chat does, until the place the reader scrolls to replaces it.
 - **The agent's sandbox.** `paperlib` runs through `uv run`, which writes its cache on every run, so the session's environment points `UV_CACHE_DIR` into the engine's cache folder, which the sandbox lets it write. Without it, `paperlib locate` failed here on uv's cache, and the agent had to work around it.
 
+## Pages cited in plain text
+
+The agent links most page citations, but leaves some plain: a page mentioned in passing ("Table 6 on p. 20"), a range to read ("pp. 8–10"). `page-links.js` makes those links when an answer is drawn, at no cost to the answer. Measured in the engine's [experiments/link-coverage](../../agentic-paper-library/experiments/link-coverage/README.md): 507 of 525 plain citations linked, none to the wrong paper.
+- **Which paper.** The one the question was asked about, and only when every link in the answer goes to it. When the question names none, the one paper the answer links. A chat read back from its transcript finds the paper's PDF by its stem in the library's list. An answer that links two papers is left alone: a plain "p. 7" in it could be either's.
+- **Another paper named.** A citation whose sentence names another library paper just before it ("FASTopic paper, p. 6") stays plain. A paper's name is its title before the colon, when that is three words or fewer.
+- **What the link holds.** The page, a range's first page, and the named destination its label gives (`Table 6` → `table.6`, `§5.2` → `subsection.5.2`, `Appendix A.3` → `subsection.A.3`), which finds the table in a LaTeX paper even where the cited page is wrong. Never a rectangle: that needs `paperlib locate`.
+- **Only text.** Code, maths and the agent's own links are left as they are.
+
 ## The text layer
 
 Find, highlights and the selection all work on PDF.js's text layer.

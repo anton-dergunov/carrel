@@ -13,6 +13,7 @@
 
 import { parsePaperLink } from './links.js';
 import { drawMarkdown } from './markdown.js';
+import { linkPages } from './page-links.js';
 import { startOverview } from './overview.js';
 import { startSettings } from './settings.js';
 
@@ -31,7 +32,8 @@ const QUOTE_SHOWN = 280;
  * `currentPaper()` and `currentPage()` say what a question is about, or `currentReview()` the
  * review's scope when one is in view; `openTarget` follows a citation, `openReview(scope)`
  * opens a review, and `reviewNamed(file)` says which review a file is ({scope, title}, or null);
- * `reveal()` brings the chat into view; `onActivity()` says an answer ended or a question for
+ * `papers()` lists the library's papers ({title, pdf}), so a plain "p. 7" in an answer can be
+ * linked to the paper it is about (page-links.js); `reveal()` brings the chat into view; `onActivity()` says an answer ended or a question for
  * the reader came, so a chat out of sight can say so. Returns `quote(passage)`, which sets the passage the next question
  * carries ({pdf, page, text}, or null for none), `quoted()`, the one it would carry, `focus()`,
  * `about(pdf)`, the paper the next question is about, and `showOverview()`.
@@ -43,6 +45,7 @@ export function startChat({
   openTarget,
   openReview = () => {},
   reviewNamed = () => null,
+  papers = () => [],
   reveal,
   onActivity = () => {},
 }) {
@@ -337,7 +340,10 @@ export function startChat({
       if (from) quoted.append(placeLink('from', from, selection.pdf ?? pdf, selection.page));
     }
     bubble.append(text);
-    turn = { question: bubble, fold: null, steps: 0, texts: [], text };
+    // The PDF the answer's plain page citations link to: a question read back from a transcript
+    // names only its paper's stem.
+    const asked = pdf ?? (paper ? papers().find((entry) => entry.pdf && stem(entry.pdf) === paper)?.pdf : undefined);
+    turn = { question: bubble, fold: null, steps: 0, texts: [], text, pdf: asked };
   }
 
   /** A line naming the review a question was asked beside; a tap opens it. */
@@ -556,6 +562,7 @@ export function startChat({
   function answerBlock() {
     const element = append('div', 'answer');
     turn?.texts.push(element);
+    const asked = turn?.pdf;
     let frame = 0;
     const block = {
       text: '',
@@ -569,6 +576,7 @@ export function startChat({
             frame = 0;
             const stick = nearBottom();
             drawMarkdown(element, block.text, { diagrams: block.complete });
+            linkPages(element, asked, papers());
             if (stick) log.scrollTop = log.scrollHeight;
           });
         }

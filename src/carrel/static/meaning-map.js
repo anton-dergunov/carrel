@@ -59,6 +59,7 @@ export function wrapLines(text, width, most = 3) {
 export function createMeaningMap(canvas, { onSelect = () => {}, onRegion = () => {}, onCamera = () => {} } = {}) {
   const ctx = canvas.getContext('2d');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const scheme = matchMedia('(prefers-color-scheme: dark)');
 
   let data = null;
   let n = 0;
@@ -249,7 +250,16 @@ export function createMeaningMap(canvas, { onSelect = () => {}, onRegion = () =>
 
   // Colours, fonts, measuring.
 
+  // The colours are the page's tokens, read again whenever they may have changed: the scheme or
+  // the theme changing, the map shown again, the page back on screen. iOS flips a page to dark
+  // and back while it pictures the app for the switcher, and a map that read its colours only on
+  // the scheme's change events kept the dark ones in a light page. So each frame also checks that
+  // its colours were read under the scheme that holds now.
+  let styledFor = '';
+  const styleKey = () => `${scheme.matches}|${document.documentElement.dataset.theme ?? ''}`;
+
   function readStyle() {
+    styledFor = styleKey();
     const cs = getComputedStyle(canvas);
     const v = (name) => cs.getPropertyValue(name).trim();
     colors = {
@@ -328,6 +338,7 @@ export function createMeaningMap(canvas, { onSelect = () => {}, onRegion = () =>
   // Drawing.
 
   function draw(now, map) {
+    if (styledFor !== styleKey()) readStyle();
     const t = positions(now);
     const growing = anim !== null && anim.kind === 'grow';
     const labelsIn = growing ? smooth(anim.total - 520, anim.total, t) : 1;
@@ -813,12 +824,16 @@ export function createMeaningMap(canvas, { onSelect = () => {}, onRegion = () =>
     request();
   });
   themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-  const scheme = matchMedia('(prefers-color-scheme: dark)');
   const onScheme = () => {
     readStyle();
     request();
   };
   scheme.addEventListener('change', onScheme);
+  const onShown = () => {
+    if (document.visibilityState === 'visible') onScheme();
+  };
+  document.addEventListener('visibilitychange', onShown);
+  window.addEventListener('pageshow', onShown);
   readStyle();
   document.fonts?.ready.then(() => {
     widths.clear();
@@ -895,12 +910,16 @@ export function createMeaningMap(canvas, { onSelect = () => {}, onRegion = () =>
     getCamera,
     setCamera,
     redraw: request,
+    /** Reads the page's colours again and draws: the view calls it when the map shows. */
+    restyle: onScheme,
     destroy() {
       cancelAnimationFrame(raf);
       clearTimeout(wheelTimer);
       sizes.disconnect();
       themeWatch.disconnect();
       scheme.removeEventListener('change', onScheme);
+      document.removeEventListener('visibilitychange', onShown);
+      window.removeEventListener('pageshow', onShown);
       canvas.removeEventListener('pointerdown', down);
       canvas.removeEventListener('pointermove', move);
       canvas.removeEventListener('pointerup', up);

@@ -443,6 +443,7 @@ export function startMapView(container, { openPaper }) {
       doc = nextDoc;
       search.query = query;
       search.depth = depth;
+      if (showing) map.restyle();
       if (showing || !drawn) void fetchMap();
       show();
       light();

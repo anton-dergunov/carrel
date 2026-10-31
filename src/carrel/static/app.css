@@ -553,6 +553,15 @@ body:not(.chat-left, .chat-right) #divider { height: 1px; cursor: row-resize; }
 body.chat-left #divider, body.chat-right #divider { width: 1px; cursor: col-resize; }
 #divider::after { content: ""; position: absolute; inset: -10px 0; }
 body.chat-left #divider::after, body.chat-right #divider::after { inset: 0 -10px; }
+/* With a mouse or trackpad, the pane before the split has its scrollbar at the split: the room to
+   grab the split is on the other side only, so the scrollbar's thumb can be dragged. A finger keeps
+   room on both sides. */
+@media (pointer: fine) {
+  #divider::after { inset: 0 0 -8px; }
+  body.chat-left #divider::after, body.chat-right #divider::after { inset: 0 -8px 0 0; }
+  body.chat-left #divider::before, body.chat-right #divider::before { left: 1px; transform: translateY(-50%); }
+  body:not(.chat-left, .chat-right) #divider::before { top: 1px; transform: translateX(-50%); }
+}
 #divider::before {
   content: "";
   position: absolute;

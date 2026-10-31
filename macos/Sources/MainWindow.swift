@@ -49,6 +49,8 @@ final class MainWindow: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDe
         configuration.websiteDataStore = .default()
         webView = WKWebView(frame: .zero, configuration: configuration)
         webView.allowsMagnification = false // a pinch is the page's: it zooms the PDF
+        // Safari's Develop menu can attach its Web Inspector, to profile the page as the app draws it.
+        webView.isInspectable = true
         window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1280, height: 820),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],

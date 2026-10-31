@@ -1,6 +1,6 @@
 # Plan
 
-Carrel puts a paper's PDF and a Claude Code chat side by side on a tablet. The chat runs on the laptop (later the NAS) through the Agent SDK, and the app is served over Tailscale. This file is only what is left to build. What is built is described in [architecture.md](architecture.md) as soon as it is built; the area map has its own plan, [plan-area-map.md](plan-area-map.md).
+Carrel puts a paper's PDF and a Claude Code chat side by side on a tablet. The chat runs on the laptop (later the NAS) through the Agent SDK, and the app is served over Tailscale. This file is only what is left to build. What is built is described in [architecture.md](architecture.md) as soon as it is built; the area map has its own plan, [plan-area-map.md](plan-area-map.md), and so does a faster PDF, [plan-performance.md](plan-performance.md).
 
 ## Steps
 

@@ -32,7 +32,7 @@ The agent keeps running the code it started with: after a change, or `uv sync`, 
 - **The setup, first found wins:** the app's Settings; the login agent's plist (its `carrel`, `--library`, `--engine`, `--port` and the rest of its options); the login shell (`carrel` on its PATH, `PAPER_LIBRARY`, `CARREL_ENGINE`). With the agent installed, nothing needs setting. An app opened from the Finder has launchd's bare PATH, as the agent does, so the app reads the login shell's environment once (`$SHELL -l -i -c 'env -0'`, 5 s at most) and passes on its PATH, `XDG_STATE_HOME`, `PAPER_LIBRARY` and `CARREL_ENGINE`.
 - **When it cannot start one**, the window says why, with the last lines of the log and buttons for Settings, Try Again and the log.
 
-**The window.** Its title is the page's. Carrel's own addresses stay in it; any other web address opens in the browser, `window.open` included; a paper link (`pdf.invalid`) never navigates, since the page handles it. Adding a PDF opens the Mac's file panel.
+**The window.** Its title is the page's. Safari's Develop menu can attach its Web Inspector to the page (`isInspectable`), to profile it as the app draws it. Carrel's own addresses stay in it; any other web address opens in the browser, `window.open` included; a paper link (`pdf.invalid`) never navigates, since the page handles it. Adding a PDF opens the Mac's file panel.
 
 **Menus call the page.** Each menu item that acts on the library runs one of the page's commands, `window.carrel.command(name)` (`commands.js`), and gets back whether it did anything: Add Paper (⌘N), Close Tab (⌘W, which closes the window on the library), Find (⌘F: the paper's find, or the library's search box), Library (⌘1), Next and Previous Tab (⇧⌘] and ⇧⌘[), Ask (⌘L), Show or Hide Chat (⇧⌘L). Zoom (⌘0, ⌘=, ⌘−) is the paper's, or the meaning map's, and the whole page's only when neither is showing. The page takes a few keys itself, in a browser too: ⌘F (Ctrl+F), since the browser's find cannot search the pages PDF.js has not drawn; and ⌘= ⌘− ⌘0, and + − 0 alone, which zoom the paper as they zoom the map. Where there is nothing of the page's to zoom, ⌘= and the rest are left to the browser.
 
@@ -108,7 +108,7 @@ The chat's settings open from the model's name on its status line, as a small di
 - **The address.** It names the tab showing. The Home Screen app always starts at `/`, so it opens the tab that was showing last.
 
 **Where the chat sits.** The chat sits below, above, left or right of the paper, or on a tab of its own, and it can be hidden. Each device remembers its choice. Until it has chosen, the chat is beside the paper on a wide screen (1100 px or more, and 1.3 times as wide as tall: the Mac, a tablet held sideways) and below it otherwise.
-- **The split is dragged,** and each side keeps its own size; a double tap puts it back at 40%.
+- **The split is dragged,** and each side keeps its own size; a double tap puts it back at 40%. A finger has room to grab it on both sides of the line; a mouse or trackpad only on the far side, since the pane before the split has its scrollbar there.
 - **While dragging.** The panes resize as the finger moves, a step a frame. The PDF keeps its scale meanwhile and fits the new width when the finger lifts, since drawing every page at a new scale at each step is what made it slow.
 - **Why not move only a line.** Moving a line and resizing at the end was quicker, but it looked broken and left the reader guessing how big the chat would be.
 

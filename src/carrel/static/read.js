@@ -12,6 +12,7 @@ import * as pdfjsLib from './vendor/pdfjs/pdf.min.mjs';
 import { createCiteMark } from './cite-mark.js';
 import { HIGHLIGHT_COLORS, lineBoxes } from './highlight.js';
 import { pinchToZoom, stopPageZoom } from './pinch.js';
+import { createPreviews } from './previews.js';
 
 // The viewer component reads the library from `globalThis.pdfjsLib` when its module is
 // evaluated, so it is imported only after this.
@@ -50,6 +51,8 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   linkService.setViewer(viewer);
   // The mark a citation's rectangles draw.
   const citeMark = createCiteMark({ viewer, eventBus, container });
+  // A picture of each page behind it until it is drawn.
+  const previews = createPreviews({ viewer, eventBus });
   // Links inside the PDF go through this too.
   linkService.goToDestination = (dest) => scrollToDestination(dest);
 
@@ -253,6 +256,7 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     pdfDocument = loaded;
     paper = { file: pdf, url, document: loaded, version, base };
     uiManager = null;
+    previews.show(pdf, loaded);
     viewer.setDocument(loaded);
     linkService.setDocument(loaded, null);
     void previous?.destroy();

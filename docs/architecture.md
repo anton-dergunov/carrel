@@ -103,6 +103,7 @@ The chat's settings open from the model's name on its status line, as a small di
 **Tabs.**
 - A paper opens in a tab after the one showing, and a citation to an open paper goes to its tab.
 - **Drawn on the GPU.** The pages' canvases are asked for with `enableHWA`. Without it PDF.js asks for canvases it will read back, which Safari keeps off the GPU. In WebKit at 2x, a page took 74 ms to appear after a jump and a scroll had frames of 25–33 ms; with it, 46–63 ms and 18–19 ms. carrel's own parts cost nothing measurable beside a bare PDF.js viewer.
+- **A preview behind each page.** PDF.js draws a page only once it scrolls into view and keeps about ten drawn, so a fast scroll, or a tab (whose paper is loaded into the one viewer again), showed white sheets for a moment. Each page now has a small picture of itself (540 px wide, JPEG) as its background, shown until PDF.js draws it: taken from the page's canvas whenever PDF.js draws it, and drawn small for the other pages while the viewer is idle, nearest to the page in view first (`previews.js`). The last six papers keep theirs, so coming back to a tab shows its pages at once, blurred for a moment.
 - **One viewer.** All papers share one PDF viewer, because several viewers would each keep their rendered pages, which is what makes iPad Safari drop a page. Each tab keeps its place (page, zoom, scroll), so coming back to a tab puts the paper back where it was.
 - **The address.** It names the tab showing. The Home Screen app always starts at `/`, so it opens the tab that was showing last.
 

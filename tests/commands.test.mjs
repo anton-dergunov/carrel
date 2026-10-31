@@ -61,3 +61,13 @@ test('⌘= ⌘− ⌘0 zoom, and + − 0 alone only when asked', () => {
   assert.equal(zoomKey(key({ key: '0' }), false, true), 'zoom-reset');
   assert.equal(zoomKey(key({ altKey: true }), true, true), null);
 });
+
+test('previews are drawn nearest the page in view first, ahead before behind', async () => {
+  const { nearestMissing } = await import('../src/carrel/static/previews.js');
+  assert.equal(nearestMissing(new Map(), 5, 10), 5);
+  assert.equal(nearestMissing(new Map([[5, 'u']]), 5, 10), 6); // ahead, at the same distance
+  const have = new Map([[5, 'u'], [6, 'u']]);
+  assert.equal(nearestMissing(have, 5, 10), 4); // nearer than 7
+  assert.equal(nearestMissing(have, 5, 10, new Set([4])), 7);
+  assert.equal(nearestMissing(new Map([[1, 'u'], [2, 'u']]), 1, 2), 0);
+});

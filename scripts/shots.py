@@ -3,7 +3,7 @@
     uv run --group shots python scripts/shots.py URL --out DIR [--size WxH | --landscape] [--dark]
         [--layout PLACE] [--tabs] [--find QUERY] [--highlight] [--settings] [--note TEXT]
         [--info] [--overview] [--type TEXT] [--chat ID] [--ask QUESTION] [--model M]
-        [--view areas|all] [--area TOPIC] [--rich] [--search Q [--text | --meaning]] [--review SCOPE [--peek]]
+        [--view areas|all|map] [--area TOPIC] [--rich] [--search Q [--text | --meaning]] [--review SCOPE [--peek]]
 
 URL is a page of a running carrel: a reading page, e.g. http://127.0.0.1:8517/read/<pdf>, or
 the library, http://127.0.0.1:8517/. Takes a shot once the PDF, or the library, is drawn.
@@ -11,7 +11,9 @@ the library, http://127.0.0.1:8517/. Takes a shot once the PDF, or the library, 
 starts it in Areas or All, --area at a topic (--rich with rich rows); --search types Q into its
 search box, and with --text searches the papers' text and taps the first snippet, which opens
 the paper at that page with Q in find; with --meaning it describes Q to meaning search and prints
-the nearest papers. --review opens the review of SCOPE in its tab; --peek
+the nearest papers. --view map shows the meaning map whole, zooms in twice on a paper, taps it
+for its peek, lights an area from Areas, and with --search lights the papers found and fits them.
+--review opens the review of SCOPE in its tab; --peek
 taps a paper it cites, then the peek's first page. --layout puts the chat below, above, left, right, on a tab, or
 hides it, as this device's choice. With --tabs, it opens the list, a second paper, goes back
 to the first and checks it comes back at the page it was on, closes the second, and reloads
@@ -45,7 +47,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 IPAD = {"width": 820, "height": 1180}
-LIBRARY_DRAWN = "#area-page .area-title, #all-view .rows, #all-view .list-note"
+LIBRARY_DRAWN = "#area-page .area-title, #all-view .rows, #all-view .list-note, #map-view canvas"
 LAYOUTS = ["bottom", "top", "left", "right", "tab", "hidden"]
 
 
@@ -364,11 +366,90 @@ def chat_pass(page, chat: str, out: Path) -> None:
         page.screenshot(path=out / f"chat-{chat[:8]}-01.png")
 
 
+def map_pass(page, args, out: Path) -> None:
+    """The meaning map: whole, nearer, close, a paper's peek, an area lit, and a search."""
+    status = "#map-view .map-status"
+    # Selectors, not predicates: the page's CSP refuses Playwright's evaluated strings.
+    page.wait_for_selector(f"{status}:has-text('paper')", timeout=180_000)
+    page.wait_for_timeout(3500)  # the map grows in
+    print("map:", page.inner_text(status))
+    page.screenshot(path=out / "map-1-whole.png")
+
+    # Where a paper is on the screen while the map is fitted whole, as meaning-map.js fits it.
+    drawn = page.evaluate("fetch('/api/map').then((r) => r.json())")
+    box = page.locator("#map-view canvas").bounding_box()
+    points = drawn["points"]
+    x0, x1 = min(p["x"] for p in points), max(p["x"] for p in points)
+    y0, y1 = min(p["y"] for p in points), max(p["y"] for p in points)
+    k = min((box["width"] - 72) / max(x1 - x0, 40), (box["height"] - 72) / max(y1 - y0, 40))
+
+    def screen(p):
+        return (
+            box["x"] + box["width"] / 2 + (p["x"] - (x0 + x1) / 2) * k,
+            box["y"] + box["height"] / 2 + (p["y"] - (y0 + y1) / 2) * k,
+        )
+
+    # The most central paper of the largest neighbourhood, away from every place's name.
+    places = [screen(r) for r in drawn["regions"]]
+    hoods = {}
+    for p in points:
+        hoods.setdefault(p["h"], []).append(p)
+    clear = [
+        p
+        for p in max(hoods.values(), key=len)
+        if all(abs(screen(p)[0] - x) > 70 or abs(screen(p)[1] - y) > 24 for x, y in places)
+    ]
+    target = max(clear or points, key=lambda p: p["rank"])
+    x, y = screen(target)
+    for name in ("map-2-nearer", "map-3-titles"):
+        page.mouse.dblclick(x, y)
+        page.wait_for_timeout(1200)
+        page.screenshot(path=out / f"{name}.png")
+    page.keyboard.press("Escape")
+    page.mouse.click(x, y)
+    page.wait_for_timeout(700)
+    peek = page.locator("#map-view .map-peek")
+    print(
+        "peek:",
+        peek.locator(".peek-title").inner_text() if peek.is_visible() else "(none)",
+        "| asked for:",
+        target["id"].rsplit("/", 1)[-1][:60],
+    )
+    page.screenshot(path=out / "map-4-peek.png")
+    page.keyboard.press("Escape")
+
+    page.click("#map-view .map-areas")
+    page.wait_for_timeout(300)
+    page.screenshot(path=out / "map-5-areas.png")
+    page.locator("#map-view .map-legend .choice").nth(2).click()
+    page.wait_for_timeout(900)
+    print("area lit:", page.inner_text(status))
+    page.screenshot(path=out / "map-6-area.png")
+    page.click("#map-view .map-fit")  # Every area
+
+    if not args.search:
+        return
+    if args.text or args.meaning:
+        page.click(f'#depth [data-depth="{"text" if args.text else "meaning"}"]')
+    page.type("#filter", args.search, delay=60)
+    page.wait_for_selector(f"{status}:has-text('“'):not(:has(.searching))", timeout=60_000)
+    page.wait_for_timeout(500)
+    print("map search:", page.inner_text(status))
+    page.screenshot(path=out / "map-7-search.png")
+    if page.locator("#map-view .map-fit").count():
+        page.click("#map-view .map-fit")
+        page.wait_for_timeout(900)
+        page.screenshot(path=out / "map-8-search-fit.png")
+
+
 def library_pass(page, args, out: Path) -> None:
     """The library: its view, an area, a search by titles, by text or by meaning."""
     page.wait_for_selector(LIBRARY_DRAWN, timeout=30_000)
     page.wait_for_timeout(600)
     view = page.get_attribute("#papers-pane", "data-view")
+    if view == "map":
+        map_pass(page, args, out)
+        return
     title = page.locator("#area-page .area-title")
     print(
         "library:",
@@ -554,7 +635,7 @@ def main() -> None:
     parser.add_argument("--size", help="the window, WxH (default: the iPad in portrait, 820x1180)")
     parser.add_argument("--landscape", action="store_true", help="the iPad in landscape, 1180x820")
     parser.add_argument("--dark", action="store_true", help="the dark theme")
-    parser.add_argument("--view", choices=["areas", "all"], help="the library's view")
+    parser.add_argument("--view", choices=["areas", "all", "map"], help="the library's view")
     parser.add_argument("--area", help="the library open at this topic")
     parser.add_argument("--rich", action="store_true", help="the library's rows, rich")
     parser.add_argument("--search", help="type this into the library's search box")

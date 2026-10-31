@@ -70,6 +70,15 @@ class Meaning:
 
         threading.Thread(target=run, name="meaning-warm", daemon=True).start()
 
+    def snapshot(self) -> tuple[list[str], object, Built]:
+        """The papers (their text files, from the library's root) and their vectors as the space
+        holds them now, a row each, for the meaning map. A rebuild makes a new matrix, so the one
+        handed out is never changed under its holder."""
+        with self._lock:
+            space, built = self._current()
+        root = self.library.root
+        return [path.relative_to(root).as_posix() for path in space.papers], space.matrix, built
+
     def _rows(self, found, built: Built) -> list[dict]:
         root = self.library.root
         rows = []

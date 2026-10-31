@@ -123,7 +123,8 @@ test("a device's remembered library is checked", () => {
     depth: 'text',
     chips: { areas: ['llm', 7], types: ['method', 'poem', 'none'], from: 2019, to: 'x', touched: ['chat', 'other'] },
   });
-  assert.equal(restoreLibrary({ view: 'map' }).view, 'desk');
+  assert.equal(restoreLibrary({ view: 'graph' }).view, 'desk');
+  assert.equal(restoreLibrary({ view: 'map' }).view, 'map');
   assert.equal(restoreLibrary({ view: 'timeline', timeline: 'added' }).timeline, 'added');
   assert.deepEqual(state, {
     view: 'all',

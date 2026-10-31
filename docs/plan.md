@@ -18,6 +18,11 @@ Built since the last sitting, and to be checked on the iPad (and the e-ink table
 - **Meaning search and similar papers**:
   - does a description find what the reader meant, and does the nearness meter help or distract?
   - are the sheet's similar papers worth their section?
+- **The meaning map** ([architecture](architecture.md#the-library)):
+  - do the region names read as the library's fields, and do the titles come in at the right zoom on the iPad?
+  - does a pinch move the map smoothly, and does a double tap zoom without the peek getting in the way?
+  - the peek's place in both orientations, and with the chat beside or below;
+  - is lighting a search's papers useful, and does a paper added glide in?
 - **The paper's sheet** (item 23, [architecture](architecture.md#the-overview-and-the-properties)):
   - do the folded sections' notes say enough to choose what to open?
   - is opened out, over the chat too, the right size on the iPad in both orientations?
@@ -38,12 +43,6 @@ Each step ends with a sitting on the iPad, and its findings are added here. Step
 
 6. **The library** (items 16–18). Left:
    - **The area map**: entering an area opens a map of its own subtopics, and more if the sitting asks ([plan-area-map.md](plan-area-map.md)).
-   - **The meaning map**: Acervo's meaning map (`acervo-llm-dictionary`, `docs/features/meaning-map.md`), drawn from the papers' embeddings, which meaning search now keeps.
-     - **The look.** Related papers sit together. Zoomed out, the map names its regions; zoomed in, it shows titles. A tap peeks at a paper.
-     - **The layout.** UMAP with the cosine metric. Each new layout starts from the previous one and is aligned onto it (Procrustes), so the map moves as little as it can when papers are added.
-     - **Regions** come from Ward clustering on the 2-D layout, at two levels, so a label sits over its points.
-     - **Names** are written by a model, off the path that draws the map.
-     - **Colour.** Papers are coloured by top-level area, so the map shows where the meaning cuts across the folders.
    - **Highlights as a mark** on a paper's row: counting them means opening every PDF, so they would come from the saves carrel makes itself.
 7. **The paper's highlights listed in its contents.**
 8. **Lectern's comforts and the NAS** (the old parts 6–7). Themes, e-ink (no animation, page turns, the stream shown in a few large updates), start at login with launchd, and a Docker image for the NAS.

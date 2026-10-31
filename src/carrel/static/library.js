@@ -220,7 +220,7 @@ export function reviewsInside(area, reviews) {
 
 // What each device keeps of the library tab.
 
-export const VIEWS = ['desk', 'areas', 'all', 'timeline'];
+export const VIEWS = ['desk', 'areas', 'all', 'timeline', 'map'];
 
 export function defaultLibraryState() {
   return { view: 'desk', area: '', density: 'compact', sort: 'topic', depth: 'titles', timeline: 'published', chips: { areas: [], types: [], from: null, to: null, touched: [] } };

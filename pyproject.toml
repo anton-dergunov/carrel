@@ -9,11 +9,14 @@ dependencies = [
     # Pinned: Claude Code comes bundled with it, and an update is a deliberate bump
     # (ask the dozen questions again, run the engine's reading canary).
     "claude-agent-sdk==0.2.174",
+    "contourpy>=1.2",
     "numpy>=2",         # meaning.py, imported from the engine: the papers' vectors
     "pyyaml>=6",        # paperlib.py, imported from the engine
+    "scipy>=1.12",
     "send2trash>=2.1.0",  # BSD-3-Clause: a deleted overview note goes to the Trash
     "sentence-transformers>=6.2",  # Apache-2.0; meaning.py, imported from the engine: its encoder
     "starlette>=0.47",
+    "umap-learn>=0.5.12",
     "uvicorn[standard]>=0.35",
 ]
 

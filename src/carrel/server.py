@@ -49,6 +49,7 @@ from .catalog import Catalog
 from .edits import EditError, Edits, discard_upload, save_upload
 from .engine import Library
 from .meaning import Meaning, MeaningError
+from .meaning_map import MeaningMap
 from .search import SearchError, search
 from .session import Session, Sessions
 from .settings import DEFAULT_MODEL, LONGEST_NOTE, MODELS, Settings
@@ -64,6 +65,7 @@ SAFE_METHODS = {"GET", "HEAD"}
 MAX_PDF = 256 * 1024 * 1024
 # A line of a page's log, as the page sends it.
 MAX_LOG = 8192
+NO_STORE = {"Cache-Control": "no-store"}
 # The settings as a page sends them: the note and a little more.
 MAX_SETTINGS = 4 * LONGEST_NOTE + 1024
 
@@ -181,11 +183,13 @@ def make_app(
     catalog: Catalog | None = None,
     edits: Edits | None = None,
     meaning: Meaning | None = None,
+    meaning_map: MeaningMap | None = None,
 ):
     sessions = sessions or Sessions(library, extra_folders, settings=settings)
     catalog = catalog or Catalog(library)
     edits = edits or Edits(library)
     meaning = meaning or Meaning(library, catalog)
+    meaning_map = meaning_map or MeaningMap(meaning)
     # One PDF written at a time: a save checks the file's version, then replaces it.
     writing = asyncio.Lock()
 
@@ -267,6 +271,28 @@ def make_app(
         if found is None:
             return JSONResponse({"error": "No such paper in the library."}, status_code=404)
         return JSONResponse(found)
+
+    async def map_document(request: Request) -> Response:
+        """The papers laid out by meaning, as last drawn: at once, saying `drawing` while a newer
+        map is drawn; 202 while the first is."""
+        served = await asyncio.to_thread(meaning_map.current)
+        if served is None:
+            if meaning_map.drawing:
+                return JSONResponse({"drawing": True}, status_code=202, headers=NO_STORE)
+            return JSONResponse(
+                {"error": "The map could not be drawn; the laptop's log says why."},
+                status_code=503,
+                headers=NO_STORE,
+            )
+        headers = {"ETag": served.etag, "Cache-Control": "no-cache", "Vary": "Accept-Encoding"}
+        if served.etag in [
+            tag.strip() for tag in request.headers.get("if-none-match", "").split(",")
+        ]:
+            return Response(status_code=304, headers=headers)
+        if "gzip" in request.headers.get("accept-encoding", "").lower():
+            headers["Content-Encoding"] = "gzip"
+            return Response(served.gzipped, media_type="application/json", headers=headers)
+        return Response(served.body, media_type="application/json", headers=headers)
 
     def streamed(lines) -> StreamingResponse:
         return StreamingResponse(
@@ -549,6 +575,7 @@ def make_app(
     async def lifespan(app):
         reaper = asyncio.create_task(sessions.reap_forever())
         meaning.warm()
+        meaning_map.warm()  # waits for the space, then draws the map if the library changed
         freer = asyncio.create_task(free_meaning_forever())
         try:
             yield
@@ -568,6 +595,7 @@ def make_app(
             Route("/api/search", text_search),
             Route("/api/meaning", meaning_search),
             Route("/api/similar/{path:path}", similar_papers),
+            Route("/api/map", map_document),
             Route("/api/add", add_paper, methods=["POST"]),
             Route("/api/remove", remove_paper, methods=["POST"]),
             Route("/pdf/{path:path}", pdf, methods=["GET", "HEAD"]),

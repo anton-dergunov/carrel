@@ -4,6 +4,7 @@
 // - Areas: the topic tree and an area's page (areas.js); the library's own page is a treemap.
 // - All: every paper, with filter chips (area, type, years, touched).
 // - Timeline: the papers by year published, or by month added, a dot each (timeline.js).
+// - Map: the papers laid out by what they are about, regions named (map-view.js).
 //
 // The box searches at three depths: Titles narrows the rows on the device, by every word, in the
 // title, the authors, the summary, the topic and the type; Text searches the papers' text on the
@@ -14,6 +15,7 @@
 import { drawAreaPage, drawTree, plural } from './areas.js';
 import { drawDesk } from './desk.js';
 import { startAdding } from './library-edits.js';
+import { startMapView } from './map-view.js';
 import { drawTimeline } from './timeline.js';
 import {
   TOUCHED,
@@ -68,7 +70,8 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   const allView = document.getElementById('all-view');
   const deskView = document.getElementById('desk-view');
   const timelineView = document.getElementById('timeline-view');
-  const views = { desk: deskView, areas: areasView, all: allView, timeline: timelineView };
+  const mapView = document.getElementById('map-view');
+  const views = { desk: deskView, areas: areasView, all: allView, timeline: timelineView, map: mapView };
 
   let doc = null;
   let state = loadLibraryState();
@@ -77,6 +80,7 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   const rows = new Map(); // rows made, by paper and look, used again at each draw
   const laptop = laptopSearch(startTextSearch({ openTarget }), startMeaningSearch(), () => state.depth);
   let chats = { at: 0, list: [] }; // carrel's recent chats, for the desk
+  const meaningMap = startMapView(mapView, { openPaper });
 
   function save() {
     saveLibraryState(state);
@@ -91,8 +95,10 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
     pane.dataset.view = state.view;
     for (const [name, view] of Object.entries(views)) view.hidden = name !== state.view;
     chipsBar.hidden = state.view !== 'all';
+    if (state.view !== 'map') meaningMap.hide();
     if (!doc) return;
-    if (state.view === 'all') drawAll();
+    if (state.view === 'map') drawMap();
+    else if (state.view === 'all') drawAll();
     else if (state.view === 'areas') drawAreas();
     else if (state.view === 'timeline') drawTimelineView();
     else drawDeskView();
@@ -137,6 +143,13 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
     const narrowed = matches.length !== doc.papers.length;
     countLabel.textContent = narrowed ? `${number.format(matches.length)} of ${plural(doc.papers.length, 'paper')}` : plural(doc.papers.length, 'paper');
     drawTimeline(timelineView, doc, matches, { mode: state.timeline });
+  }
+
+  /** The map; words in the box light the papers they find, at the depth chosen. */
+  function drawMap() {
+    laptop.stop();
+    countLabel.textContent = '';
+    meaningMap.draw(doc, { query: filter.value, depth: state.depth });
   }
 
   function localDate() {
@@ -591,6 +604,7 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
     doc = next;
     rows.clear();
     render();
+    meaningMap.refresh();
   }
 
   startAdding({ topics: () => doc?.topics ?? [], onAdded: () => void reload(), openPaper });

@@ -30,6 +30,13 @@
   --area-10: #a5674e;
   --area-11: #5f8e85;
   --area-12: #9a7aa6;
+  /* The meaning map: an atlas of land (where papers are thick) in a sea a shade darker. */
+  --map-sea: #f1ead4;
+  --map-land: #fefaee;
+  --map-coast: #cbbf9e;
+  --map-contour: #e6dcc3;
+  --map-halo: #fefaee;
+  --map-ink-2: #4a473f;
   color-scheme: light;
 }
 
@@ -60,6 +67,12 @@
     --area-10: #b5785f;
     --area-11: #6f9e95;
     --area-12: #aa8ab6;
+    --map-sea: #131516;
+    --map-land: #282d30;
+    --map-coast: #59615f;
+    --map-contour: #383f42;
+    --map-halo: #282d30;
+    --map-ink-2: #cfcabc;
     color-scheme: dark;
   }
 }
@@ -1498,3 +1511,55 @@ button.danger { background: var(--error); color: var(--surface); padding: 6px 14
 .confirm-remove .buttons { display: flex; align-items: center; gap: 12px; }
 
 #all-areas { scroll-margin-top: calc(var(--bar-height, 104px) + 12px); }
+
+/* The meaning map: the papers laid out by meaning, filling the pane under the library's bar. */
+#papers-pane[data-view="map"] { overflow: hidden; }
+#map-view { position: relative; height: calc(var(--pane-height, 100vh) - var(--bar-height, 104px)); overflow: hidden; background: var(--map-sea); }
+#map-view[hidden] { display: none; }
+.map-canvas { display: block; width: 100%; height: 100%; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; outline: none; }
+.map-status {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  max-width: calc(100% - 24px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.map-status:empty { display: none; }
+.map-status .list-note { display: inline; margin: 0; font-size: 13px; text-align: left; }
+.map-waiting { animation: working 1.6s ease-in-out infinite; }
+.map-error { color: var(--error); }
+.map-status .map-fit { padding: 0; font-size: 13px; }
+.map-tools { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; justify-content: space-between; align-items: flex-end; pointer-events: none; }
+.map-tools > * { pointer-events: auto; }
+.map-button { border: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 92%, transparent); color: var(--text); box-shadow: 0 2px 8px rgb(0 0 0 / 0.08); }
+.map-areas { min-height: 40px; padding: 0 14px; border-radius: 999px; font-size: 14px; }
+.map-areas[aria-expanded="true"] { background: var(--question); }
+.map-areas.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.map-zoom { display: grid; gap: 6px; }
+.map-zoom .icon-button { width: 40px; height: 40px; border-radius: 12px; color: var(--text); }
+.map-legend { position: absolute; left: 12px; bottom: 62px; width: min(300px, calc(100% - 24px)); padding: 8px; animation: fade-in 0.12s ease-out; }
+.map-legend .sheet-header { margin: 2px 8px 6px; }
+.map-legend .choices-scroll { max-height: min(40vh, calc(var(--pane-height, 100vh) - var(--bar-height, 104px) - 170px)); }
+.map-legend .dot { width: 10px; height: 10px; }
+.map-legend .every-dot { background: conic-gradient(var(--area-1), var(--area-3), var(--area-5), var(--area-7), var(--area-9), var(--area-11), var(--area-1)); }
+.map-legend .choice[aria-checked="true"] { background: var(--chip-on); }
+.map-peek { display: grid; gap: 4px; padding: 14px 16px 12px; overflow-y: auto; overscroll-behavior: contain; z-index: 4; animation: fade-in 0.12s ease-out; }
+.map-peek[hidden] { display: none; }
+.map-peek .peek-summary { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.peek-near { align-self: center; margin-left: 4px; font-size: 12.5px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) {
+  .map-waiting, .map-legend, .map-peek { animation: none; }
+}

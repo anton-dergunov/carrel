@@ -1,52 +1,33 @@
 # Plan
 
-Carrel puts a paper's PDF and a Claude Code chat side by side on a tablet. The chat runs on the laptop (later the NAS) through the Agent SDK, and the app is served over Tailscale. This file is only what is left: what to build, and what to check at the next sitting on the iPad. What is built is described in [architecture.md](architecture.md) as soon as it is built; the area map has its own plan, [plan-area-map.md](plan-area-map.md).
-
-## For the next sitting
-
-Built since the last sitting, and to be checked on the iPad (and the e-ink tablet, where it says so). What the sitting finds goes into the steps below, or into architecture.md when it settles something.
-
-- **A citation's mark** (item 14, [architecture](architecture.md#a-citations-mark)): does it read well on the iPad, at a glance from the chat, and does a tap on the page clear it without getting in the way of the pen?
-- **The library** (items 16–18, [architecture](architecture.md#the-library)):
-  - the treemap's labels at a finger's reach;
-  - the tree beside an area's page in landscape;
-  - the review peek's placement near the screen's edges;
-  - a review's place after trips to its papers;
-  - Text search's snippets and find;
-  - Desk's Continue after a few days;
-  - adding a paper by pasting an arXiv link, and a PDF from Files.
-- **Meaning search and similar papers**:
-  - does a description find what the reader meant, and does the nearness meter help or distract?
-  - are the sheet's similar papers worth their section?
-- **The meaning map** ([architecture](architecture.md#the-library)):
-  - do the region names read as the library's fields, and do the titles come in at the right zoom on the iPad?
-  - does a pinch move the map smoothly, and does a double tap zoom without the peek getting in the way?
-  - the peek's place in both orientations, and with the chat beside or below;
-  - is lighting a search's papers useful, and does a paper added glide in?
-- **The paper's sheet** (item 23, [architecture](architecture.md#the-overview-and-the-properties)):
-  - do the folded sections' notes say enough to choose what to open?
-  - is opened out, over the chat too, the right size on the iPad in both orientations?
-  - and on the phone, the whole page at once.
-
-## Feedback still open
-
-From the reader's sittings on the iPad, numbered as the steps below cite them. Items 1–20 and 23 are built (14, 16–18 and 23 await their sitting, above); 21–22 are open.
-
-**The chat**
-
-21. **A resumed chat shows no output for a local command** such as `/context`: its transcript keeps it where the SDK does not read.
-22. **A background task's notification in a VS Code chat** is drawn as a question.
+Carrel puts a paper's PDF and a Claude Code chat side by side on a tablet. The chat runs on the laptop (later the NAS) through the Agent SDK, and the app is served over Tailscale. This file is only what is left to build. What is built is described in [architecture.md](architecture.md) as soon as it is built; the area map has its own plan, [plan-area-map.md](plan-area-map.md).
 
 ## Steps
 
-Each step ends with a sitting on the iPad, and its findings are added here. Steps 1–5 and most of 6 are built and described in [architecture.md](architecture.md).
+Each step ends with a sitting on the iPad (and the e-ink tablet, where it says so); what the sitting finds goes into the step, or into architecture.md when it settles something. Steps 1–5, the library's views, and starting at login are built and described in [architecture.md](architecture.md).
 
-6. **The library** (items 16–18). Left:
-   - **The area map**: entering an area opens a map of its own subtopics, and more if the sitting asks ([plan-area-map.md](plan-area-map.md)).
-   - **Highlights as a mark** on a paper's row: counting them means opening every PDF, so they would come from the saves carrel makes itself.
-7. **The paper's highlights listed in its contents.**
-8. **Lectern's comforts and the NAS** (the old parts 6–7). Themes, e-ink (no animation, page turns, the stream shown in a few large updates), start at login with launchd, and a Docker image for the NAS.
+6. **The area map.** Entering an area opens a map of its own subtopics, and more if the sitting asks ([plan-area-map.md](plan-area-map.md)).
 
-## Open questions
+7. **Highlights, gathered.**
+   - A mark on a paper's row for the papers with highlights. Counting them from the PDFs means opening every one, so the count comes from the saves carrel makes itself.
+   - The paper's highlights listed in its contents, beside its headings, each one a jump to its page.
 
-- Does the PDF fit above a chat on the e-ink tablet, or does e-ink want the chat as a sheet over the page? Step 2's layout choices should answer this.
+8. **Settings: themes, font sizes, e-ink.** One Settings dialog, as in [Lectern](https://github.com/anton-dergunov/lectern), reusing its implementation where it fits:
+   - themes and font sizes for the page, the chat and the library;
+   - e-ink, as Lectern does it: no animation, pages turned rather than scrolled, the chat's stream shown in a few large updates. Try both the chat below the PDF and the chat as a sheet over the page.
+
+9. **The NAS.** A Docker image, and the instructions to install it:
+   - logging in to the Claude subscription there (a long-lived token from `claude setup-token`, kept out of the image);
+   - Tailscale, on the NAS or in the container, and who is let in;
+   - the library, the PDFs, the engine checkout and the model cache as volumes, with ripgrep in the image.
+
+10. **A Mac app.** Carrel in a window of its own on the Mac, built on the same pages, with a menu bar item as an option for having it always to hand.
+    - A thin native shell around a WebView (Swift and WKWebView), or a framework like Tauri.
+    - Does the app start the server itself, or rely on the login agent and only show its page?
+    - The layout and the keyboard on a wide screen, and the pinch on a trackpad.
+
+11. **Offline on the tablet.** A copy of the library on the iPad or an Android phone (the PDFs are 7 GB now), so carrel works with no server: the library, the papers, their highlights and overviews. The chat is not available offline, and the page says so.
+    - A Home Screen web app with a service worker and storage on the device, or a native wrapper; Safari's storage quota and when it evicts.
+    - What to keep on the device (everything, or chosen areas and recent papers), and when to sync.
+    - Highlights made offline, written back to the laptop without clashing with the version check that guards saving a PDF.
+    - The library's document, the overview notes and the reviews kept on the device; text search on the device; meaning search left out offline.

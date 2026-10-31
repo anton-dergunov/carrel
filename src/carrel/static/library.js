@@ -115,9 +115,13 @@ export function isTouched(paper, mark) {
   return Boolean(paper.overview || paper.reviews?.length || paper.chats);
 }
 
+// One collator for every comparison: `localeCompare` with options makes one per call, which
+// costs most of a keystroke's time on 2,000 papers.
+const collator = new Intl.Collator(undefined, { sensitivity: 'base' });
+
 /** The papers in order: by topic then title, or the newest first by date added or published. */
 export function sortPapers(papers, sort = 'topic') {
-  const byTitle = (a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+  const byTitle = (a, b) => collator.compare(a.title, b.title);
   const sorted = [...papers];
   if (sort === 'added' || sort === 'published') {
     const date = (paper) => String(paper[sort] ?? '');
@@ -126,6 +130,94 @@ export function sortPapers(papers, sort = 'topic') {
     sorted.sort((a, b) => a.topic.localeCompare(b.topic) || byTitle(a, b));
   }
   return sorted;
+}
+
+const ranks = new WeakMap(); // document → Map(sort → Map(paper → place))
+
+/**
+ * Each paper's place in the library sorted by `sort`, worked out once per document: ordering a
+ * search's matches by it costs a numeric sort, not a sort by title at every key.
+ */
+export function sortRanks(document, sort = 'topic') {
+  let bySort = ranks.get(document);
+  if (!bySort) ranks.set(document, (bySort = new Map()));
+  let rank = bySort.get(sort);
+  if (!rank) {
+    rank = new Map(sortPapers(document.papers, sort).map((paper, place) => [paper, place]));
+    bySort.set(sort, rank);
+  }
+  return rank;
+}
+
+// What a search found, to mark it.
+
+let lastPattern = { key: null, patterns: [] };
+
+function patternsOf(words) {
+  const key = words.join('\n');
+  if (lastPattern.key !== key) {
+    lastPattern = { key, patterns: words.map((word) => new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'giu')) };
+  }
+  return lastPattern.patterns;
+}
+
+/** Where the `words` (lower-case) are in `text`, whatever their case: [start, end) spans, sorted and merged. */
+export function matchRanges(text, words) {
+  const spans = [];
+  if (!text) return spans;
+  for (const pattern of patternsOf(words)) {
+    pattern.lastIndex = 0;
+    for (const match of String(text).matchAll(pattern)) spans.push([match.index, match.index + match[0].length]);
+  }
+  spans.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const merged = [];
+  for (const span of spans) {
+    const last = merged.at(-1);
+    if (last && span[0] <= last[1]) last[1] = Math.max(last[1], span[1]);
+    else merged.push([...span]);
+  }
+  return merged;
+}
+
+const LEAD = 40; // how much of the summary comes before its first match
+
+/**
+ * What a title search found outside the title: for the words the title lacks, the fields that
+ * hold them, in the order summary, authors, area, type, year, as [{field, text, ranges}], the
+ * ranges marking every word. A field comes only for a word no field before it holds. The summary
+ * is cut to start a little before its first match; the authors are the ones whose names match.
+ * `shown` names fields the row already shows: they account for their words, and are left out.
+ * A word has no spaces and the haystack joins the fields with spaces, so each word is in one field.
+ */
+export function foundOutsideTitle(paper, words, { shown = [] } = {}) {
+  let left = words.filter((word) => !paper.title.toLowerCase().includes(word));
+  const found = [];
+  const field = (name, text, value = () => text) => {
+    if (!left.length || !text) return;
+    const lower = String(text).toLowerCase();
+    const held = left.filter((word) => lower.includes(word));
+    if (!held.length) return;
+    left = left.filter((word) => !held.includes(word));
+    if (shown.includes(name)) return;
+    const shownText = value(held);
+    found.push({ field: name, text: shownText, ranges: matchRanges(shownText, words) });
+  };
+  field('summary', paper.summary, (held) => summaryWindow(paper.summary, held));
+  const authors = [paper.authors ?? []].flat().filter(Boolean);
+  field('authors', authors.join(' '), (held) => authors.filter((name) => held.some((word) => name.toLowerCase().includes(word))).join(', '));
+  field('area', paper.topic?.replaceAll('/', ' '), () => paper.topic);
+  field('type', paper.type);
+  field('year', paper.year);
+  return found;
+}
+
+function summaryWindow(summary, words) {
+  const lower = summary.toLowerCase();
+  const first = Math.min(...words.map((word) => lower.indexOf(word)).filter((at) => at >= 0));
+  if (first <= LEAD) return summary;
+  const space = summary.indexOf(' ', first - LEAD);
+  const start = space >= 0 && space < first ? space + 1 : first - LEAD;
+  return `…${summary.slice(start)}`;
 }
 
 /** The heading a sorted paper falls under: its topic, its year, or the month it was added. */

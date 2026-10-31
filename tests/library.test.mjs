@@ -6,7 +6,9 @@ import {
   chipsOn,
   defaultLibraryState,
   filterPapers,
+  foundOutsideTitle,
   groupOf,
+  matchRanges,
   plainTitle,
   prepare,
   restoreLibrary,
@@ -14,6 +16,7 @@ import {
   reviewsInside,
   shortDate,
   sortPapers,
+  sortRanks,
   topicTree,
   yearCounts,
 } from '../src/carrel/static/library.js';
@@ -64,6 +67,48 @@ test('sorting, and the headings rows fall under', () => {
   assert.equal(groupOf(papers[0], 'added'), 'October 2026');
   assert.equal(groupOf(papers[0], 'published'), '2024');
   assert.equal(groupOf(papers[3], 'published'), 'Undated');
+});
+
+test('the sort ranks follow sortPapers, kept per document', () => {
+  const library = doc();
+  for (const sort of ['topic', 'added', 'published']) {
+    const rank = sortRanks(library, sort);
+    assert.deepEqual(titles([...library.papers].sort((a, b) => rank.get(a) - rank.get(b))), titles(sortPapers(library.papers, sort)));
+    assert.equal(sortRanks(library, sort), rank);
+  }
+  assert.notEqual(sortRanks(doc(), 'topic'), sortRanks(library, 'topic'));
+});
+
+test('the spans a search marks: any case, overlapping words merged', () => {
+  assert.deepEqual(matchRanges('LLMs judge LLM output', ['llm']), [[0, 3], [11, 14]]);
+  assert.deepEqual(matchRanges('abcd', ['ab', 'bc']), [[0, 3]]);
+  assert.deepEqual(matchRanges('a+b (c)', ['+b', '(c)']), [[1, 3], [4, 7]]);
+  assert.deepEqual(matchRanges('τ²-Bench', ['τ²']), [[0, 2]]);
+  assert.deepEqual(matchRanges('', ['x']), []);
+});
+
+test('what a title search found outside the title', () => {
+  const [judges, tau] = doc().papers;
+  assert.deepEqual(foundOutsideTitle(judges, ['judging']), []);
+  assert.deepEqual(foundOutsideTitle(judges, ['judging', 'shi']), [{ field: 'authors', text: 'Lin Shi', ranges: [[4, 7]] }]);
+  assert.deepEqual(foundOutsideTitle(judges, ['bias', 'judges']), [{ field: 'summary', text: 'Position bias in judges.', ranges: [[9, 13], [17, 23]] }]);
+  assert.deepEqual(
+    foundOutsideTitle(tau, ['eval', 'bench', '2024']).map((each) => [each.field, each.text]),
+    [
+      ['area', 'llm/eval'],
+      ['year', '2024'],
+    ],
+  );
+  // A field comes only for a word the ones before it lack; a field the row shows is left out.
+  const agents = { ...judges, title: 'Agents', summary: 'An LLM survey.', topic: 'llm/agents' };
+  assert.deepEqual(foundOutsideTitle(agents, ['llm', 'agent']).map((each) => each.field), ['summary']);
+  assert.deepEqual(foundOutsideTitle(agents, ['llm'], { shown: ['summary'] }), []);
+  assert.deepEqual(foundOutsideTitle({ ...agents, summary: 'A survey.' }, ['llm']).map((each) => each.text), ['llm/agents']);
+  const long = { ...judges, summary: `${'Some words come first here, '.repeat(4)}then the needle, and more.` };
+  const [found] = foundOutsideTitle(long, ['needle']);
+  assert.match(found.text, /^…\S.*needle, and more\.$/);
+  assert.ok(found.text.indexOf('needle') <= 42);
+  assert.deepEqual(found.ranges, [[found.text.indexOf('needle'), found.text.indexOf('needle') + 6]]);
 });
 
 test('the topic tree, with totals or with the matches of a search', () => {

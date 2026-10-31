@@ -719,6 +719,9 @@ body.dragging #divider::before { opacity: 1; }
   contain-intrinsic-size: auto 45px;
 }
 .paper-row.rich { contain-intrinsic-size: auto 104px; }
+.paper-row.compact.has-found { contain-intrinsic-size: auto 66px; }
+.paper-row.rich.has-found { contain-intrinsic-size: auto 124px; }
+.rows-end { height: 1px; }
 .paper-row:active { background: color-mix(in srgb, var(--question) 70%, transparent); }
 .paper-row .type { display: grid; place-items: center; width: 20px; height: 24px; color: var(--muted); }
 .paper-row .type .icon { width: 15px; height: 15px; stroke-width: 1.75; }
@@ -737,6 +740,11 @@ body.dragging #divider::before { opacity: 1; }
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* Where a title search found the words the title lacks: one line under it. */
+.paper-row .found { font-size: 13px; line-height: 1.5; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.paper-row .found-label { font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: color-mix(in srgb, var(--muted) 75%, transparent); }
+.paper-row .found-summary { font: 14px var(--reading); color: color-mix(in srgb, var(--text) 78%, var(--muted)); }
+.paper-row .found mark { color: var(--text); }
 .marks { flex: none; display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
 .marks:empty { display: none; }
 .marks .mark { display: inline-flex; align-items: center; gap: 1px; }

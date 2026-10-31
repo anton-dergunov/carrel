@@ -5,8 +5,11 @@
 // it), and the summary in two lines.
 //
 // The marks: the reader's overview note, a review that cites the paper, the chats about it.
+//
+// A title search marks its words in the row (`markRow`), and when some are not in the title, a
+// line under it says where they are: the summary, the authors, the area, the type or the year.
 
-import { TYPE_ICONS, shortDate } from './library.js';
+import { TYPE_ICONS, foundOutsideTitle, matchRanges, shortDate } from './library.js';
 import { readingUrl } from './tabs.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -100,4 +103,57 @@ export function groupHeading(text, count) {
   heading.append(element('span', 'name', text));
   if (count != null) heading.append(element('span', 'count', String(count)));
   return heading;
+}
+
+const FOUND_LABELS = { summary: 'summary', authors: 'by', area: 'area', type: 'type', year: 'published' };
+
+/**
+ * Marks the `words` (lower-case) of a title search in a row from `paperRow`, and adds the line
+ * saying where the ones outside the title were found; no words clears both. A rich row's authors
+ * and summary are marked where they are; the line leaves the summary out and comes last. Rows are kept and placed again, so a row
+ * remembers the words it was marked for and is only changed when they change.
+ */
+export function markRow(row, paper, words) {
+  const key = words.join(' ');
+  if ((row.dataset.marked ?? '') === key) return;
+  row.dataset.marked = key;
+  fillMarked(row.querySelector('.title'), paper.title, words);
+  const summary = row.querySelector('.summary');
+  if (summary) fillMarked(summary, paper.summary, words);
+  const meta = row.querySelector('.meta');
+  if (meta) fillMarked(meta, meta.textContent, words);
+  row.querySelector('.found')?.remove();
+  const found = words.length ? foundOutsideTitle(paper, words, { shown: summary ? ['summary'] : [] }) : [];
+  row.classList.toggle('has-found', found.length > 0);
+  if (!found.length) return;
+  const line = element('span', 'found');
+  found.forEach((each, i) => {
+    if (i) line.append(' · ');
+    line.append(element('span', 'found-label', FOUND_LABELS[each.field]), ' ');
+    const text = line.appendChild(element('span', `found-${each.field}`));
+    appendMarked(text, each.text, each.ranges);
+  });
+  // Under the title in a compact row; in a rich one, under what it already shows.
+  if (row.classList.contains('rich')) row.querySelector('.main').append(line);
+  else row.querySelector('.head').after(line);
+}
+
+function fillMarked(box, text, words) {
+  if (!words.length) {
+    box.textContent = text;
+    return;
+  }
+  box.replaceChildren();
+  appendMarked(box, text, matchRanges(text, words));
+}
+
+/** `text` into `box`, its `ranges` in <mark>. */
+export function appendMarked(box, text, ranges) {
+  let at = 0;
+  for (const [start, end] of ranges) {
+    if (start > at) box.append(text.slice(at, start));
+    box.append(element('mark', '', text.slice(start, end)));
+    at = end;
+  }
+  if (at < text.length) box.append(text.slice(at));
 }

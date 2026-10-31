@@ -31,3 +31,5 @@ Each step ends with a sitting on the iPad (and the e-ink tablet, where it says s
     - What to keep on the device (everything, or chosen areas and recent papers), and when to sync.
     - Highlights made offline, written back to the laptop without clashing with the version check that guards saving a PDF.
     - The library's document, the overview notes and the reviews kept on the device; text search on the device; meaning search left out offline.
+
+12. **Liking/ranking papers** (favourites, etc)

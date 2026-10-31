@@ -7,9 +7,11 @@
 // - Map: the papers laid out by what they are about, regions named (map-view.js).
 //
 // The box searches at three depths: Titles narrows the rows on the device, by every word, in the
-// title, the authors, the summary, the topic and the type; Text searches the papers' text on the
+// title, the authors, the summary, the topic and the type, and marks the words in each row, with
+// a line saying where those outside the title were found; Text searches the papers' text on the
 // laptop (text-search.js), and Meaning ranks the papers there by what they are about
-// (meaning-search.js). Rows are compact or rich, sorted by topic, date added or published.
+// (meaning-search.js). Rows are compact or rich, sorted by topic, date added or published, and
+// drawn a screenful at a time: the first ones at once, the next as the reader scrolls to them.
 // Each device remembers its view, area, rows, sort, chips and depth.
 
 import { drawAreaPage, drawTree, plural } from './areas.js';
@@ -30,16 +32,19 @@ import {
   loadLibrary,
   loadLibraryState,
   saveLibraryState,
-  sortPapers,
+  sortRanks,
   topicTree,
+  words,
   yearCounts,
 } from './library.js';
-import { element, groupHeading, icon, paperRow } from './rows.js';
+import { element, groupHeading, icon, markRow, paperRow } from './rows.js';
 import { areaUrl } from './tabs.js';
 import { startMeaningSearch } from './meaning-search.js';
 import { startTextSearch } from './text-search.js';
 
-const TYPING_MS = 120;
+const TYPING_MS = 60;
+const FIRST_ROWS = 60; // drawn at once: some screens' worth, even in compact rows
+const MORE_ROWS = 200; // drawn each time the reader scrolls near the end of those drawn
 const PLACEHOLDERS = {
   titles: 'Search titles, authors, summaries',
   text: "Search the papers' text",
@@ -79,6 +84,8 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   let year = null; // the year an area's histogram narrows the rows to
   const expanded = new Set(); // the tree's folders the reader opened
   const rows = new Map(); // rows made, by paper and look, used again at each draw
+  let drawn = null; // what fillRows last drew: {slot, list, key, papers}
+  let more = null; // the observer that draws the rest of those rows
   const laptop = laptopSearch(startTextSearch({ openTarget }), startMeaningSearch(), () => state.depth);
   let chats = { at: 0, list: [] }; // carrel's recent chats, for the desk
   const meaningMap = startMapView(mapView, { openPaper });
@@ -212,31 +219,70 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
     };
   }
 
-  /** The rows of `papers`, sorted and under their headings, into `slot`. */
+  /**
+   * The rows of `papers`, sorted and under their headings, into `slot`, the title search's words
+   * marked in them. The first FIRST_ROWS are drawn at once and the rest as the reader nears them:
+   * placing every row of a long list is what made each key slow on the iPad.
+   */
   function fillRows(slot, papers, { topic, under = '' }) {
-    const sorted = sortPapers(papers, state.sort);
+    const rank = sortRanks(doc, state.sort);
+    const sorted = [...papers].sort((a, b) => rank.get(a) - rank.get(b));
     const rich = state.density === 'rich';
     const date = state.sort === 'added' ? 'added' : 'published';
-    const parts = [];
-    let group = null;
+    const wanted = words(titleQuery());
+    const key = [rich, topic, date, under, state.sort, wanted.join(' ')].join('\n');
+    // The same rows as the last draw, still showing: a space typed, a letter that narrows nothing.
+    if (sorted.length && drawn?.slot === slot && drawn.key === key && slot.firstChild === drawn.list && sameList(drawn.papers, sorted)) return;
+    more?.disconnect();
+    more = null;
     const groups = new Map();
     for (const paper of sorted) {
       const name = groupName(paper, under);
       groups.set(name, (groups.get(name) ?? 0) + 1);
     }
     const headed = groups.size > 1 || state.sort !== 'topic';
-    for (const paper of sorted) {
-      const name = groupName(paper, under);
-      if (headed && name !== group) {
-        group = name;
-        parts.push(groupHeading(name, groups.get(name)));
-      }
-      parts.push(row(paper, { rich, topic, date }));
-    }
-    if (!sorted.length) parts.push(element('p', 'list-note', emptyNote()));
     const list = element('div', `rows ${rich ? 'rich' : 'compact'}`);
-    list.append(...parts);
+    let next = 0;
+    let group = null;
+    const drawRows = (count) => {
+      const parts = [];
+      const end = Math.min(sorted.length, next + count);
+      for (; next < end; next++) {
+        const paper = sorted[next];
+        const name = groupName(paper, under);
+        if (headed && name !== group) {
+          group = name;
+          parts.push(groupHeading(name, groups.get(name)));
+        }
+        const made = row(paper, { rich, topic, date });
+        markRow(made, paper, wanted);
+        parts.push(made);
+      }
+      list.append(...parts);
+    };
+    drawRows(FIRST_ROWS);
+    if (!sorted.length) list.append(element('p', 'list-note', emptyNote()));
+    if (next < sorted.length) {
+      const end = element('div', 'rows-end');
+      list.append(end);
+      const observer = new IntersectionObserver((entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        drawRows(MORE_ROWS);
+        if (next < sorted.length) list.append(end);
+        else {
+          observer.disconnect();
+          end.remove();
+        }
+      }, { root: pane, rootMargin: '0px 0px 1500px 0px' });
+      observer.observe(end);
+      more = observer;
+    }
     slot.replaceChildren(list);
+    drawn = { slot, list, key, papers: sorted };
+  }
+
+  function sameList(a, b) {
+    return a.length === b.length && a.every((paper, i) => paper === b[i]);
   }
 
   function groupName(paper, under) {
@@ -621,6 +667,7 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
     if (next === doc) return;
     doc = next;
     rows.clear();
+    drawn = null;
     render();
     meaningMap.refresh();
   }

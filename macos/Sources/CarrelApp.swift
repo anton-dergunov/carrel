@@ -1,10 +1,14 @@
 import AppKit
 import Combine
+import WebKit
 
 @main
 struct CarrelApplication {
     static func main() {
         let application = NSApplication.shared
+        // Carrel has tabs of its own, in the page; the window's would only add Show Tab Bar. Set
+        // before the window is made.
+        NSWindow.allowsAutomaticWindowTabbing = false
         let delegate = AppDelegate()
         application.delegate = delegate
         application.run()
@@ -164,9 +168,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
-    @objc func actualSize() { main.webView.pageZoom = 1 }
-    @objc func zoomIn() { main.webView.pageZoom = min(main.webView.pageZoom * 1.1, 3) }
-    @objc func zoomOut() { main.webView.pageZoom = max(main.webView.pageZoom / 1.1, 0.5) }
+    /// Zoom is the paper's or the meaning map's, as the page decides; with neither showing, the
+    /// whole page's.
+    @objc func actualSize() { zoom("zoom-reset") { $0.pageZoom = 1 } }
+    @objc func zoomIn() { zoom("zoom-in") { $0.pageZoom = min($0.pageZoom * 1.1, 3) } }
+    @objc func zoomOut() { zoom("zoom-out") { $0.pageZoom = max($0.pageZoom / 1.1, 0.5) } }
+
+    private func zoom(_ command: String, otherwise: @escaping (WKWebView) -> Void) {
+        main.command(command) { [weak self] done in
+            if !done, let view = self?.main.webView { otherwise(view) }
+        }
+    }
     @objc func reload() {
         if server.pageURL == nil { Task { await server.connect() } } else { main.webView.reload() }
     }

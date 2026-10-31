@@ -38,7 +38,7 @@ The folders your library's `paper-library.yaml` names outside it, such as `pdf_r
 
 ### On the Mac
 
-Carrel also comes as a Mac app, with the same pages in a window of its own and menus for its keys (⌘F find, ⌘W close the tab, ⌘L ask, ⇧⌘[ and ⇧⌘] move between tabs). It needs Xcode and XcodeGen to build:
+Carrel also comes as a Mac app, with the same pages in a window of its own and menus for its keys (⌘F find, ⌘= and ⌘− zoom the paper or the map, ⌘W close the tab, ⌘L ask, ⇧⌘[ and ⇧⌘] move between tabs). It needs Xcode and XcodeGen to build:
 
 ```sh
 brew install xcodegen

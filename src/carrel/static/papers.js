@@ -689,7 +689,16 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
     filter.select();
   }
 
-  return { showArea, address, reload, focusSearch, area: () => state.area, view: () => state.view };
+  return {
+    showArea,
+    address,
+    reload,
+    focusSearch,
+    /** Zooms the meaning map, when it is the view showing. */
+    zoom: (step) => state.view === 'map' && meaningMap.zoom(step),
+    area: () => state.area,
+    view: () => state.view,
+  };
 }
 
 /** The depth the box is at, of the two the laptop answers; the other is stopped. */

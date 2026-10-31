@@ -34,7 +34,7 @@ The agent keeps running the code it started with: after a change, or `uv sync`, 
 
 **The window.** Its title is the page's. Carrel's own addresses stay in it; any other web address opens in the browser, `window.open` included; a paper link (`pdf.invalid`) never navigates, since the page handles it. Adding a PDF opens the Mac's file panel.
 
-**Menus call the page.** Each menu item that acts on the library runs one of the page's commands, `window.carrel.command(name)` (`commands.js`), and gets back whether it did anything: Add Paper (⌘N), Close Tab (⌘W, which closes the window on the library), Find (⌘F: the paper's find, or the library's search box), Library (⌘1), Next and Previous Tab (⇧⌘] and ⇧⌘[), Ask (⌘L), Show or Hide Chat (⇧⌘L). Zoom (⌘0, ⌘=, ⌘−) is the WebView's. In a browser the page takes ⌘F (Ctrl+F) for itself, since the browser's find cannot search the pages PDF.js has not drawn.
+**Menus call the page.** Each menu item that acts on the library runs one of the page's commands, `window.carrel.command(name)` (`commands.js`), and gets back whether it did anything: Add Paper (⌘N), Close Tab (⌘W, which closes the window on the library), Find (⌘F: the paper's find, or the library's search box), Library (⌘1), Next and Previous Tab (⇧⌘] and ⇧⌘[), Ask (⌘L), Show or Hide Chat (⇧⌘L). Zoom (⌘0, ⌘=, ⌘−) is the paper's, or the meaning map's, and the whole page's only when neither is showing. The page takes a few keys itself, in a browser too: ⌘F (Ctrl+F), since the browser's find cannot search the pages PDF.js has not drawn; and ⌘= ⌘− ⌘0, and + − 0 alone, which zoom the paper as they zoom the map. Where there is nothing of the page's to zoom, ⌘= and the rest are left to the browser.
 
 **The menu bar item** is off until Settings turns it on. A click shows or hides the window; a right click has the server's status, Copy Tablet Address, Start or Stop Server (the app's own), Settings and Quit. With it on, closing the window leaves Carrel in the menu bar with no Dock icon, and a launch at login stays there.
 
@@ -102,6 +102,7 @@ The chat's settings open from the model's name on its status line, as a small di
 
 **Tabs.**
 - A paper opens in a tab after the one showing, and a citation to an open paper goes to its tab.
+- **Drawn on the GPU.** The pages' canvases are asked for with `enableHWA`. Without it PDF.js asks for canvases it will read back, which Safari keeps off the GPU. In WebKit at 2x, a page took 74 ms to appear after a jump and a scroll had frames of 25–33 ms; with it, 46–63 ms and 18–19 ms. carrel's own parts cost nothing measurable beside a bare PDF.js viewer.
 - **One viewer.** All papers share one PDF viewer, because several viewers would each keep their rendered pages, which is what makes iPad Safari drop a page. Each tab keeps its place (page, zoom, scroll), so coming back to a tab puts the paper back where it was.
 - **The address.** It names the tab showing. The Home Screen app always starts at `/`, so it opens the tab that was showing last.
 

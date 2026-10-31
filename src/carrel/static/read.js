@@ -233,6 +233,10 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
         standardFontDataUrl: `${ASSETS}standard_fonts/`,
         wasmUrl: `${ASSETS}wasm/`,
         iccUrl: `${ASSETS}iccs/`,
+        // The pages' canvases on the GPU. Without it PDF.js asks for canvases it will read back,
+        // which Safari keeps off the GPU: in WebKit at 2x a page took 74 ms to appear after a jump
+        // and a scroll had frames of 25–33 ms; with it, 46–63 ms and 18–19 ms.
+        enableHWA: true,
       });
       loaded = await task.promise;
     } catch (error) {
@@ -447,6 +451,15 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     open,
     goTo,
     refit,
+    /** Zooms the paper a step in (1) or out (-1), or back to the page's width (0); false with
+     * no paper showing. */
+    zoom(step) {
+      if (!viewer.pagesCount) return false;
+      if (step > 0) viewer.increaseScale();
+      else if (step < 0) viewer.decreaseScale();
+      else viewer.currentScaleValue = 'page-width';
+      return true;
+    },
     find,
     endFind: () => eventBus.dispatch('findbarclose', { source: null }),
     outline,

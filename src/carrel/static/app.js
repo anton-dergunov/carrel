@@ -346,7 +346,17 @@ function tabKeys() {
   return [PAPERS, ...state.papers.map(keyOf), ...(layout.place === 'tab' ? [CHAT] : [])];
 }
 
-startCommands({
+/** Zooms what can be zoomed: the paper showing, or the meaning map. */
+function zoom(step) {
+  if (shownPaper()) return reader.zoom(step);
+  if (state.active === PAPERS) return library.zoom(step);
+  return false;
+}
+
+const commands = {
+  'zoom-in': () => zoom(1),
+  'zoom-out': () => zoom(-1),
+  'zoom-reset': () => zoom(0),
   find() {
     if (shownPaper()) tools.openFind();
     else if (state.active === PAPERS) library.focusSearch();
@@ -372,7 +382,9 @@ startCommands({
     go(PAPERS);
     document.getElementById('library-add').click();
   },
-});
+};
+// + − 0 alone zoom the paper, as they do the map (which takes them itself).
+startCommands(commands, { plainZoom: () => Boolean(shownPaper()) });
 
 tabStrip.addEventListener('click', (event) => {
   const tab = event.target.closest('[data-key]');

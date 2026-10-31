@@ -2,8 +2,10 @@
 // `window.carrel.command(name)`, and get back whether it did anything (Close Tab on the library
 // closes the window instead). The actions themselves are the page's own; this only names them.
 //
-// In a browser the page takes one key for itself, ⌘F (Ctrl+F elsewhere): find in the paper finds
-// on pages PDF.js has not drawn, which the browser's own find cannot. The browser keeps the rest.
+// The page takes a few keys for itself, in a browser too: ⌘F (Ctrl+F elsewhere), since find in the
+// paper finds on pages PDF.js has not drawn, which the browser's own find cannot; and ⌘= ⌘− ⌘0, and
+// + − 0 alone, which zoom the paper or the meaning map rather than the page. Where there is nothing
+// of the page's to zoom, ⌘= and the rest are left to the browser (or to the app's menu).
 
 /** Runs the command `name` from `commands`: true when it did something. */
 export function runCommand(commands, name) {
@@ -17,6 +19,18 @@ export function isFindKey(event, mac) {
   return primary && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'f';
 }
 
+const ZOOMS = { '=': 'zoom-in', '+': 'zoom-in', '-': 'zoom-out', _: 'zoom-out', 0: 'zoom-reset' };
+
+/** The zoom command a keydown asks for: ⌘= ⌘− ⌘0 on a Mac (Ctrl elsewhere), or with `plain`, the
+ * keys alone. Null for anything else. */
+export function zoomKey(event, mac, plain = false) {
+  if (event.altKey) return null;
+  const primary = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+  const none = !event.metaKey && !event.ctrlKey;
+  if (!(primary || (plain && none))) return null;
+  return ZOOMS[event.key] ?? null;
+}
+
 /** The key of the tab `step` away from `active` among `keys`, wrapping round. */
 export function stepTab(keys, active, step) {
   if (!keys.length) return active;
@@ -24,11 +38,15 @@ export function stepTab(keys, active, step) {
   return keys[(at + step + keys.length) % keys.length];
 }
 
-export function startCommands(commands) {
+/** `plainZoom()`: whether + − 0 alone should zoom now. */
+export function startCommands(commands, { plainZoom = () => false } = {}) {
   const command = (name) => runCommand(commands, String(name));
   window.carrel = Object.freeze({ command });
   const mac = /Mac/.test(navigator.platform);
   document.addEventListener('keydown', (event) => {
-    if (!event.defaultPrevented && isFindKey(event, mac) && command('find')) event.preventDefault();
+    if (event.defaultPrevented || event.isComposing) return;
+    const typing = event.target?.closest?.('input, textarea, select, [contenteditable]');
+    const name = isFindKey(event, mac) ? 'find' : zoomKey(event, mac, !typing && plainZoom());
+    if (name && command(name)) event.preventDefault();
   });
 }

@@ -436,6 +436,14 @@ export function startMapView(container, { openPaper }) {
   });
 
   return {
+    /** Zooms the map a step in (1) or out (-1), or fits it whole (0); false when it is not showing. */
+    zoom(step) {
+      if (!visible || !map) return false;
+      if (step > 0) map.zoomBy(1.6);
+      else if (step < 0) map.zoomBy(1 / 1.6);
+      else map.fit(true);
+      return true;
+    },
     draw(nextDoc, { query = '', depth = 'titles' } = {}) {
       const showing = !visible;
       visible = true;

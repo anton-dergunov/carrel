@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { isFindKey, runCommand, stepTab } from '../src/carrel/static/commands.js';
+import { isFindKey, runCommand, stepTab, zoomKey } from '../src/carrel/static/commands.js';
 import { wheelFactor } from '../src/carrel/static/pinch.js';
 
 test('a command says whether it did anything', () => {
@@ -45,4 +45,19 @@ test('a trackpad pinch zooms by small steps, a mouse wheel by notches', () => {
   assert.ok(notch > 1.2 && notch < 1.35);
   const line = wheelFactor({ deltaY: -3, deltaMode: 1 });
   assert.ok(line > 1.05 && line < 1.1);
+});
+
+test('⌘= ⌘− ⌘0 zoom, and + − 0 alone only when asked', () => {
+  const key = (props) => ({ key: '=', metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...props });
+  assert.equal(zoomKey(key({ metaKey: true }), true), 'zoom-in');
+  assert.equal(zoomKey(key({ metaKey: true, key: '+', shiftKey: true }), true), 'zoom-in');
+  assert.equal(zoomKey(key({ metaKey: true, key: '-' }), true), 'zoom-out');
+  assert.equal(zoomKey(key({ metaKey: true, key: '0' }), true), 'zoom-reset');
+  assert.equal(zoomKey(key({ ctrlKey: true, key: '-' }), false), 'zoom-out');
+  assert.equal(zoomKey(key({ ctrlKey: true }), true), null); // Ctrl on a Mac is not ⌘
+  assert.equal(zoomKey(key({ metaKey: true, key: 'f' }), true), null);
+  assert.equal(zoomKey(key({}), true), null);
+  assert.equal(zoomKey(key({}), true, true), 'zoom-in');
+  assert.equal(zoomKey(key({ key: '0' }), false, true), 'zoom-reset');
+  assert.equal(zoomKey(key({ altKey: true }), true, true), null);
 });

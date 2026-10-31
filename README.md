@@ -24,4 +24,14 @@ tailscale serve --bg --https=8443 http://127.0.0.1:8517     # once
 
 Then open `https://<laptop>.<tailnet>.ts.net:8443/` on the tablet, and add it to the Home Screen to have it full screen. Only your own Tailscale login is let in (`--login` adds another). The agent works with Claude Code's own tools, its Bash in Claude Code's sandbox; anything outside what reading needs is put to you as Allow / Deny. `carrel tools` shows what was used and asked.
 
+To have carrel running from login onwards (macOS), install it as a login agent, with the same options as `serve`:
+
+```sh
+uv run carrel agent install --library ~/papers
+uv run carrel agent status       # running? which library, which version
+uv run carrel agent uninstall
+```
+
+Its output goes to `~/Library/Logs/carrel.log`. It keeps running the version it started with: after updating carrel, restart it with `launchctl kickstart -k gui/$(id -u)/com.anton.carrel`. A `carrel serve` typed while it runs says where carrel already is instead of starting a second one.
+
 The folders your library's `paper-library.yaml` names outside it, such as `pdf_root` and `overview_dir`, are open to the agent; `--add-dir FOLDER` opens another for reading.

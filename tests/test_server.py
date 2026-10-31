@@ -4,6 +4,7 @@ import pytest
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
+from carrel import __version__
 from carrel.server import make_app
 from carrel.session import Sessions
 
@@ -25,6 +26,14 @@ def test_index_is_the_library(client):
     assert 'id="papers-pane"' in response.text and 'id="review-pane"' in response.text
     assert 'data-pdf=""' in response.text and 'data-area=""' in response.text
     assert "script-src 'self'" in response.headers["content-security-policy"]
+
+
+def test_ping_says_which_carrel_answers(client, library):
+    assert client.get("/api/ping").json() == {
+        "app": "carrel",
+        "version": __version__,
+        "library": str(library.root),
+    }
 
 
 def test_read_page_is_the_same_page_with_the_paper_showing(client):

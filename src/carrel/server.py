@@ -45,6 +45,7 @@ from starlette.routing import Mount, Route, WebSocketRoute
 from starlette.staticfiles import StaticFiles
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
+from . import APP_NAME, __version__
 from .catalog import Catalog
 from .edits import EditError, Edits, discard_upload, save_upload
 from .engine import Library
@@ -448,6 +449,10 @@ def make_app(
             }
         )
 
+    async def ping(request: Request) -> Response:
+        """Who answers on this port: a second `carrel serve` steps aside for it."""
+        return JSONResponse({"app": APP_NAME, "version": __version__, "library": str(library.root)})
+
     async def get_settings(request: Request) -> Response:
         return settings_reply(sessions.settings.get())
 
@@ -607,6 +612,7 @@ def make_app(
             Route("/api/overview/{path:path}", delete_overview, methods=["DELETE"]),
             Route("/api/commands", commands),
             Route("/api/chats", chats),
+            Route("/api/ping", ping),
             Route("/api/settings", get_settings, methods=["GET", "HEAD"]),
             Route("/api/settings", put_settings, methods=["PUT"]),
             WebSocketRoute("/ws", session),

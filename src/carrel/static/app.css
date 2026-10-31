@@ -616,6 +616,11 @@ body.dragging #divider::before { opacity: 1; }
   color: var(--text);
   padding: 0;
 }
+/* Our own clear button, the same on every browser. */
+#filter::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+#filter-clear { width: 32px; height: 32px; margin-right: -8px; border-radius: 50%; }
+#filter-clear .icon { width: 16px; height: 16px; }
+#filter-clear[hidden] { display: none; }
 #library-count { flex: 1; min-width: 0; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #library-options { width: 34px; height: 34px; }
 

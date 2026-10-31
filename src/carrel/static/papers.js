@@ -57,6 +57,7 @@ const TOUCHED_LABELS = { overview: ['notebook-text', 'Has your overview note'], 
 export function startLibrary({ openPaper, openReview, openTarget, onAddress = () => {}, tabs = () => [] }) {
   const pane = document.getElementById('papers-pane');
   const filter = document.getElementById('filter');
+  const filterClear = document.getElementById('filter-clear');
   const depthControl = document.getElementById('depth');
   const viewControl = document.getElementById('views');
   const countLabel = document.getElementById('library-count');
@@ -467,12 +468,29 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   // Events.
 
   let typing = 0;
+  const showClear = () => { filterClear.hidden = !filter.value; };
+  const clearFilter = () => {
+    if (!filter.value) return;
+    clearTimeout(typing);
+    filter.value = '';
+    showClear();
+    render();
+  };
   filter.addEventListener('input', () => {
+    showClear();
     clearTimeout(typing);
     typing = setTimeout(render, state.depth === 'titles' ? TYPING_MS : 0);
   });
   filter.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') filter.blur();
+    if (event.key === 'Escape') clearFilter();
+  });
+  // The box keeps the focus it had: the keyboard neither comes up nor goes away. Not on
+  // pointerdown: WebKit then drops a tap's click.
+  filterClear.addEventListener('mousedown', (event) => event.preventDefault());
+  filterClear.addEventListener('click', (event) => {
+    event.preventDefault();
+    clearFilter();
   });
 
   depthControl.addEventListener('click', (event) => {
@@ -616,6 +634,7 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   }).observe(pane);
   new ResizeObserver(() => pane.style.setProperty('--bar-height', `${document.getElementById('library-bar').offsetHeight}px`)).observe(document.getElementById('library-bar'));
 
+  showClear();
   render();
   void reload();
   return { showArea, address, reload, area: () => state.area, view: () => state.view };

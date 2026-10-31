@@ -1,6 +1,6 @@
 # Architecture
 
-How carrel works as built, and why it works that way. A part is described here as soon as it is built; [plan.md](plan.md) keeps only what is left, and what to check at the next sitting on the iPad. The task began in the engine as [docs/tasks/tablet-reader.md](../../agentic-paper-library/docs/tasks/tablet-reader.md), which keeps the earliest reasoning.
+How carrel works as built, and why it works that way. A part is described here as soon as it is built; [plan.md](plan.md) keeps only what is left to build. The task began in the engine as [docs/tasks/tablet-reader.md](../../agentic-paper-library/docs/tasks/tablet-reader.md), which keeps the earliest reasoning.
 
 Carrel puts a paper's PDF and a Claude Code chat side by side on a tablet. The chat runs on the laptop (later the NAS) through the Agent SDK, in the library, and the browser only shows its messages. The app is served to the tablet over Tailscale.
 
@@ -11,6 +11,15 @@ Carrel has its own repository and imports the engine's `paperlib.py`, so the lib
 ## Who connects
 
 The server listens on 127.0.0.1 and is published to the tailnet by `tailscale serve` on port 8443, over HTTPS. It admits only the reader's Tailscale login and checks Host and Origin. There is no password.
+
+## Starting at login
+
+`carrel agent install` (with serve's own options) writes a launchd agent, `~/Library/LaunchAgents/com.anton.carrel.plist`, that runs `carrel serve` from login onwards, logging to `~/Library/Logs/carrel.log`; `status` and `uninstall` check and remove it. It is Lectern's `lectern agent`, with three changes:
+- **Everything named.** launchd knows nothing of the shell's folder or environment, so the agent runs with the library, the engine and the extra folders as absolute paths, and with the installing shell's `PATH` (and `XDG_STATE_HOME`, when set): launchd's own lacks Homebrew's `rg` and `uv`, which runs `paperlib`, and the `tailscale` command. The program is the checkout's `.venv/bin/carrel`, which `uv sync` keeps in place.
+- **One carrel per port.** `serve` first asks the port's `GET /api/ping` (`{app, version, library}`). When a carrel answers, it says so and exits 0, and launchd, which restarts it only after a failure (`KeepAlive: {SuccessfulExit: false}`), leaves it stopped. So a hand-typed `carrel serve` tells where carrel already runs.
+- **Waiting for the old one.** `launchctl bootout` returns while carrel is still closing its chats, and loading the agent again before then fails, so `install` waits until the old one is gone.
+
+The agent keeps running the code it started with: after a change, or `uv sync`, `launchctl kickstart -k gui/$UID/com.anton.carrel` restarts it. Chats under launchd use the same Claude Code login, from the login keychain.
 
 ## What the agent may do
 
@@ -193,7 +202,7 @@ The chat reads as the VS Code panel does: a dozen real VS Code chats from the li
 
 ## The library
 
-The library tab is the reader's view of the whole collection: five views of one document, and one search box that narrows whichever is showing, at three depths (titles on the device, the papers' text and their meaning on the laptop). Each device remembers its view, area, rows, sort, chips and depth.
+The library tab is the reader's view of the whole collection: five views of one document, and one search box that narrows whichever is showing, at three depths (titles on the device, the papers' text and their meaning on the laptop). Each device remembers its view, area, rows, sort, chips and depth. An × in the box, or Escape, empties it; the × leaves the keyboard as it was, up or down (it cancels its `mousedown`, not its `pointerdown`, after which WebKit drops a tap's click).
 
 **One document.** `GET /api/library` holds every paper that has a PDF, with its title, authors, dates, summary, topic, type and arXiv id, and its marks: the reader's overview note, the reviews that cite it, whether the agent has read it, and how many of carrel's questions were about it. With them come the topics (each with its own and its total count), the review scopes in their order, and the reviews.
 - **Built from the engine's reads**: `paper_index`, `load_topics`, `load_reviews` with `review_links`, `read_note`, `review_scopes`. The type is the frontmatter's, which every paper has: the engine writes it when a paper is filed and replaces it when the paper is read ([experiments/paper-type](../../agentic-paper-library/experiments/paper-type/README.md)).

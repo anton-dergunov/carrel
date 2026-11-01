@@ -26,6 +26,11 @@ def state_dir() -> Path:
     return Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state") / "carrel"
 
 
+def pan_trace_file() -> Path:
+    """The iPad's scrolling traces (pan-trace.js), one gesture a line."""
+    return state_dir() / "pan-trace.jsonl"
+
+
 def permissions_log() -> Path:
     return state_dir() / "permissions.jsonl"
 

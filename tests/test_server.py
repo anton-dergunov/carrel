@@ -1,3 +1,4 @@
+import json
 from urllib.parse import quote
 
 import pytest
@@ -237,6 +238,20 @@ def test_a_page_writes_to_the_log(client, caplog):
         client.post("/api/log", json=entry, headers={"Host": "127.0.0.1:8517"}).status_code == 403
     )
     assert client.post("/api/log", content=b"[]", headers=OWN).status_code == 400
+
+
+def test_a_page_writes_a_gesture_trace(client, monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    trace = {"kind": "gesture", "moves": [[0, 1, 2]]}
+    assert client.post("/api/trace", json=trace, headers=OWN).status_code == 204
+    assert client.post("/api/trace", json={"kind": "mark"}, headers=OWN).status_code == 204
+    lines = (tmp_path / "state" / "carrel" / "pan-trace.jsonl").read_text().splitlines()
+    assert [json.loads(line)["kind"] for line in lines] == ["gesture", "mark"]
+    assert json.loads(lines[0])["moves"] == [[0, 1, 2]]
+    assert (
+        client.post("/api/trace", json=trace, headers={"Host": "127.0.0.1:8517"}).status_code == 403
+    )
+    assert client.post("/api/trace", content=b"[]", headers=OWN).status_code == 400
 
 
 def test_the_overview_note_shown_and_moved_to_the_trash(client, library, monkeypatch):

@@ -244,6 +244,20 @@ body.finding #strip > :not(#find) { display: none; }
   backdrop-filter: blur(6px);
 }
 #page-badge[hidden] { display: none; }
+/* The scroll trace's mark (pan-trace.js), temporary: in the corner opposite the badge. */
+#pan-mark {
+  position: absolute;
+  z-index: 3;
+  left: 12px;
+  bottom: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font: calc(13px * var(--scale)) var(--ui);
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  border: 1px solid var(--line);
+}
+body.chat-sheet:not(.chat-hidden) #pan-mark { bottom: calc(var(--chat-height, 40%) + 12px); }
 /* The paper's sheet (paper-tools.js, paper-sheet.js): small by the badge, closed by a tap
    elsewhere; opened out over the page below the tabs until it is closed; on a phone, over the
    whole page. A bar with the page field stays on top, then the paper's head and its sections,

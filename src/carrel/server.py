@@ -57,6 +57,7 @@ from .scans import Scans
 from .search import SearchError, search
 from .session import Session, Sessions
 from .settings import DEFAULT_MODEL, LONGEST_NOTE, MODELS, Settings
+from .usage import pan_trace_file
 
 log = logging.getLogger("carrel")
 
@@ -69,6 +70,9 @@ SAFE_METHODS = {"GET", "HEAD"}
 MAX_PDF = 256 * 1024 * 1024
 # A line of a page's log, as the page sends it.
 MAX_LOG = 8192
+# A gesture's trace (pan-trace.js), and the most the trace file may grow to.
+MAX_TRACE = 256 * 1024
+MAX_TRACE_FILE = 32 * 1024 * 1024
 NO_STORE = {"Cache-Control": "no-store"}
 # The settings as a page sends them: the note and a little more.
 MAX_SETTINGS = 4 * LONGEST_NOTE + 1024
@@ -661,6 +665,27 @@ def make_app(
         )
         return Response(status_code=204)
 
+    async def page_trace(request: Request) -> Response:
+        """A gesture's trace from the iPad (pan-trace.js), one JSON line in the state folder,
+        while the paper's scrolling is being looked into."""
+        body = await request.body()
+        if len(body) > MAX_TRACE:
+            return PlainTextResponse("Too long.", status_code=413)
+        try:
+            entry = json.loads(body)
+        except ValueError:
+            entry = None
+        if not isinstance(entry, dict):
+            return PlainTextResponse("Not a trace.", status_code=400)
+        path = pan_trace_file()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists() and path.stat().st_size > MAX_TRACE_FILE:
+            return PlainTextResponse("The trace file is full.", status_code=507)
+        line = json.dumps({"received": time.time(), **entry}, separators=(",", ":"))
+        with path.open("a", encoding="utf-8") as file:
+            file.write(line + "\n")
+        return Response(status_code=204)
+
     async def session(websocket: WebSocket) -> None:
         """A page attached to a chat: `?chat=<id>` (or `new`), and `after=<seq>&epoch=<e>`
         for the last message it has. Leaving detaches the page; the chat goes on."""
@@ -742,6 +767,7 @@ def make_app(
             Route("/api/tag/{name}", put_tag, methods=["PUT"]),
             Route("/api/tag/{name}", delete_tag, methods=["DELETE"]),
             Route("/api/log", page_log, methods=["POST"]),
+            Route("/api/trace", page_trace, methods=["POST"]),
             Route("/api/paper/{path:path}", paper),
             Route("/api/overview-note", overview_paper, methods=["GET", "HEAD"]),
             Route("/api/overview/{path:path}", overview, methods=["GET", "HEAD"]),

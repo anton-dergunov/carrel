@@ -31,8 +31,8 @@ QUALITY = 72
 # The pages of a paper drawn ahead of being asked for: a book's are drawn as they are asked.
 MOST_PAGES = 400
 # The pictures kept on disk, at most: the papers used longest ago go first. Some 90 KB a page, so
-# about 250 papers of twenty pages.
-MOST_BYTES = 500 * 2**20
+# about 50 papers of twenty pages.
+MOST_BYTES = 100 * 2**20
 
 
 def render(path: Path, page: int, width: int = WIDTH) -> bytes:

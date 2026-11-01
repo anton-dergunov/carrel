@@ -892,8 +892,9 @@ h3.group .count { font-weight: 400; font-variant-numeric: tabular-nums; opacity:
 .year-bar:disabled { cursor: default; }
 .rows-slot { margin-top: 8px; }
 
-/* The library's own page: a treemap of the areas. */
+/* The area maps: the library's areas on its own page, an area's subtopics on its page (areas.js). */
 .treemap { position: relative; margin: 14px 0 0; }
+.treemap.area-map { margin-top: 16px; }
 .treemap .tile {
   position: absolute;
   display: block;
@@ -923,6 +924,20 @@ h3.group .count { font-weight: 400; font-variant-numeric: tabular-nums; opacity:
     repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--hue) 18%, transparent) 6px 7px),
     color-mix(in srgb, var(--hue) 26%, var(--surface)); }
 .treemap .tile.more .label .name { font-style: italic; font-weight: 400; }
+/* The papers filed in a topic itself, beside its subtopics: a quieter wash, its name in italics. */
+.treemap .tile.own { background: color-mix(in srgb, var(--hue) 16%, var(--surface)); }
+.treemap .tile.sub.own { background: color-mix(in srgb, var(--hue) 28%, var(--surface)); }
+.treemap .tile.own .label .name { font-style: italic; font-weight: 400; }
+.treemap div.tile.own { cursor: default; }
+.treemap div.tile.own:active { filter: none; }
+.treemap .tile.more[aria-expanded="true"] { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--hue) 70%, var(--text)); }
+
+/* What a "+N more" tile at a map's own level holds, in a card over the map. */
+#more-sheet { display: grid; padding: 12px 14px 8px; overflow-y: auto; overscroll-behavior: contain; animation: fade-in 0.12s ease-out; }
+#more-sheet[hidden] { display: none; }
+#more-sheet .sheet-header { margin-bottom: 2px; }
+#more-sheet .bar-row { grid-template-columns: minmax(0, 1fr) 72px 2.8em; min-height: 44px; }
+#more-sheet .bar-row .name { font-family: var(--reading); font-size: 15px; }
 
 /* The Text depth: the papers whose text holds the words, with snippets and their pages. */
 .text-head { padding-left: 4px; }
@@ -991,7 +1006,7 @@ article.review[hidden] { display: none; }
 
 @keyframes fade-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  #peek, #chip-sheet, #options-sheet { animation: none; }
+  #peek, #chip-sheet, #options-sheet, #more-sheet { animation: none; }
   .tree-row .chevron .icon { transition: none; }
   .list-note.searching { animation: none; }
 }
@@ -1531,8 +1546,6 @@ button.danger { background: var(--error); color: var(--surface); padding: 6px 14
 .confirm-remove { display: grid; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .confirm-remove .warning { margin: 0; font-size: 13.5px; line-height: 1.4; color: var(--text); }
 .confirm-remove .buttons { display: flex; align-items: center; gap: 12px; }
-
-#all-areas { scroll-margin-top: calc(var(--bar-height, 104px) + 12px); }
 
 /* The meaning map: the papers laid out by meaning, filling the pane under the library's bar. */
 #papers-pane[data-view="map"] { overflow: hidden; }

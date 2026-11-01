@@ -24,7 +24,7 @@ A tab switch fetches the paper again and parses it again, since the papers share
 
 ### 2. Previews made by the server
 
-The previews are drawn in the browser today, the first time a paper is opened. The laptop could make them once instead, with PyMuPDF (the engine's dependency already), keep them on disk by the PDF's version, and serve them as images. Then a paper opened for the first time has its previews at once, the browser draws nothing for them, and the iPad saves the work and the battery. The offline step (plan step 11) could carry them too.
+The previews are drawn in the browser today, the first time a paper is opened. The laptop could make them once instead, with PyMuPDF (the engine's dependency already), keep them on disk by the PDF's version, and serve them as images. Then a paper opened for the first time has its previews at once, the browser draws nothing for them, and the iPad saves the work and the battery. The offline step (plan step 10) could carry them too.
 
 ### 3. Draw further ahead
 

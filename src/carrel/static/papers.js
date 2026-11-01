@@ -14,7 +14,7 @@
 // drawn a screenful at a time: the first ones at once, the next as the reader scrolls to them.
 // Each device remembers its view, area, rows, sort, chips and depth.
 
-import { drawAreaPage, drawTree, plural } from './areas.js';
+import { drawAreaPage, drawTree, moreCard, plural } from './areas.js';
 import { drawDesk } from './desk.js';
 import { startAdding } from './library-edits.js';
 import { startMapView } from './map-view.js';
@@ -70,6 +70,7 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   const optionsSheet = document.getElementById('options-sheet');
   const chipsBar = document.getElementById('chips');
   const chipSheet = document.getElementById('chip-sheet');
+  const moreSheet = document.getElementById('more-sheet');
   const areasView = document.getElementById('areas-view');
   const tree = document.getElementById('area-tree');
   const areaPage = document.getElementById('area-page');
@@ -101,6 +102,7 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
     depthControl.querySelectorAll('[data-depth]').forEach((button) => button.setAttribute('aria-checked', String(button.dataset.depth === state.depth)));
     filter.placeholder = PLACEHOLDERS[state.depth];
     pane.dataset.view = state.view;
+    closeMore();
     for (const [name, view] of Object.entries(views)) view.hidden = name !== state.view;
     chipsBar.hidden = state.view !== 'all';
     if (state.view !== 'map') meaningMap.hide();
@@ -452,12 +454,62 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   }
 
   function closeSheets() {
+    closeMore();
     const was = !chipSheet.hidden;
     chipSheet.hidden = true;
     optionsSheet.hidden = true;
     optionsButton.setAttribute('aria-expanded', 'false');
     if (was && doc && state.view === 'all') drawChips();
   }
+
+  // The card of a "+N more" tile at a map's own level: what the tile holds, over the map.
+
+  let moreTile = null;
+
+  function openMore(tile) {
+    closeSheets();
+    const card = moreCard(tile);
+    if (!card) return;
+    moreSheet.replaceChildren(...card);
+    moreSheet.hidden = false;
+    moreTile = tile;
+    tile.setAttribute('aria-expanded', 'true');
+    placeMore(tile);
+  }
+
+  /** Under the tile's label when the pane has room, else over the tile, else at the pane's top. */
+  function placeMore(tile) {
+    const area = pane.getBoundingClientRect();
+    const label = (tile.querySelector('.label') ?? tile).getBoundingClientRect();
+    const box = tile.getBoundingClientRect();
+    const width = Math.min(360, area.width - 24);
+    moreSheet.style.width = `${width}px`;
+    moreSheet.style.maxHeight = `${area.height - 16}px`;
+    moreSheet.style.left = `${Math.max(area.left + 12, Math.min(label.left, area.right - width - 12))}px`;
+    const height = moreSheet.offsetHeight;
+    const below = label.bottom + 6;
+    const above = box.top - height - 6;
+    moreSheet.style.top = `${below + height <= area.bottom - 8 ? below : above >= area.top + 8 ? above : area.top + 8}px`;
+  }
+
+  function closeMore() {
+    if (moreSheet.hidden) return;
+    moreSheet.hidden = true;
+    moreSheet.replaceChildren();
+    moreTile?.setAttribute('aria-expanded', 'false');
+    moreTile = null;
+  }
+
+  moreSheet.addEventListener('click', (event) => {
+    const link = event.target.closest('a[data-area]');
+    if (!link) return;
+    event.preventDefault();
+    closeMore();
+    showArea(link.dataset.area, { push: true });
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !moreSheet.hidden) closeMore();
+  });
 
   function drawOptions() {
     const segmented = (label, name, values) => {
@@ -574,12 +626,12 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   });
 
   document.addEventListener('pointerdown', (event) => {
-    if (chipSheet.hidden && optionsSheet.hidden) return;
-    if (event.target.closest('#chip-sheet, #options-sheet, #chips [data-chip], #library-options')) return;
+    if (chipSheet.hidden && optionsSheet.hidden && moreSheet.hidden) return;
+    if (event.target.closest('#chip-sheet, #options-sheet, #more-sheet, #chips [data-chip], #library-options, [data-more]')) return;
     closeSheets();
   });
   pane.addEventListener('scroll', () => {
-    if (!chipSheet.hidden || !optionsSheet.hidden) closeSheets();
+    if (!chipSheet.hidden || !optionsSheet.hidden || !moreSheet.hidden) closeSheets();
   }, { passive: true });
 
   pane.addEventListener('click', (event) => {
@@ -597,11 +649,11 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
       drawTree(tree, doc, { area: state.area, counts: titleQuery() ? areaCounts(filterPapers(doc.papers, titleQuery())) : null, expanded });
       return;
     }
-    const scroll = event.target.closest('[data-scroll]');
-    if (scroll) {
+    const more = event.target.closest('[data-more]');
+    if (more) {
       event.preventDefault();
-      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-      document.getElementById(scroll.dataset.scroll)?.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
+      if (moreTile === more) closeMore();
+      else openMore(more);
       return;
     }
     const mode = event.target.closest('[data-timeline]');

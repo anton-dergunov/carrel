@@ -37,7 +37,7 @@ targets:
         SWIFT_VERSION: "6.0"
         SWIFT_STRICT_CONCURRENCY: minimal
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        # Signed to run on this Mac; a Developer ID for handing it to others is step 9's.
+        # Signed to run on this Mac; a Developer ID for handing it to others is step 8's.
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_IDENTITY: "-"
         ENABLE_HARDENED_RUNTIME: NO

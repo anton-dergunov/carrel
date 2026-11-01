@@ -1,13 +1,14 @@
 // Areas: the library by its topic folders. On a wide pane the tree sits beside the area's page;
-// on a narrow one the page alone, entered from the treemap and the subtopics' bars, with a
-// breadcrumb back up (CSS decides, by the pane's width).
+// on a narrow one the page alone, entered from the maps, with a breadcrumb back up (CSS decides,
+// by the pane's width).
 //
-// An area's page: its scope, its review's card, its subtopics as count bars, a histogram of
-// the years its papers were published (a tap narrows the rows to a year), then the rows, which
-// papers.js fills. The library's own page is a treemap of the top-level areas and the reviews.
+// An area's page: its scope, the map of its subtopics, its review's card, a histogram of the
+// years its papers were published (a tap narrows the rows to a year), then the rows, which
+// papers.js fills. While a search narrows it, the subtopics are bars of what matches instead.
+// The library's own page is the map of the top-level areas, every area as bars, and the reviews.
 
 import { ancestry, areaCounts, inArea, reviewFor, reviewsInside, shortDate, topicTree, yearCounts } from './library.js';
-import { keepLargest, squarify } from './treemap.js';
+import { layoutToFit, layoutTreemap, mapNodes } from './treemap.js';
 import { element, icon } from './rows.js';
 import { areaUrl, reviewUrl } from './tabs.js';
 
@@ -105,20 +106,21 @@ export function drawAreaPage(page, doc, { area, matches, query, year, searching 
   parts.push(head);
   if (topic?.scope) parts.push(element('p', 'lede', topic.scope));
 
-  if (!area && !query && !searching) {
-    parts.push(treemap(doc));
-    // Every area, as bars: the ones too small to name in the treemap are here too.
+  const map = query || searching ? null : areaMap(doc, area);
+  if (!area && map) {
+    parts.push(map);
+    // Every area, as bars: the list of the library, sorted, the ones the map merged too.
     const largest = childrenOf(doc, '').sort((a, b) => b.total - a.total);
     const every = subtopicBars(largest, doc.papers, '', doc, 'Every area');
-    every.id = 'all-areas';
     parts.push(every, reviewShelf(doc.reviews, 'Reviews'));
     page.replaceChildren(...parts);
     return null;
   }
 
+  if (map) parts.push(map);
   if (area) parts.push(reviewCard(area, doc.reviews));
   const children = childrenOf(doc, area);
-  if (children.length && !searching) parts.push(subtopicBars(children, inHere, area, doc));
+  if (children.length && !searching && !map) parts.push(subtopicBars(children, inHere, area, doc));
   const years = yearCounts(inHere);
   if (years.length > 1 && !searching) parts.push(histogram(years, year, area ? `var(--area-${hueOf(area, hues(doc))})` : 'var(--muted)'));
   const rows = element('div', 'rows-slot');
@@ -248,167 +250,119 @@ function histogram(years, chosen, hue) {
   return section;
 }
 
-// The treemap of the whole library.
-//
-// Every tile names its area and its count, or is merged: an area's subtopics too small for a
-// label become one "+N more" tile, which opens the area's page (its subtopic bars list them),
-// and the smallest areas one "+N more areas" tile, which goes to the list of every area under
-// the treemap. A label is measured before it is drawn (fitLabel), so it is never cut.
 
-const GUTTER = 3;
-const PAD = { x: 8, y: 5 }; // a label's padding inside its tile
-const SUB_PAD = { x: 6, y: 4 };
+// The area map: the library's areas, or an area's subtopics, as a treemap two levels deep, laid
+// out by treemap.js. Every tile names its topic and its count, or is merged into "+N more":
+// inside a tile, that tile's rest, which enters its area, whose own map names them; at the map's
+// own level, a card that lists them (moreCard). The library's map fills the pane under it; an
+// area's is as short as it can be while naming all it can.
 
-function treemap(doc) {
-  const box = element('div', 'treemap');
+const AREA_MAP = { min: 140, max: 640, share: 0.62 };
+const LIBRARY_MAP = { min: 340, margin: 16 };
+
+const widths = new Map();
+let canvas = null;
+let family = null;
+
+/** A text's width in the page's reading font, as the labels are drawn. */
+function measure(text, size, weight) {
+  const key = `${weight} ${size} ${text}`;
+  let width = widths.get(key);
+  if (width === undefined) {
+    canvas ??= document.createElement('canvas').getContext('2d');
+    family ??= getComputedStyle(document.documentElement).getPropertyValue('--reading').trim() || 'serif';
+    canvas.font = `${weight} ${size}px ${family}`;
+    width = canvas.measureText(text).width;
+    widths.set(key, width);
+  }
+  return width;
+}
+
+const held = new WeakMap(); // a "+N more" tile at the map's own level → what it holds
+
+/** The map of `area` ('' for the library), or null when it has no subtopics. */
+function areaMap(doc, area) {
+  const nodes = mapNodes(doc.topics, area, areaName);
+  if (!nodes.some((node) => !node.own)) return null;
+  const box = element('div', area ? 'treemap area-map' : 'treemap');
   box.setAttribute('role', 'list');
-  box.setAttribute('aria-label', 'The library by area');
+  box.setAttribute('aria-label', area ? `${areaName(area)} by subtopic` : 'The library by area');
   const hue = hues(doc);
-  const nodes = topicTree(doc.topics).map((node) => ({
-    value: node.total,
-    path: node.path,
-    children: node.children.map((child) => ({ value: child.total, path: child.path })),
-  }));
-  let width = 0;
+  let drawnWidth = 0;
+  let drawnHeight = 0;
   const draw = () => {
-    const now = box.clientWidth;
-    if (!now || now === width) return;
-    width = now;
-    const height = Math.round(Math.min(640, Math.max(340, now * 0.62)));
-    box.style.height = `${height}px`;
-    const drawn = [];
-    for (const tile of layoutTreemap(nodes, { x: 0, y: 0, width: now, height })) {
-      const area = tile.item.merged ? '' : tile.item.path;
-      const link = place(areaLink(area, 'tile', ''), tile);
-      link.setAttribute('role', 'listitem');
-      if (tile.item.merged) {
-        // The areas too small to name: the list of every area, under the treemap.
-        link.classList.add('more');
-        link.href = '#all-areas';
-        delete link.dataset.area;
-        link.dataset.scroll = 'all-areas';
-      }
-      link.style.setProperty('--hue', tile.item.merged ? 'var(--muted)' : `var(--area-${hueOf(area, hue)})`);
-      link.title = tileTitle(tile.item);
-      if (tile.label) link.append(drawLabel(tile.item, tile.label));
-      drawn.push(link);
-      for (const child of tile.children) {
-        // A merged subtopic tile opens its area's page, where the bars name them all.
-        const sub = place(areaLink(child.item.merged ? tile.item.path : child.item.path, 'tile sub', ''), child);
-        if (child.item.merged) sub.classList.add('more');
-        sub.style.setProperty('--hue', `var(--area-${hueOf(tile.item.path, hue)})`);
-        sub.title = tileTitle(child.item);
-        if (child.label) sub.append(drawLabel(child.item, child.label));
-        drawn.push(sub);
-      }
-    }
-    box.replaceChildren(...drawn);
+    if (!box.isConnected) return observer.disconnect();
+    const width = box.clientWidth;
+    if (!width) return;
+    const height = area ? 0 : libraryHeight(box, width);
+    if (width === drawnWidth && height === drawnHeight) return;
+    // The keyboard takes from the pane while the search box has it: the map stays as it was.
+    if (width === drawnWidth && document.activeElement?.matches('input, textarea')) return;
+    drawnWidth = width;
+    drawnHeight = height;
+    const laid = area
+      ? layoutToFit(nodes, width, { min: AREA_MAP.min, max: Math.round(Math.min(AREA_MAP.max, width * AREA_MAP.share)), measure })
+      : { ...layoutTreemap(nodes, { x: 0, y: 0, width, height }, { measure, more: 'areas' }), height };
+    box.style.height = `${laid.height}px`;
+    // What the map names, for scripts/shots.py.
+    Object.assign(box.dataset, { named: `${laid.named}/${laid.of}`, inner: `${laid.inner}/${laid.innerOf}`, smallest: String(laid.smallest ?? '') });
+    box.replaceChildren(...laid.tiles.flatMap((tile) => [drawTile(tile, area, hue, true), ...tile.children.map((child) => drawTile(child, tile.item.path, hue, false))]));
   };
-  new ResizeObserver(draw).observe(box);
+  const observer = new ResizeObserver(draw);
+  observer.observe(box);
+  if (!area) observer.observe(document.getElementById('papers-pane'));
   requestAnimationFrame(draw);
   return box;
 }
 
-// The rest, merged: laid out last, in the corner where the smallest tiles are.
-const merge = (members) => ({ merged: true, last: true, members, value: members.reduce((sum, item) => sum + item.value, 0), children: [] });
+/** The library's map: as tall as the pane leaves under it, between 340 px and as tall as wide. */
+function libraryHeight(box, width) {
+  const pane = box.closest('#papers-pane');
+  if (!pane) return Math.round(width * AREA_MAP.share);
+  const top = box.getBoundingClientRect().top - pane.getBoundingClientRect().top + pane.scrollTop;
+  return Math.round(Math.max(LIBRARY_MAP.min, Math.min(width, pane.clientHeight - top - LIBRARY_MAP.margin)));
+}
 
-/** What a tile says: its name, or for a merged one "+N more", then the count. */
-function tileText(item, top) {
-  if (!item.merged) return { name: areaName(item.path), count: number.format(item.value) };
-  return { name: `+${item.members.length} more${top ? ' areas' : ''}`, count: number.format(item.value) };
+/** A tile: a link to its topic; its rest, merged, a link into `parent` or (at the top) the card's. */
+function drawTile(tile, parent, hue, top) {
+  const { item } = tile;
+  let node;
+  if (item.own) {
+    // The papers filed in the topic itself: on its own page they are the rows below.
+    node = top ? element('div', 'tile own') : areaLink(item.path, 'tile own', '');
+  } else if (item.merged) {
+    node = areaLink(parent, 'tile more', '');
+    if (top) {
+      delete node.dataset.area;
+      node.dataset.more = '';
+      node.setAttribute('aria-haspopup', 'dialog');
+      held.set(node, { members: item.members, area: parent, hue });
+    }
+  } else {
+    node = areaLink(item.path, 'tile', '');
+  }
+  if (!top) node.classList.add('sub');
+  place(node, tile);
+  node.setAttribute('role', 'listitem');
+  const path = item.merged ? parent : item.path;
+  node.style.setProperty('--hue', path ? `var(--area-${hueOf(path, hue)})` : 'var(--muted)');
+  node.title = tileTitle(item);
+  if (tile.label) node.append(drawLabel(tile.label));
+  return node;
 }
 
 function tileTitle(item) {
-  if (!item.merged) return `${areaName(item.path)}: ${plural(item.value, 'paper')}`;
-  return item.members.map((member) => `${areaName(member.path)}: ${number.format(member.value)}`).join('\n');
+  if (item.merged) return item.members.map((member) => `${member.name}: ${number.format(member.value)}`).join('\n');
+  if (item.own) return `Filed in ${areaName(item.path)} itself: ${plural(item.value, 'paper')}`;
+  return `${item.name}: ${plural(item.value, 'paper')}`;
 }
 
-/**
- * The tiles to draw: the top-level areas, each with its label and, inside a tile large enough,
- * its subtopics below the label. Tiles that cannot hold a label are merged, at each level.
- */
-function layoutTreemap(nodes, rect) {
-  const half = GUTTER / 2;
-  const inset = (tile) => ({ ...tile, x: tile.x + half, y: tile.y + half, width: Math.max(0, tile.width - GUTTER), height: Math.max(0, tile.height - GUTTER) });
-  const topLabel = (tile, height = tile.height) => fitLabel(tileText(tile.item, true), tile.width - 2 * PAD.x, height - 2 * PAD.y, TOP_TEXT);
-  const { tiles: tops } = keepLargest(nodes, (items) => squarify(items, rect).map(inset), (tile) => topLabel(tile) !== null, merge);
-  return tops.map((tile) => {
-    const children = tile.item.children ?? [];
-    if (children.length < 2 || tile.width < 110 || tile.height < 90) return { ...tile, label: topLabel(tile), children: [] };
-    // The header takes what its label needs, at most a third of the tile.
-    const label = topLabel(tile, Math.max(30, tile.height / 3));
-    if (!label) return { ...tile, label: topLabel(tile), children: [] };
-    const header = label.height + 2 * PAD.y;
-    const area = { x: tile.x + half, y: tile.y + header, width: tile.width - GUTTER, height: tile.height - header - half };
-    const subLabel = (child) => fitLabel(tileText(child.item, false), child.width - 2 * SUB_PAD.x, child.height - 2 * SUB_PAD.y, SUB_TEXT);
-    const { tiles: laid, kept } = keepLargest(children, (items) => squarify(items, area).map(inset), (child) => subLabel(child) !== null, merge);
-    // Not even one subtopic can be named: the tile shows its own label alone.
-    if (!kept) return { ...tile, label: topLabel(tile), children: [] };
-    return { ...tile, label, children: laid.map((child) => ({ ...child, label: subLabel(child) })) };
-  });
+function place(node, rect) {
+  Object.assign(node.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` });
+  return node;
 }
 
-function place(element, rect) {
-  Object.assign(element.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.width}px`, height: `${rect.height}px` });
-  return element;
-}
-
-// Labels are measured with the page's own font: the name wraps between words, never inside one,
-// at the largest size from the text's own down to 11 px at which it fits; the count follows on
-// the name's last line when there is room, else on a line of its own. A label that does not fit
-// at 11 px is not drawn, and its tile is merged.
-const TOP_TEXT = { size: 15, weight: 600, count: 12 };
-const SUB_TEXT = { size: 13.5, weight: 400, count: 11.5 };
-const SMALLEST_TEXT = 11;
-const LINE = 1.2;
-const MOST_LINES = 3;
-const SAFETY = 4; // px: the canvas measures a little narrower than WebKit draws
-let measure = null;
-let family = null;
-
-function textWidth(text, size, weight) {
-  measure ??= document.createElement('canvas').getContext('2d');
-  family ??= getComputedStyle(document.documentElement).getPropertyValue('--reading').trim() || 'serif';
-  measure.font = `${weight} ${size}px ${family}`;
-  return measure.measureText(text).width;
-}
-
-/** The lines `words` wrap into at `width` px, or null when a word alone is wider. */
-function wrap(words, width, size, weight) {
-  const lines = [];
-  let line = '';
-  for (const word of words) {
-    if (textWidth(word, size, weight) > width) return null;
-    const longer = line ? `${line} ${word}` : word;
-    if (line && textWidth(longer, size, weight) > width) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = longer;
-    }
-  }
-  lines.push(line);
-  return lines;
-}
-
-/** How a label of {name, count} fits in `width` × `height` px: {size, countSize, below, height, said}, or null. */
-function fitLabel({ name, count }, width, height, text) {
-  const said = { name, count };
-  width -= SAFETY;
-  if (width <= 0 || height <= 0) return null;
-  for (let size = text.size; size >= SMALLEST_TEXT; size -= 0.5) {
-    const countSize = Math.min(text.count, size);
-    const lines = wrap(name.split(' '), width, size, text.weight);
-    if (!lines || lines.length > MOST_LINES) continue;
-    const countWidth = textWidth(count, countSize, 400) + 6;
-    const below = textWidth(lines.at(-1), size, text.weight) + countWidth > width;
-    const needed = lines.length * size * LINE + (below ? countSize * LINE : 0);
-    if (needed <= height) return { size, countSize, below, height: needed, said };
-  }
-  return null;
-}
-
-function drawLabel(item, fitted) {
+function drawLabel(fitted) {
   const { name, count } = fitted.said;
   const box = element('span', fitted.below ? 'label count-below' : 'label');
   box.style.fontSize = `${fitted.size}px`;
@@ -416,4 +370,27 @@ function drawLabel(item, fitted) {
   const tally = box.appendChild(element('span', 'count', count));
   tally.style.fontSize = `${fitted.countSize}px`;
   return box;
+}
+
+/**
+ * The card that a "+N more" tile at a map's own level opens: what it holds, largest first, each
+ * a row with a bar and a link to its page. Null for any other element.
+ */
+export function moreCard(tile) {
+  const what = held.get(tile);
+  if (!what) return null;
+  const { members, area, hue } = what;
+  const most = Math.max(1, ...members.map((member) => member.value));
+  const rows = members.map((member) => {
+    const row = member.own ? element('div', 'bar-row') : areaLink(member.path, 'bar-row', '');
+    row.append(element('span', 'name', member.name));
+    const track = row.appendChild(element('span', 'track'));
+    const bar = track.appendChild(element('span', 'bar-fill'));
+    bar.style.width = `${(member.value / most) * 100}%`;
+    bar.style.setProperty('--hue', `var(--area-${hueOf(member.path, hue)})`);
+    row.append(element('span', 'count', number.format(member.value)));
+    return row;
+  });
+  const title = area ? `${plural(members.length, 'more subtopic')} in ${areaName(area)}` : plural(members.length, 'more area');
+  return [element('div', 'sheet-header', title), ...rows];
 }

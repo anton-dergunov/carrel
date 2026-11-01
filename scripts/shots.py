@@ -3,12 +3,14 @@
     uv run --group shots python scripts/shots.py URL --out DIR [--size WxH | --landscape] [--dark]
         [--layout PLACE] [--tabs] [--find QUERY] [--highlight] [--settings] [--note TEXT]
         [--info] [--overview] [--type TEXT] [--chat ID] [--ask QUESTION] [--model M]
-        [--view areas|all|map] [--area TOPIC] [--rich] [--search Q [--text | --meaning]] [--review SCOPE [--peek]]
+        [--view areas|all|map] [--area TOPIC] [--more] [--rich] [--search Q [--text | --meaning]]
+        [--review SCOPE [--peek]]
 
 URL is a page of a running carrel: a reading page, e.g. http://127.0.0.1:8517/read/<pdf>, or
 the library, http://127.0.0.1:8517/. Takes a shot once the PDF, or the library, is drawn.
 --size sets the window (--landscape: 1180x820), --dark the dark theme. The library: --view
-starts it in Areas or All, --area at a topic (--rich with rich rows); --search types Q into its
+starts it in Areas or All, --area at a topic (--rich with rich rows), and prints how many of
+the area map's tiles are named; --more taps the map's "+N more" and shoots its card. --search types Q into its
 search box, and with --text searches the papers' text and taps the first snippet, which opens
 the paper at that page with Q in find; with --meaning it describes Q to meaning search and prints
 the nearest papers. --view map shows the meaning map whole, zooms in twice on a paper, taps it
@@ -442,6 +444,34 @@ def map_pass(page, args, out: Path) -> None:
         page.screenshot(path=out / "map-8-search-fit.png")
 
 
+def map_named(page) -> str:
+    """What the area map names: its tiles, the tiles inside them, and its smallest label."""
+    if not page.locator(".treemap").count():
+        return "-"
+    named, inner, smallest = (
+        page.get_attribute(".treemap", f"data-{key}") for key in ("named", "inner", "smallest")
+    )
+    return f"named {named}, inside {inner}, smallest {smallest} px"
+
+
+def more_pass(page, out: Path) -> None:
+    """The area map's "+N more" at its own level, and the card of what it holds."""
+    tile = page.locator(".treemap .tile[data-more]")
+    if not tile.count():
+        print("more: the map merged nothing at its own level")
+        return
+    tile.first.click()
+    page.wait_for_selector("#more-sheet:not([hidden])")
+    page.wait_for_timeout(300)
+    print(
+        "more:",
+        page.inner_text("#more-sheet .sheet-header"),
+        "|",
+        ", ".join(page.locator("#more-sheet .bar-row .name").all_inner_texts()),
+    )
+    page.screenshot(path=out / "library-more.png")
+
+
 def library_pass(page, args, out: Path) -> None:
     """The library: its view, an area, a search by titles, by text or by meaning."""
     page.wait_for_selector(LIBRARY_DRAWN, timeout=30_000)
@@ -464,12 +494,16 @@ def library_pass(page, args, out: Path) -> None:
         page.locator(".paper-row").count(),
         "| tiles:",
         page.locator(".treemap .tile").count(),
+        "| map:",
+        map_named(page),
         "| tree:",
         page.locator("#area-tree").is_visible(),
     )
     page.screenshot(
         path=out / f"library-{view}{'-' + args.area.replace('/', '-') if args.area else ''}.png"
     )
+    if args.more:
+        more_pass(page, out)
     if not args.search:
         return
     if args.text or args.meaning:
@@ -637,6 +671,7 @@ def main() -> None:
     parser.add_argument("--dark", action="store_true", help="the dark theme")
     parser.add_argument("--view", choices=["areas", "all", "map"], help="the library's view")
     parser.add_argument("--area", help="the library open at this topic")
+    parser.add_argument("--more", action="store_true", help="open the area map's +N more card")
     parser.add_argument("--rich", action="store_true", help="the library's rows, rich")
     parser.add_argument("--search", help="type this into the library's search box")
     parser.add_argument(

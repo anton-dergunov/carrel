@@ -22,11 +22,17 @@ def records(name: str) -> list[dict]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
+# The tablet's own settings, as the bench's form names them.
+SETTINGS = ("contrast", "enhance", "dither", "refresh", "notes")
+
+
 def device_of(record: dict) -> str:
-    """The device's name as typed in the bench, with its own contrast when one was given."""
+    """The device's name as typed in the bench, with its own settings as typed (the colour mode
+    went into Refresh, or into Notes), so picks made under different settings are counted apart."""
     tablet = record.get("tablet") or {}
     name = tablet.get("device") or record["device"]["userAgent"][:40]
-    return f"{name} (contrast {tablet['contrast']})" if tablet.get("contrast") else name
+    settings = [f"{key} {tablet[key]}" for key in SETTINGS if tablet.get(key)]
+    return f"{name} ({'; '.join(settings)})" if settings else name
 
 
 def main() -> None:
@@ -63,9 +69,9 @@ def main() -> None:
     measured = records("measurements.jsonl")
     if measured:
         print(
-            "\n| Device | Paper width | Cap | Canvas | Share of device pixels | Drawn (ms) | After a turn (ms) |"
+            "\n| Device | Paper | Glyphs | Cap | Canvas | Share of device pixels | Drawn (ms) | After a turn (ms) |"
         )
-        print("|---|---|---|---|---|---|---|")
+        print("|---|---|---|---|---|---|---|---|")
         for m in measured:
             for detail in (False, True):
                 events = [e for e in m["events"] if e["detail"] == detail and e["ofDevice"]]
@@ -75,7 +81,8 @@ def main() -> None:
                 drawn = sorted(e["drawMs"] or 0 for e in events)[len(events) // 2]
                 after = sorted(e["afterTurnMs"] for e in events)[len(events) // 2]
                 print(
-                    f"| {device_of(m)} | {m['paperWidth']} | {m['cap']} | {'detail' if detail else 'page'} "
+                    f"| {device_of(m)} | {m['crop']} | {m.get('fonts', 'face')} | {m['cap']} "
+                    f"| {'detail' if detail else 'page'} "
                     f"| {share:.0%} | {drawn} | {after} |"
                 )
 

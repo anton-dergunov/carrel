@@ -1,6 +1,6 @@
 # Plan: crisp pages on e-ink (research)
 
-**This is research, with the reader in the loop.** It is a session of its own, not a change to make between others. Nothing is chosen in advance: the reader looks at the candidates on the e-ink tablet itself and picks, round after round, and the settings carrel ends up with come from those picks. E-ink is the reader's main reading device, so this is worth doing thoroughly. Built so far: the bench and round 1's crops, in [experiments/crisp-pages](../experiments/crisp-pages/README.md); no picks yet.
+**This is research, with the reader in the loop.** It is a session of its own, not a change to make between others. Nothing is chosen in advance: the reader looks at the candidates on the e-ink tablet itself and picks, round after round, and the settings carrel ends up with come from those picks. E-ink is the reader's main reading device, so this is worth doing thoroughly. Built so far: the bench, and round 1 on the Boox in two colour modes, the iPad begun ([experiments/crisp-pages](../experiments/crisp-pages/README.md)): glyphs as paths, a light embolden, a mild tone curve and a threshold for scans are kept, the rest dropped, and every one of them depends on the paper.
 
 ## The problem
 
@@ -45,6 +45,6 @@ Picked from the library, two or three of each, the same crops every round:
 
 ## What it should end in
 
-- A **Pages** part in the Settings dialog, each device's own: probably more than one choice, for example a strength for text and a mode for scans, or a few named presets (*Text*, *Scan*), with defaults for e-ink and none elsewhere.
+- **Options for a paper, not one setting for all pages** (round 1: which knob helps, and how much, depends on the paper). Each paper can turn on glyphs as paths, a light embolden, a mild tone curve or, for a scan, a threshold, on each device; how a paper is given a sensible choice to start with (its fonts, its kind), where the choice is kept, and what the Settings dialog still sets for every page are round 2's questions.
 - What it costs to draw a page with it, on the Boox and the iPad.
 - A line in architecture.md on what was chosen and why, with the picks that settled it.

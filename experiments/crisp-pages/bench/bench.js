@@ -117,16 +117,20 @@ const KNOBS = {
   tone: { name: 'Tone curve', levels: [1.25, 1.5, 1.8, 2.2, 2.7, 3.3], set: (r, v) => ({ ...r, tone: v }), show: (v) => `gamma ${v}` },
   embolden: {
     name: 'Embolden',
-    levels: [0.1, 0.18, 0.25, 0.35, 0.5, 0.7],
+    levels: [0.05, 0.1, 0.18, 0.25, 0.35, 0.5, 0.7], // 0.05 added after round 1 on the Boox: 0.1 won most
     set: (r, v) => ({ ...r, embolden: v }),
     show: (v) => `stroke ${v} pt`,
     applies: textOnly,
   },
+  // Glyphs as paths does two things: PDF.js fills its own outlines of every glyph instead of
+  // the browser drawing a font, and a font the PDF does not embed comes from PDF.js's standard
+  // fonts instead of the system's. 'standard' is the second alone: on a paper that embeds all
+  // its fonts it is the baseline again.
   glyphs: {
     name: 'Glyphs as paths',
-    levels: ['paths'],
-    set: (r) => ({ ...r, fonts: 'paths' }),
-    show: () => 'glyphs drawn as paths',
+    levels: ['paths', 'standard'],
+    set: (r, v) => ({ ...r, fonts: v }),
+    show: (v) => (v === 'paths' ? 'glyphs drawn as paths' : "PDF.js's fonts for those not embedded"),
     applies: textOnly,
   },
   laptop: {
@@ -157,7 +161,7 @@ const BASES = { full: RECIPE, laptop: { ...RECIPE, laptop: { aa: 8 } } };
 function describe(recipe) {
   const parts = [];
   for (const [name, knob] of Object.entries(KNOBS)) {
-    const value = name === 'glyphs' ? (recipe.fonts === 'paths' ? 'paths' : null) : recipe[name];
+    const value = name === 'glyphs' ? (recipe.fonts === 'face' ? null : recipe.fonts) : recipe[name];
     if (value !== null && value !== RECIPE[name] && !(name === 'res' && value === 1)) parts.push(knob.show(value));
   }
   return parts.join(', ') || 'as carrel draws it';
@@ -166,11 +170,12 @@ function describe(recipe) {
 // ---- Drawing a variant ----
 
 const documents = new Map();
-function documentFor(id, embolden, paths) {
-  const key = `${id}|${embolden}|${paths}`;
+function documentFor(id, embolden, fonts) {
+  const key = `${id}|${embolden}|${fonts}`;
   if (!documents.has(key)) {
     const url = `/pdf/${encodeURIComponent(id)}${embolden ? `?embolden=${embolden}` : ''}`;
-    const task = pdfjsLib.getDocument({ ...DOCUMENT, url, disableFontFace: paths });
+    const options = fonts === 'face' ? {} : { disableFontFace: fonts === 'paths', useSystemFonts: false };
+    const task = pdfjsLib.getDocument({ ...DOCUMENT, url, ...options });
     documents.set(key, task.promise);
   }
   return documents.get(key);
@@ -275,7 +280,7 @@ async function draw(crop, recipe) {
     const img = await loadImage(`/render/${encodeURIComponent(crop.id)}?${query}`);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   } else {
-    const pdf = await documentFor(crop.id, recipe.embolden, recipe.fonts === 'paths');
+    const pdf = await documentFor(crop.id, recipe.embolden, recipe.fonts);
     const page = await pdf.getPage(1);
     const viewport = page.getViewport({ scale });
     ctx.fillStyle = '#fff';
@@ -429,6 +434,7 @@ async function measure() {
   measuring = true;
   const crop = crops.find((c) => c.id === $('measure-paper').value);
   const capped = $('measure-cap').value === 'carrel';
+  const paths = $('measure-fonts').value === 'paths';
   const log = $('measure-log');
   log.textContent = 'Opening…\n';
   const box = $('measure-viewer');
@@ -468,7 +474,7 @@ async function measure() {
       error: error ? String(error) : undefined,
     });
   });
-  const task = pdfjsLib.getDocument({ ...DOCUMENT, url: `/pdf/${encodeURIComponent(crop.id)}?whole=1` });
+  const task = pdfjsLib.getDocument({ ...DOCUMENT, url: `/pdf/${encodeURIComponent(crop.id)}?whole=1`, disableFontFace: paths });
   const pdf = await task.promise;
   const ready = new Promise((resolve) => eventBus.on('pagesinit', resolve, { once: true }));
   viewer.setDocument(pdf);
@@ -493,8 +499,8 @@ async function measure() {
       `p${e.page} ${e.detail ? 'detail' : 'page  '} ${e.canvas?.join('×')} for ${e.css?.join('×')} css: ${Math.round((e.ofDevice ?? 0) * 100)}% of device px, ` +
       `drawn ${e.drawMs} ms, ${e.afterTurnMs} ms after the turn${e.error ? ` ERROR ${e.error}` : ''}`,
   );
-  log.textContent = `${crop.title}, cap ${capped ? 'PDF.js' : 'none'}, scale ${viewer.currentScale.toFixed(3)}\n${lines.join('\n')}\n`;
-  const record = { kind: 'measure', round: ROUND, crop: crop.id, cap: capped ? 'pdfjs' : 'none', scale: viewer.currentScale, paperWidth: container.clientWidth, events, device: facts(), tablet: tablet() };
+  log.textContent = `${crop.title}, cap ${capped ? 'PDF.js' : 'none'}, glyphs ${paths ? 'as paths' : 'as carrel'}, scale ${viewer.currentScale.toFixed(3)}\n${lines.join('\n')}\n`;
+  const record = { kind: 'measure', round: ROUND, crop: crop.id, cap: capped ? 'pdfjs' : 'none', fonts: paths ? 'paths' : 'face', scale: viewer.currentScale, paperWidth: container.clientWidth, events, device: facts(), tablet: tablet() };
   const response = await fetch('/api/measure', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(record) }).catch(() => ({ ok: false }));
   log.textContent += response.ok ? 'Saved.\n' : 'Not saved.\n';
   viewer.setDocument(null);

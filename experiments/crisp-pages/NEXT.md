@@ -1,26 +1,42 @@
-# Crisp pages: where round 1 stands (1 Nov 2026)
+# Crisp pages: where the research stands (1 Nov 2026, evening)
 
-For the next session: read this, then [README.md](README.md) (method, knobs, crops, how to run), then `uv run python experiments/crisp-pages/summary.py` for the picks so far. The research plan is [docs/plan-crisp-pages.md](../../docs/plan-crisp-pages.md).
+For the next session: read this, then [README.md](README.md) (method, knobs, crops, round 1's results), then run `uv run python experiments/crisp-pages/summary.py` for every pick and measurement so far. The research plan is [docs/plan-crisp-pages.md](../../docs/plan-crisp-pages.md).
 
 ## Done
 
-- The bench is built and works on the Boox: `bench.py` (server), `bench/` (the page), `papers.yaml` (15 crops of 6 kinds), `stills.py`, `summary.py`, `find_papers.py`. The reader runs the server in their own terminal; `tailscale serve --bg --https=8444 http://127.0.0.1:8519` publishes it.
-- **Boox measured** (`measurements.jsonl`, two papers, PDF.js's cap). Chrome there: `devicePixelRatio` 2.8125, window 853×1012 CSS px (2400×3200 device px); the paper at page width is 821–853 CSS px. The page's canvas is drawn at 42% of the device's pixels, and the detail canvas then redraws the part in view at 100%, typically 0.1–0.4 s after a turn and about 1 s at worst (GPT-3 pp. 3 and 5). So the page in view is at full resolution once it settles; it is soft only briefly after a turn.
-- **Boox, knobs Resolution and Tone curve swept** (`picks.jsonl`, 23 picks, 14:31–14:45). The reader's words: on Resolution "anything but the worst option (without the detail layer) looked good enough; I was basically just guessing what's better". On Tone curve "the difference is very minimal; I tend to prefer the smaller boost, but it's nuanced. Most papers are strangely good enough already."
-  - Resolution over full resolution: 1.25× picked 9 times, 1.5× 3, the baseline 6 (scans 2 of 2, maths 2 of 3, Word 2 of 3). Read as noise, as the reader says, apart from "before the detail canvas" never being picked.
-  - Tone curve: gamma 1.25 ×2, 1.5 ×1, 1.8 ×4, baseline ×1, over 7 screens (no scans or maths yet). A slight lean towards a mild curve.
+- The bench (`bench.py`, `bench/`, `papers.yaml`, `stills.py`, `summary.py`, `find_papers.py`). The reader runs the server in their own terminal; `tailscale serve --bg --https=8444 http://127.0.0.1:8519` publishes it.
+- **Round 1 on the Boox Tab X C, colour mode Optimal**: 127 picks and 16 measurements, written up in the README's Results. In short:
+  - **Keep:** glyphs as paths (the reader's favourite), embolden at 0.1–0.18 pt, a mild tone curve (gamma 1.25–1.8), and a threshold for scans (the one cut, 45–65%: rarely needed, but the reader wants it for the scans where it helps).
+  - **Drop:** sharpen, contrast, drawn on the laptop (and it would slow every page), resolution beyond the detail canvas.
+  - **Every improvement depends on the paper**, so they are options for a paper, not one setting for all pages. This is the reader's decision.
+  - The page in view is at full resolution once PDF.js's detail canvas is drawn, 0.1–0.4 s after a turn. Without the detail canvas it is much worse.
+- **Round 1 again on the Boox in Custom High Contrast** with the reader's own colour adjustments (108 picks, the bench unchanged, so comparable): the same conclusions, the knobs mattering less (the baseline won more often, lower strengths picked). The reader prefers the default mode with the knobs: more nuanced pages. This mode is not a target.
+- **The iPad begun:** Resolution on all 15 crops. The page there is under PDF.js's cap, drawn whole at full resolution at once, so the Resolution knob has nothing to show; the reader saw almost no difference.
+- **A caution on close calls:** the top row (A, B) was picked about twice as often as the bottom row on the Boox, and on the iPad every non-"no difference" pick was A. Tone curve and resolution tallies are weak evidence; glyphs, embolden and sharpen's "no difference" are clear.
+- After the two Boox passes, two changes to the bench: the Glyphs knob shows a third cell, PDF.js's standard fonts alone (`useSystemFonts: false`, the browser still drawing the font), to tell its two effects apart; Embolden starts at 0.05 pt. Measure has a Glyphs choice, to time a paper drawn as paths in carrel's own viewer.
 
-## Open
+## Under way (the reader, 1 Nov)
 
-1. **What contrast was the Boox set to for these picks?** The Device form's Contrast field was empty (the Refresh field says "Color mode: Optimal"). Ask the reader, and add it to these 23 picks by hand in `picks.jsonl` (`tablet.contrast`) if they know. From now on the field is filled before judging; `summary.py` splits rows by it.
-2. **"Most papers are good enough already."** The problem was thin grey text at the tablet's default contrast. If the bench's baseline looks fine at the default contrast, the problem may have been something carrel did then and does not now (its heavier e-ink text is gone), or something in carrel's page the bench lacks (the text layer, the previews behind the page, Dark pages, the page's own colours). Check: open one of the crops' papers in carrel on the Boox, beside the bench's baseline of the same crop, at the default contrast.
-3. **The rest of round 1 on the Boox**, in this order: Embolden, Drawn on the laptop, Sharpen, Contrast, Glyphs as paths; the two thresholds on the scans. About one crop of each kind a knob.
-4. **A second Boox contrast setting:** only the knobs that won at the default, plus Resolution as a reference.
-5. **iPad and phone:** Measure once each, then the knobs that did something on the Boox.
-6. Then: round 2 (combine the winners, tune their strengths) or, if nothing beats the baseline clearly, conclude that carrel's pages need no Pages setting and say why in the README.
+1. The iPad (Chrome), then the MacBook, with the knobs kept (Glyphs, Embolden, Tone curve, the thresholds on scans); Resolution only as a reference.
+2. Then back on the Boox (Optimal) for the changed Glyphs knob (its third cell) and Embolden's 0.05 pt, and Measure once with Glyphs: as paths.
+
+The tablet's settings go in the Device tab (a colour mode went into Refresh on the first pass and into Notes on the second); `summary.py` splits rows by every one of those fields.
+
+## Next
+
+1. **Fold in the iPad, the Mac and the Boox's second visit**: does the same set win, at the same strengths? On the iPad and the Mac the system has Times and Arial, so glyphs as paths may matter less there; the third Glyphs cell tells the font fix from the outlines.
+2. **Glyphs as paths, its two effects**: from the third cell, is it the standard fonts (only papers that do not embed theirs) or the outlines (every paper)?
+3. **What each kept knob costs to draw**: Measure on the Boox with glyphs as paths against as carrel, on two or three papers. The cell times in `picks.jsonl` include loading a document and do not compare.
+4. **Round 2, the kept knobs combined** (paths + embolden + tone), on the papers where each won, with strengths tuned. The bench draws one knob over a base; combining needs a base made of the round-1 winners (a small change to `BASES` in `bench.js`).
+5. **Per paper**, which the design now has to answer:
+   - Can a paper's features predict which option helps (fonts not embedded → paths; thin Type 1 → embolden; Word → leave it), so a paper starts with a sensible choice and the reader only corrects it?
+   - Where is the choice kept: per paper and per device (a paper may want embolden on the Boox, not on the iPad), in carrel's state folder or in the browser's `localStorage`? The reader's own data (`catalog/reader.yaml`) is the engine's; ask before using it.
+   - How does each option ship in carrel: paths and the standard fonts are `getDocument` options; the tone curve and the scans' threshold are filters beside Dark pages; emboldening was done here by rewriting a copy of the page on the laptop, which carrel cannot do to the reader's PDF, so it needs another route (PDF.js has no stroke option for text: to be researched).
+6. Then round 3 (a sitting reading whole papers with the options on) and the Pages part of carrel's Settings.
 
 ## Notes
 
-- `gpt3-body` under Resolution was picked twice four seconds apart (14:31:44 and :48), probably a reload; `summary.py` counts both. Drop one when writing results up.
-- `stills.py`'s Boox now uses the measured 853×1012 at 2.8125.
-- Nothing is committed yet; the commit messages suggested in the first session cover the bench and the summary change.
+- The Contrast field was empty for the Optimal pass, so the Boox's contrast for those picks is not on record.
+- Position bias: the bench shuffles the cells, so it does not skew a knob's tally one way, but it adds noise. If it matters in round 2, show two cells at a time, side by side, so there is no top row.
+- `gpt3-body` under Resolution was picked twice four seconds apart (14:31:44 and :48); `summary.py` counts both, and the README notes it.
+- `stills.py`'s Boox is the measured 853×1012 at 2.8125.

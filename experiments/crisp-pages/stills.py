@@ -23,7 +23,7 @@ HERE = Path(__file__).resolve().parent
 MOBILE_CAP = 5242880  # PDF.js's canvas cap on Android and iOS, which desktop Chromium lacks
 DEVICES = {
     # name: (CSS width, CSS height, device pixel ratio)
-    "boox": (1200, 1530, 2.0),
+    "boox": (853, 1012, 2.8125),  # measured: Chrome on the Boox Tab X C
     "ipad": (820, 1180, 2.0),
     "phone": (412, 860, 2.625),
 }

@@ -1,4 +1,4 @@
-"""What the picks say so far: for each device, knob and kind of page, how often the baseline,
+"""What the picks say so far: for each device (and its own contrast setting), knob and kind of page, how often the baseline,
 no difference, or each strength was picked.
 
     uv run python experiments/crisp-pages/summary.py [--round 1] [--device boox]
@@ -23,7 +23,10 @@ def records(name: str) -> list[dict]:
 
 
 def device_of(record: dict) -> str:
-    return (record.get("tablet") or {}).get("device") or record["device"]["userAgent"][:40]
+    """The device's name as typed in the bench, with its own contrast when one was given."""
+    tablet = record.get("tablet") or {}
+    name = tablet.get("device") or record["device"]["userAgent"][:40]
+    return f"{name} (contrast {tablet['contrast']})" if tablet.get("contrast") else name
 
 
 def main() -> None:

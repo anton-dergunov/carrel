@@ -2,7 +2,7 @@
 
 **Question.** On the Boox Tab X C (13.3", 3200×2400, Kaleido 3, Chrome) a paper's text looks thin and grey, and turning the tablet's contrast up makes carrel's chat and library far too heavy. What, done to the page alone, makes it crisp enough that the tablet's contrast can stay at its default? The plan, the candidates and why: [docs/plan-crisp-pages.md](../../docs/plan-crisp-pages.md).
 
-**Status.** Round 1 (one knob at a time) is ready to run; nothing is picked yet.
+**Status.** Round 1 under way on the Boox: measured, and Resolution and Tone curve swept. Where it stands and what is next: [NEXT.md](NEXT.md).
 
 ## Method
 
@@ -64,4 +64,8 @@ Results: [picks.jsonl](picks.jsonl) and [measurements.jsonl](measurements.jsonl)
 
 ## Results
 
-None yet.
+Preliminary, Boox only; see [NEXT.md](NEXT.md).
+
+- **What PDF.js draws there** (Measure): `devicePixelRatio` 2.8125, the page's canvas at 42% of the device's pixels, the detail canvas at 100% typically 0.1–0.4 s after a turn, about 1 s at worst.
+- **Resolution:** anything with the detail canvas looked good enough; the reader was guessing between full resolution and more (1.25× picked 9 times, 1.5× 3, baseline 6). Only the page before its detail canvas was clearly worse.
+- **Tone curve:** a mild curve preferred slightly (gamma 1.25–1.8 picked 6 times of 7), the difference small.

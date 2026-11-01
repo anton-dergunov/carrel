@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { axisFor, coastStep, onAxis, releaseVelocity } from '../src/carrel/static/pan.js';
+import { axisFor, carriedSpeed, coastStep, onAxis, releaseVelocity, withCarry } from '../src/carrel/static/pan.js';
 
 /** A move of `length` px at `degrees` from straight down. */
 function at(degrees, length = 100) {
@@ -31,15 +31,34 @@ test('a move kept to its axis', () => {
   assert.deepEqual(onAxis('both', 30, 30), { dx: 30, dy: 30 });
 });
 
-test('the speed at release is the last moves’, on the axis', () => {
+test('the speed at release weighs the last three moves, the newest least, on the axis', () => {
   const samples = [
     { t: 0, x: 0, y: 0 },
-    { t: 100, x: 5, y: 50 },
-    { t: 150, x: 10, y: 100 },
-    { t: 200, x: 15, y: 150 },
+    { t: 16, x: 0, y: 10 }, // 0.625 px/ms, too old to count
+    { t: 32, x: 0, y: 26 }, // 1 px/ms, weighed 0.6
+    { t: 48, x: 8, y: 58 }, // 2 px/ms, weighed 0.35
+    { t: 64, x: 8, y: 106 }, // 3 px/ms, weighed 0.05
   ];
-  assert.deepEqual(releaseVelocity(samples, 'y', 210), { vx: 0, vy: 1 });
-  assert.deepEqual(releaseVelocity(samples, 'both', 210), { vx: 0.1, vy: 1 });
+  const { vx, vy } = releaseVelocity(samples, 'y', 70);
+  assert.equal(vx, 0);
+  assert.ok(Math.abs(vy - (0.6 * 1 + 0.35 * 2 + 0.05 * 3)) < 1e-9, String(vy));
+  assert.ok(Math.abs(releaseVelocity(samples, 'both', 70).vx - 0.35 * 0.5) < 1e-9);
+});
+
+test('a short flick of one or two moves still coasts at its speed', () => {
+  const one = [
+    { t: 0, x: 0, y: 0 },
+    { t: 16, x: 0, y: -32 },
+  ];
+  assert.deepEqual(releaseVelocity(one, 'y', 20), { vx: 0, vy: -2 });
+});
+
+test('a release is no faster than 8 px/ms', () => {
+  const samples = [
+    { t: 0, x: 0, y: 0 },
+    { t: 10, x: 0, y: 200 },
+  ];
+  assert.equal(releaseVelocity(samples, 'y', 12).vy, 8);
 });
 
 test('a finger that stopped before lifting does not coast', () => {
@@ -47,8 +66,25 @@ test('a finger that stopped before lifting does not coast', () => {
     { t: 0, x: 0, y: 0 },
     { t: 50, x: 0, y: 80 },
   ];
-  assert.deepEqual(releaseVelocity(samples, 'y', 200), { vx: 0, vy: 0 });
+  assert.deepEqual(releaseVelocity(samples, 'y', 100), { vx: 0, vy: 0 });
   assert.deepEqual(releaseVelocity([], 'y', 0), { vx: 0, vy: 0 });
+});
+
+test('a flick while coasting adds to the speed, as iOS does', () => {
+  // Flutter's fit: 3000 px/s carries 0.000816 · 3000^1.967 px/s.
+  const carried = carriedSpeed(3);
+  assert.ok(Math.abs(carried - (0.000816 * 3000 ** 1.967) / 1000) < 1e-9);
+  assert.ok(carriedSpeed(-3) < 0);
+  assert.equal(carriedSpeed(1000), 40);
+  assert.ok(Math.abs(withCarry(3, carried) - (3 + carried)) < 1e-9);
+});
+
+test('a flick against the coast, or much slower than it, carries nothing', () => {
+  assert.equal(withCarry(-3, carriedSpeed(3)), -3);
+  assert.equal(withCarry(1, 4), 1);
+  assert.equal(withCarry(2, 0), 2);
+  assert.equal(withCarry(0, 3), 0);
+  assert.equal(withCarry(30, 30), 40);
 });
 
 test('coasting slows at UIScrollView’s rate, and one slow frame goes as far as two', () => {

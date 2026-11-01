@@ -1,5 +1,5 @@
 // What the library knows of a paper, in the page badge's sheet, with no model call: the title
-// and byline, then sections that fold with a tap (About, the agent's reading, its digest, the
+// with the reader's star, the byline and the reader's tags, then sections that fold with a tap (About, the agent's reading, its digest, the
 // similar papers, the contents), then Overview and Remove. Each section's header says what is
 // inside, so a folded one still tells the reader whether to open it. Which sections are folded
 // is kept per device.
@@ -8,6 +8,7 @@ import { areaName } from './areas.js';
 import { TYPE_ICONS } from './library.js';
 import { commandLog, runCommand } from './library-edits.js';
 import { drawMarkdown } from './markdown.js';
+import { starButton, tagLine } from './marks.js';
 import { element, icon } from './rows.js';
 
 const SHEET_KEY = 'carrel.sheet';
@@ -33,10 +34,39 @@ export function digestPoints(digest) {
   return (String(digest ?? '').match(/^[-*] /gm) ?? []).length;
 }
 
-/** "9 entries": the contents' top level. */
-export function contentsNote(items) {
-  if (!items.length) return 'no table';
-  return items.length === 1 ? '1 entry' : `${items.length} entries`;
+/** "9 entries · 4 highlights": the contents' top level, and the reader's highlights. */
+export function contentsNote(items, highlights = 0) {
+  const entries = !items.length ? (highlights ? '' : 'no table') : items.length === 1 ? '1 entry' : `${items.length} entries`;
+  const marked = highlights ? `${highlights} highlight${highlights === 1 ? '' : 's'}` : '';
+  return [entries, marked].filter(Boolean).join(' · ');
+}
+
+/**
+ * The highlights among the contents: each goes under the last entry that leads to a place at or
+ * above it (by page, then points from the page's top), or before them all. `places` are the
+ * entries' places in the outline's order, depth first, null for one that leads nowhere;
+ * `highlights` are in the paper's order. Returns {before: [highlight], under: Map(entry's index
+ * → [highlight])}.
+ */
+export function interleave(places, highlights) {
+  const entries = places
+    .map((place, index) => (place ? { ...place, index } : null))
+    .filter(Boolean)
+    .sort((a, b) => a.page - b.page || a.top - b.top || a.index - b.index);
+  const before = [];
+  const under = new Map();
+  for (const highlight of highlights) {
+    // A heading's place is the top of the view it opens, a little above its line.
+    const top = highlight.rect?.[1] ?? 0;
+    let found = null;
+    for (const entry of entries) {
+      if (entry.page < highlight.page || (entry.page === highlight.page && entry.top <= top + 2)) found = entry;
+      else break;
+    }
+    if (found) under.set(found.index, [...(under.get(found.index) ?? []), highlight]);
+    else before.push(highlight);
+  }
+  return { before, under };
 }
 
 /** "position · data centric ml". */
@@ -127,13 +157,15 @@ export function startPaperSheet({ info, similar, actions, isCurrent, close, show
     const title = fields.title ?? paper.title;
 
     const head = element('header', 'paper-head');
-    head.append(element('h2', 'paper-title', title));
+    const titleRow = head.appendChild(element('div', 'title-row'));
+    titleRow.append(element('h2', 'paper-title', title), starButton(file, paper.starred));
     const byline = head.appendChild(element('p', 'byline'));
     if (fields.authors?.length) byline.append(authors([fields.authors].flat()));
     if (fields.published) byline.append(element('span', 'year', String(fields.published).slice(0, 4)));
     const where = source(fields);
     if (where) byline.append(where);
     if (!byline.childElementCount) byline.remove();
+    head.append(tagLine(file, paper.tags));
     info.append(head);
 
     const type = fields.type ?? note?.type;

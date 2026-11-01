@@ -5,6 +5,7 @@ import {
   areaCounts,
   chipsOn,
   defaultLibraryState,
+  emptyChips,
   filterPapers,
   foundOutsideTitle,
   groupOf,
@@ -26,8 +27,8 @@ const doc = () =>
     papers: [
       { pdf: 'llm/eval/a.pdf', text: 'library/llm/eval/a.txt', title: 'Judging judges', authors: ['Lin Shi'], published: '2024-06-01', added: '2026-10-01', summary: 'Position bias in judges.', topic: 'llm/eval', type: 'study', reviews: ['llm/eval'] },
       { pdf: 'llm/eval/b.pdf', text: 'library/llm/eval/b.txt', title: '$\\tau$-bench', published: '2024-02-01', added: '2026-10-16', topic: 'llm/eval', type: 'benchmark', chats: 3 },
-      { pdf: 'llm/c.pdf', text: 'library/llm/c.txt', title: 'Attention', published: '2017-06-12', added: '2026-09-30', topic: 'llm', overview: true },
-      { pdf: 'recsys/d.pdf', text: 'library/recsys/d.txt', title: 'Wide & Deep', topic: 'recsys', type: 'method' },
+      { pdf: 'llm/c.pdf', text: 'library/llm/c.txt', title: 'Attention', published: '2017-06-12', added: '2026-09-30', topic: 'llm', overview: true, tags: ['carrel', 'memory-talk'], highlights: 4 },
+      { pdf: 'recsys/d.pdf', text: 'library/recsys/d.txt', title: 'Wide & Deep', topic: 'recsys', type: 'method', starred: '2026-10-31', tags: ['carrel'] },
     ],
     topics: [
       { path: 'llm', scope: 'LLMs', count: 1, total: 3 },
@@ -57,6 +58,19 @@ test('chips: areas, types, years and what was touched', () => {
   assert.deepEqual(titles(filterPapers(papers, '', { from: 2018, to: 2024 })), ['Judging judges', 'τ-bench']);
   assert.deepEqual(titles(filterPapers(papers, '', { touched: ['overview', 'chat'] })), ['τ-bench', 'Attention']);
   assert.equal(chipsOn(defaultLibraryState().chips), false);
+});
+
+test("chips: the reader's tags, stars and highlights", () => {
+  const { papers } = doc();
+  assert.deepEqual(titles(filterPapers(papers, '', { tags: ['carrel'] })), ['Attention', 'Wide & Deep']);
+  assert.deepEqual(titles(filterPapers(papers, '', { tags: ['memory-talk', 'nope'] })), ['Attention']);
+  assert.deepEqual(titles(filterPapers(papers, '', { touched: ['starred'] })), ['Wide & Deep']);
+  assert.deepEqual(titles(filterPapers(papers, '', { touched: ['highlights'] })), ['Attention']);
+  assert.equal(chipsOn({ ...emptyChips(), tags: ['carrel'] }), true);
+  // A tag's name is searched, and said where it was found.
+  assert.deepEqual(titles(filterPapers(papers, 'memory')), ['Attention']);
+  const attention = papers.find((paper) => paper.title === 'Attention');
+  assert.deepEqual(foundOutsideTitle(attention, ['memory']), [{ field: 'tags', text: 'memory-talk', ranges: [[0, 6]] }]);
 });
 
 test('sorting, and the headings rows fall under', () => {
@@ -166,7 +180,7 @@ test("a device's remembered library is checked", () => {
     density: 'huge',
     sort: 'published',
     depth: 'text',
-    chips: { areas: ['llm', 7], types: ['method', 'poem', 'none'], from: 2019, to: 'x', touched: ['chat', 'other'] },
+    chips: { areas: ['llm', 7], types: ['method', 'poem', 'none'], from: 2019, to: 'x', tags: ['carrel', 3], touched: ['chat', 'starred', 'other'] },
   });
   assert.equal(restoreLibrary({ view: 'graph' }).view, 'desk');
   assert.equal(restoreLibrary({ view: 'map' }).view, 'map');
@@ -178,6 +192,6 @@ test("a device's remembered library is checked", () => {
     sort: 'published',
     depth: 'text',
     timeline: 'published',
-    chips: { areas: ['llm'], types: ['method', 'none'], from: 2019, to: null, touched: ['chat'] },
+    chips: { areas: ['llm'], types: ['method', 'none'], from: 2019, to: null, tags: ['carrel'], touched: ['chat', 'starred'] },
   });
 });

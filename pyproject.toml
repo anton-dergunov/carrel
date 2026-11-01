@@ -11,6 +11,7 @@ dependencies = [
     "claude-agent-sdk==0.2.174",
     "contourpy>=1.2",
     "numpy>=2",         # meaning.py, imported from the engine: the papers' vectors
+    "pymupdf>=1.26",    # AGPL-3.0; highlights.py, imported from the engine: the highlights in the PDFs
     "pyyaml>=6",        # paperlib.py, imported from the engine
     "scipy>=1.12",
     "send2trash>=2.1.0",  # BSD-3-Clause: a deleted overview note goes to the Trash
@@ -38,6 +39,8 @@ packages = ["src/carrel"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# PyMuPDF's SWIG bindings, on import.
+filterwarnings = ["ignore:builtin type [Ss]wig:DeprecationWarning"]
 
 [tool.ruff]
 line-length = 100

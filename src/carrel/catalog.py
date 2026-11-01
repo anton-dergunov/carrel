@@ -1,5 +1,6 @@
-"""The library as one document for the page: every paper with what the library knows of it,
-the topics and the reviews (`GET /api/library`).
+"""The library as one document for the page: every paper with what the library knows of it
+(and the reader's highlights, stars and tags), the topics, the tags and the reviews
+(`GET /api/library`).
 
 Building it takes about a second on a library of 2,000 papers, most of it checking that
 each PDF is there and reading the notes' heads. Checking whether anything changed takes a
@@ -13,10 +14,12 @@ import hashlib
 import json
 import os
 import threading
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
 from .engine import Library
+from .highlights import Highlights
 from .usage import discussed, transcripts_dir
 
 # The frontmatter a row shows, in this order; empty ones are left out.
@@ -68,9 +71,15 @@ def _plain(value: object) -> object:
 
 
 class Catalog:
-    def __init__(self, library: Library, transcripts: Path | None = None):
+    def __init__(
+        self,
+        library: Library,
+        transcripts: Path | None = None,
+        highlights: Highlights | None = None,
+    ):
         self.library = library
         self.transcripts = transcripts or transcripts_dir(library.root)
+        self.highlights = highlights
         self._lock = threading.Lock()
         self._signature: tuple | None = None
         self._built: Built | None = None
@@ -85,10 +94,14 @@ class Catalog:
             _stamp(library.reviews_dir),
             _stamp(library.topics_file),
             _stamp(self.transcripts, deep=False, suffix=".jsonl"),
+            _stamp(library.reader_file),
+            self.highlights.revision if self.highlights else None,
         )
 
     def current(self) -> Built:
         """The document, built again when the library has changed since it was last built."""
+        if self.highlights:
+            self.highlights.refresh_soon()  # highlights made elsewhere, found in a minute
         with self._lock:
             signature = self.signature()
             if self._built is None or signature != self._signature:
@@ -113,6 +126,8 @@ class Catalog:
                 cited.setdefault(text, []).append(review["scope"])
         chats = discussed(library.root, self.transcripts)
         overviews = library.overview_names()
+        marks = library.marks()
+        highlighted = self.highlights.counts() if self.highlights else {}
 
         papers, counts = [], {}
         for paper, meta in library.entries():
@@ -134,6 +149,13 @@ class Catalog:
                 entry["reviews"] = cited[paper.text]
             if chats.get(paper.text):
                 entry["chats"] = chats[paper.text]
+            if highlighted.get(paper.pdf):
+                entry["highlights"] = highlighted[paper.pdf]
+            key = unicodedata.normalize("NFC", paper.text)
+            if key in marks["starred"]:
+                entry["starred"] = marks["starred"][key]
+            if key in marks["paper_tags"]:
+                entry["tags"] = marks["paper_tags"][key]
             papers.append(entry)
             counts[paper.topic] = counts.get(paper.topic, 0) + 1
 
@@ -141,6 +163,7 @@ class Catalog:
             "library": library.root.name,
             "papers": papers,
             "topics": _topics(library.topics(), counts),
+            "tags": marks["tags"],
             "scopes": library.review_scopes(),
             "reviews": [
                 {

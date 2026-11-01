@@ -2,7 +2,7 @@
 //
 // - Desk: what to continue, what came in lately, and the reviews' progress (desk.js).
 // - Areas: the topic tree and an area's page (areas.js); the library's own page is a treemap.
-// - All: every paper, with filter chips (area, type, years, touched).
+// - All: every paper, with filter chips (area, type, years, the reader's tags, touched).
 // - Timeline: the papers by year published, or by month added, a dot each (timeline.js).
 // - Map: the papers laid out by what they are about, regions named (map-view.js).
 //
@@ -26,9 +26,11 @@ import {
   ancestry,
   areaCounts,
   chipsOn,
+  emptyChips,
   filterPapers,
   groupOf,
   inArea,
+  isTouched,
   loadLibrary,
   loadLibraryState,
   saveLibraryState,
@@ -37,6 +39,7 @@ import {
   words,
   yearCounts,
 } from './library.js';
+import { onMarks } from './marks.js';
 import { element, groupHeading, icon, markRow, paperRow } from './rows.js';
 import { areaUrl } from './tabs.js';
 import { startMeaningSearch } from './meaning-search.js';
@@ -51,7 +54,13 @@ const PLACEHOLDERS = {
   meaning: 'Describe what you are looking for',
 };
 const number = new Intl.NumberFormat('en');
-const TOUCHED_LABELS = { overview: ['notebook-text', 'Has your overview note'], review: ['book-open-text', 'Cited in a review'], chat: ['chat', 'Asked about in carrel'] };
+const TOUCHED_LABELS = {
+  starred: ['star', 'Starred to read', 'starred'],
+  highlights: ['highlighter', 'Has your highlights', 'highlights'],
+  overview: ['notebook-text', 'Has your overview note', 'overview'],
+  review: ['book-open-text', 'Cited in a review', 'review'],
+  chat: ['chat', 'Asked about in carrel', 'chat'],
+};
 
 /**
  * `openPaper({pdf, title}, target)` and `openReview(scope, title)` open a tab; `openTarget({file,
@@ -317,13 +326,14 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
       chip('areas', 'Area', chips.areas.length ? listLabel(chips.areas) : null),
       chip('types', 'Type', chips.types.length ? listLabel(chips.types) : null),
       chip('years', 'Years', chips.from || chips.to ? `${chips.from ?? '…'}–${chips.to ?? '…'}` : null),
-      chip('touched', 'Touched', chips.touched.length ? listLabel(chips.touched.map((mark) => ({ overview: 'overview', review: 'review', chat: 'chat' })[mark])) : null),
+      ...(doc.tags?.length || chips.tags.length ? [chip('tags', 'Tags', chips.tags.length ? listLabel(chips.tags) : null)] : []),
+      chip('touched', 'Touched', chips.touched.length ? listLabel(chips.touched.map((mark) => TOUCHED_LABELS[mark][2])) : null),
     ];
     if (chipsOn(chips)) {
       const clear = element('button', 'plain clear-chips', 'Clear');
       clear.type = 'button';
       clear.addEventListener('click', () => {
-        state.chips = { areas: [], types: [], from: null, to: null, touched: [] };
+        state.chips = emptyChips();
         save();
         render();
       });
@@ -350,7 +360,7 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
     if (!chipSheet.hidden && chipSheet.dataset.chip === name) return closeSheets();
     closeSheets();
     chipSheet.dataset.chip = name;
-    const builders = { areas: areaChoices, types: typeChoices, years: yearChoices, touched: touchedChoices };
+    const builders = { areas: areaChoices, types: typeChoices, years: yearChoices, tags: tagChoices, touched: touchedChoices };
     chipSheet.replaceChildren(...builders[name]());
     showSheet(chipSheet, anchor);
     drawChips();
@@ -430,10 +440,18 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   function touchedChoices() {
     const items = TOUCHED.map((mark) => {
       const [iconName, label] = TOUCHED_LABELS[mark];
-      const count = doc.papers.filter((paper) => (mark === 'overview' ? paper.overview : mark === 'review' ? paper.reviews?.length : paper.chats)).length;
+      const count = doc.papers.filter((paper) => isTouched(paper, mark)).length;
       return choice({ label, count, on: state.chips.touched.includes(mark), iconName, toggle: () => toggleIn(state.chips.touched, mark) });
     });
     return [element('div', 'sheet-header', 'Papers you have worked with'), ...items];
+  }
+
+  /** The reader's tags, the latest used first; a tag chosen earlier but gone since, to clear. */
+  function tagChoices() {
+    const tags = [...(doc.tags ?? [])].sort((a, b) => String(b.latest).localeCompare(String(a.latest)) || a.name.localeCompare(b.name));
+    const gone = state.chips.tags.filter((name) => !tags.some((tag) => tag.name === name)).map((name) => ({ name, count: 0 }));
+    const items = [...tags, ...gone].map((tag) => choice({ label: tag.name, count: tag.count, on: state.chips.tags.includes(tag.name), iconName: 'tag', toggle: () => toggleIn(state.chips.tags, tag.name) }));
+    return [element('div', 'sheet-header', 'Your tags'), scroller(items)];
   }
 
   function scroller(items) {
@@ -668,7 +686,7 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
       // A year of the timeline: its papers, in All.
       const year = Number(listYear.dataset.listYear);
       state.view = 'all';
-      state.chips = { areas: [], types: [], from: year, to: year, touched: [] };
+      state.chips = { ...emptyChips(), from: year, to: year };
       save();
       render();
       pane.scrollTop = 0;
@@ -679,8 +697,22 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
     if (allBy) {
       state.view = 'all';
       state.sort = allBy.dataset.allBy;
-      state.chips = { areas: [], types: [], from: null, to: null, touched: [] };
+      state.chips = emptyChips();
       save();
+      render();
+      pane.scrollTop = 0;
+      onAddress();
+      return;
+    }
+    const marked = event.target.closest('[data-all-tag], [data-all-starred]');
+    if (marked) {
+      // A tag's papers, or the starred ones, in All, the newest first.
+      event.preventDefault();
+      state.view = 'all';
+      state.sort = 'added';
+      state.chips = marked.dataset.allTag ? { ...emptyChips(), tags: [marked.dataset.allTag] } : { ...emptyChips(), touched: ['starred'] };
+      save();
+      closeSheets();
       render();
       pane.scrollTop = 0;
       onAddress();
@@ -725,6 +757,18 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   }
 
   startAdding({ topics: () => doc?.topics ?? [], onAdded: () => void reload(), openPaper });
+
+  // A star or a tag changed, here or in a paper's sheet: its rows are made again.
+  onMarks((pdf) => {
+    if (!doc) return;
+    if (pdf) {
+      for (const key of [...rows.keys()]) if (key.startsWith(`${pdf}\n`)) rows.delete(key);
+    } else {
+      rows.clear();
+    }
+    drawn = null;
+    if (pane.getClientRects().length) render();
+  });
 
   // The tree stays in view under the header, as tall as the pane leaves it.
   new ResizeObserver(() => {

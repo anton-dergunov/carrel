@@ -129,6 +129,9 @@ def test_a_paper_to_open_beside_the_chat_and_what_the_library_knows_of_it(client
         "pdf": "recsys/Wide & Deep. A Test Paper.pdf",
         "title": "Wide & Deep: A Test Paper",
         "pdf_url": f"/pdf/{PDF}",
+        # The reader's star and tags: none yet.
+        "starred": None,
+        "tags": [],
     }
     assert ["summary", "A paper for the tests."] in info["fields"]
     assert info["overview"] is False

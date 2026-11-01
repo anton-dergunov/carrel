@@ -4,7 +4,8 @@
 // Rich: the same, then the authors, the type (and the topic, where the rows are not grouped by
 // it), and the summary in two lines.
 //
-// The marks: the reader's overview note, a review that cites the paper, the chats about it.
+// The marks: the reader's star (to read later), their highlights in the PDF, their tags, their
+// overview note, a review that cites the paper, the chats about it.
 //
 // A title search marks its words in the row (`markRow`), and when some are not in the title, a
 // line under it says where they are: the summary, the authors, the area, the type or the year.
@@ -43,6 +44,9 @@ export function shortAuthors(authors, shown = 3) {
 /** The marks on a paper, each an icon with what it means as its label. */
 export function marks(paper) {
   const box = element('span', 'marks');
+  if (paper.starred) box.append(mark('star', `Starred to read, ${paper.starred}`, null, 'starred'));
+  if (paper.highlights) box.append(mark('highlighter', `${paper.highlights} highlight${paper.highlights > 1 ? 's' : ''} in the PDF`, paper.highlights));
+  if (paper.tags?.length) box.append(mark('tag', `Tagged ${paper.tags.join(', ')}`, paper.tags.length > 1 ? paper.tags.length : null));
   if (paper.overview) box.append(mark('notebook-text', 'Your overview note'));
   if (paper.reviews?.length) {
     const label = `Cited in the review${paper.reviews.length > 1 ? 's' : ''} of ${paper.reviews.join(', ')}`;
@@ -52,8 +56,8 @@ export function marks(paper) {
   return box;
 }
 
-function mark(name, label, count = null) {
-  const span = element('span', 'mark');
+function mark(name, label, count = null, kind = '') {
+  const span = element('span', kind ? `mark ${kind}` : 'mark');
   span.title = label;
   span.setAttribute('aria-label', label);
   span.setAttribute('role', 'img');
@@ -91,7 +95,11 @@ export function paperRow(paper, { rich = false, topic = false, date = 'published
   head.append(element('span', 'year', when || ''));
   if (rich) {
     const meta = [shortAuthors(paper.authors), paper.type, topic && paper.topic].filter(Boolean).join(' · ');
-    if (meta) main.append(element('span', 'meta', meta));
+    if (meta || paper.tags?.length) {
+      const line = main.appendChild(element('span', 'meta'));
+      line.append(element('span', 'meta-text', meta));
+      for (const tag of paper.tags ?? []) line.append(element('span', 'tag-name', tag));
+    }
     if (summary && paper.summary) main.append(element('span', 'summary', paper.summary));
   }
   return row;
@@ -105,7 +113,7 @@ export function groupHeading(text, count) {
   return heading;
 }
 
-const FOUND_LABELS = { summary: 'summary', authors: 'by', area: 'area', type: 'type', year: 'published' };
+const FOUND_LABELS = { summary: 'summary', authors: 'by', area: 'area', type: 'type', year: 'published', tags: 'tagged' };
 
 /**
  * Marks the `words` (lower-case) of a title search in a row from `paperRow`, and adds the line
@@ -120,7 +128,7 @@ export function markRow(row, paper, words) {
   fillMarked(row.querySelector('.title'), paper.title, words);
   const summary = row.querySelector('.summary');
   if (summary) fillMarked(summary, paper.summary, words);
-  const meta = row.querySelector('.meta');
+  const meta = row.querySelector('.meta-text');
   if (meta) fillMarked(meta, meta.textContent, words);
   row.querySelector('.found')?.remove();
   const found = words.length ? foundOutsideTitle(paper, words, { shown: summary ? ['summary'] : [] }) : [];

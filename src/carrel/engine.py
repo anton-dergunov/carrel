@@ -117,6 +117,65 @@ class Library:
     def topics_file(self) -> Path:
         return Path(self.lib.TOPICS_FILE).resolve()
 
+    @property
+    def reader_file(self) -> Path:
+        """The reader's own marks: the papers starred to read, and their tags."""
+        return Path(self.lib.READER_FILE).resolve()
+
+    def read_highlights(self, pdf: Path) -> list[dict]:
+        """The highlights in a PDF, with the words under them (the engine's highlights.py)."""
+        import highlights
+
+        return highlights.read_highlights(pdf)
+
+    def marks(self) -> dict:
+        """The reader's stars and tags, by paper file (relative to the library root, as a
+        Paper's `text`): {starred: {text: date}, paper_tags: {text: [name]}, tags: [{name,
+        about, count, latest}]}, the tags by name."""
+        marks = self.lib.load_reader()
+
+        def text(key: str) -> str:
+            path = self.papers_dir / key
+            return _nfc(
+                path.relative_to(self.root).as_posix()
+                if path.is_relative_to(self.root)
+                else str(path)
+            )
+
+        paper_tags: dict[str, list[str]] = {}
+        tags = []
+        for name, tag in sorted(marks["tags"].items()):
+            for key in tag["papers"]:
+                paper_tags.setdefault(text(key), []).append(name)
+            tags.append(
+                {
+                    "name": name,
+                    "about": tag["about"],
+                    "count": len(tag["papers"]),
+                    "latest": max(tag["papers"].values(), default=""),
+                }
+            )
+        return {
+            "starred": {text(key): day for key, day in marks["starred"].items()},
+            "paper_tags": paper_tags,
+            "tags": tags,
+        }
+
+    def star(self, paper: Paper, on: bool) -> str | None:
+        """Stars a paper to read, or takes the star off: the day it is starred, or None."""
+        return self.lib.star(self.root / paper.text, on)
+
+    def set_tags(self, paper: Paper, names: list[str]) -> list[str]:
+        """Gives a paper exactly these tags (ValueError for a name that cannot be one)."""
+        return self.lib.set_paper_tags(self.root / paper.text, names)
+
+    def edit_tag(self, name: str, about: str | None = None, rename: str | None = None) -> str:
+        """A tag's description, or its new name: the name it has now."""
+        return self.lib.edit_tag(name, about=about, rename=rename)
+
+    def delete_tag(self, name: str) -> None:
+        self.lib.delete_tag(name)
+
     def entries(self) -> list[tuple[Paper, dict]]:
         """Every paper that has a PDF, with its frontmatter (as JSON holds it: dates are
         strings), by topic and title. Web articles without a printed PDF are left out: there

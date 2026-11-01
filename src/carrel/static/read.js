@@ -161,8 +161,8 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
    * A citation's rectangles are the most exact place there is, and are marked; otherwise a named
    * destination wins over a page when the PDF has it, and the page is the fallback.
    */
-  async function goTo({ page, dest, rect }) {
-    if (rect && page && pdfDocument && (await citeMark.show(pdfDocument, page, rect))) return;
+  async function goTo({ page, dest, rect, mark = true }) {
+    if (rect && page && pdfDocument && (await citeMark.show(pdfDocument, page, rect, { mark }))) return;
     citeMark.clear(false);
     const found = dest ? await scrollToDestination(dest) : false;
     if (!found && page && page <= viewer.pagesCount) {
@@ -451,6 +451,43 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     return (pdfDocument && (await pdfDocument.getOutline().catch(() => null))) ?? [];
   }
 
+  /**
+   * Where each of the outline's entries leads, in its order: {page, top} with `top` in points from
+   * the top of the page, or null for an entry that leads nowhere this paper has. Highlights are
+   * placed among the entries by it.
+   */
+  async function outlinePlaces(items) {
+    const document = pdfDocument;
+    if (!document) return [];
+    const flat = [];
+    const walk = (list) => {
+      for (const item of list) {
+        flat.push(item);
+        if (item.items?.length) walk(item.items);
+      }
+    };
+    walk(items);
+    const tops = new Map(); // page → its height, for a top measured from the bottom
+    return Promise.all(
+      flat.map(async (item) => {
+        try {
+          const dest = typeof item.dest === 'string' ? await document.getDestination(item.dest) : item.dest;
+          if (!Array.isArray(dest)) return null;
+          const index = typeof dest[0] === 'object' && dest[0] ? await document.getPageIndex(dest[0]) : Number(dest[0]);
+          if (!(index >= 0)) return null;
+          if (!tops.has(index)) tops.set(index, document.getPage(index + 1).then((page) => page.view));
+          const [, , , y1] = await tops.get(index);
+          // XYZ and FitH carry the top of the view (from the page's bottom); the rest, none.
+          const name = dest[1]?.name;
+          const y = name === 'XYZ' ? dest[3] : name === 'FitH' || name === 'FitBH' ? dest[2] : null;
+          return { page: index + 1, top: typeof y === 'number' ? y1 - y : 0 };
+        } catch {
+          return null;
+        }
+      }),
+    );
+  }
+
   return {
     open,
     goTo,
@@ -467,6 +504,7 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     find,
     endFind: () => eventBus.dispatch('findbarclose', { source: null }),
     outline,
+    outlinePlaces,
     goToDestination: (dest) => scrollToDestination(dest),
     clearMark: () => citeMark.clear(true),
     file: () => file,

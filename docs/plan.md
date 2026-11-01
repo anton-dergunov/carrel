@@ -4,11 +4,7 @@ Carrel puts a paper's PDF and a Claude Code chat side by side on a tablet. The c
 
 ## Steps
 
-Each step ends with a sitting on the iPad (and the e-ink tablet, where it says so); what the sitting finds goes into the step, or into architecture.md when it settles something. Steps 1–5, the library's views and their area maps, starting at login and the Mac app are built and described in [architecture.md](architecture.md).
-
-6. **Highlights, gathered.**
-   - A mark on a paper's row for the papers with highlights. Counting them from the PDFs means opening every one, so the count comes from the saves carrel makes itself.
-   - The paper's highlights listed in its contents, beside its headings, each one a jump to its page.
+Each step ends with a sitting on the iPad (and the e-ink tablet, where it says so); what the sitting finds goes into the step, or into architecture.md when it settles something. Steps 1–6 and 11, the library's views and their area maps, starting at login and the Mac app are built and described in [architecture.md](architecture.md): step 6 gathered the highlights, and step 11 became the reader's stars and tags.
 
 7. **Settings: themes, font sizes, e-ink.** One Settings dialog, as in [Lectern](https://github.com/anton-dergunov/lectern), reusing its implementation where it fits:
    - themes and font sizes for the page, the chat and the library;
@@ -35,5 +31,3 @@ Each step ends with a sitting on the iPad (and the e-ink tablet, where it says s
     - What to keep on the device (everything, or chosen areas and recent papers), and when to sync.
     - Highlights made offline, written back to the laptop without clashing with the version check that guards saving a PDF.
     - The library's document, the overview notes and the reviews kept on the device; text search on the device; meaning search left out offline.
-
-11. **Liking/ranking papers** (favourites, etc)

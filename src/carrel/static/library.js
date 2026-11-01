@@ -16,7 +16,7 @@ export const TYPE_ICONS = {
   theory: 'sigma',
 };
 export const SORTS = ['topic', 'added', 'published'];
-export const TOUCHED = ['overview', 'review', 'chat'];
+export const TOUCHED = ['starred', 'highlights', 'overview', 'review', 'chat'];
 const LIBRARY_KEY = 'carrel.library';
 
 let loading = null;
@@ -70,9 +70,9 @@ export function plainTitle(title) {
   });
 }
 
-/** One lower-case text per paper: title, authors, summary, topic, type and year. */
+/** One lower-case text per paper: title, authors, summary, topic, type, year and the reader's tags. */
 export function haystackOf(paper) {
-  return [paper.title, [paper.authors ?? []].flat().join(' '), paper.summary, paper.topic.replaceAll('/', ' '), paper.type, paper.year]
+  return [paper.title, [paper.authors ?? []].flat().join(' '), paper.summary, paper.topic.replaceAll('/', ' '), paper.type, paper.year, (paper.tags ?? []).join(' ')]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
@@ -89,12 +89,12 @@ export function inArea(paper, area) {
 
 /**
  * The papers that match every word of `query` and every chip: `areas` (any of them), `types`
- * (any; 'none' for a paper without one), `from`–`to` (years published), and `touched` (any of
- * overview, review, chat).
+ * (any; 'none' for a paper without one), `from`–`to` (years published), `tags` (any of the
+ * reader's), and `touched` (any of starred, highlights, overview, review, chat).
  */
 export function filterPapers(papers, query = '', chips = {}) {
   const wanted = words(query);
-  const { areas = [], types = [], from = null, to = null, touched = [] } = chips;
+  const { areas = [], types = [], from = null, to = null, tags = [], touched = [] } = chips;
   return papers.filter((paper) => {
     if (!wanted.every((word) => paper.haystack.includes(word))) return false;
     if (areas.length && !areas.some((area) => inArea(paper, area))) return false;
@@ -103,16 +103,19 @@ export function filterPapers(papers, query = '', chips = {}) {
       const year = Number(paper.year);
       if (!year || (from && year < from) || (to && year > to)) return false;
     }
+    if (tags.length && !tags.some((tag) => paper.tags?.includes(tag))) return false;
     if (touched.length && !touched.some((mark) => isTouched(paper, mark))) return false;
     return true;
   });
 }
 
 export function isTouched(paper, mark) {
+  if (mark === 'starred') return Boolean(paper.starred);
+  if (mark === 'highlights') return Boolean(paper.highlights);
   if (mark === 'overview') return Boolean(paper.overview);
   if (mark === 'review') return Boolean(paper.reviews?.length);
   if (mark === 'chat') return Boolean(paper.chats);
-  return Boolean(paper.overview || paper.reviews?.length || paper.chats);
+  return TOUCHED.some((each) => isTouched(paper, each));
 }
 
 // One collator for every comparison: `localeCompare` with options makes one per call, which
@@ -183,7 +186,7 @@ const LEAD = 40; // how much of the summary comes before its first match
 
 /**
  * What a title search found outside the title: for the words the title lacks, the fields that
- * hold them, in the order summary, authors, area, type, year, as [{field, text, ranges}], the
+ * hold them, in the order summary, authors, area, type, year, tags, as [{field, text, ranges}], the
  * ranges marking every word. A field comes only for a word no field before it holds. The summary
  * is cut to start a little before its first match; the authors are the ones whose names match.
  * `shown` names fields the row already shows: they account for their words, and are left out.
@@ -208,6 +211,7 @@ export function foundOutsideTitle(paper, words, { shown = [] } = {}) {
   field('area', paper.topic?.replaceAll('/', ' '), () => paper.topic);
   field('type', paper.type);
   field('year', paper.year);
+  field('tags', (paper.tags ?? []).join(' '), (held) => paper.tags.filter((tag) => held.some((word) => tag.includes(word))).join(', '));
   return found;
 }
 
@@ -314,8 +318,13 @@ export function reviewsInside(area, reviews) {
 
 export const VIEWS = ['desk', 'areas', 'all', 'timeline', 'map'];
 
+/** No chip narrowing anything. */
+export function emptyChips() {
+  return { areas: [], types: [], from: null, to: null, tags: [], touched: [] };
+}
+
 export function defaultLibraryState() {
-  return { view: 'desk', area: '', density: 'compact', sort: 'topic', depth: 'titles', timeline: 'published', chips: { areas: [], types: [], from: null, to: null, touched: [] } };
+  return { view: 'desk', area: '', density: 'compact', sort: 'topic', depth: 'titles', timeline: 'published', chips: emptyChips() };
 }
 
 /** A remembered state, checked: whatever does not fit is left as it starts. */
@@ -332,6 +341,7 @@ export function restoreLibrary(stored) {
   const strings = (list, allowed) => (Array.isArray(list) ? list.filter((item) => typeof item === 'string' && (!allowed || allowed.includes(item))) : []);
   state.chips.areas = strings(chips.areas);
   state.chips.types = strings(chips.types, [...TYPES, 'none']);
+  state.chips.tags = strings(chips.tags);
   state.chips.touched = strings(chips.touched, TOUCHED);
   for (const end of ['from', 'to']) {
     const year = Number(chips[end]);
@@ -358,5 +368,5 @@ export function saveLibraryState(state) {
 
 /** Whether any chip narrows the list. */
 export function chipsOn(chips) {
-  return Boolean(chips.areas.length || chips.types.length || chips.from || chips.to || chips.touched.length);
+  return Boolean(chips.areas.length || chips.types.length || chips.from || chips.to || chips.tags.length || chips.touched.length);
 }

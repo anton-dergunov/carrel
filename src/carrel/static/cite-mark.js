@@ -73,16 +73,22 @@ export function createCiteMark({ viewer, eventBus, container }) {
   });
 
   /**
-   * Marks rectangles on a page of `pdfDocument` and scrolls them into the middle of the view.
-   * False when none of them is on the page, which then shows nothing.
+   * Marks rectangles on a page of `pdfDocument` and scrolls them into the middle of the view;
+   * with `mark: false` it only scrolls (to a highlight, which needs no mark over it). False when
+   * none of them is on the page, which then shows nothing.
    */
-  async function show(pdfDocument, pageNumber, rects) {
+  async function show(pdfDocument, pageNumber, rects, { mark = true } = {}) {
     clear(false);
     if (!(pageNumber >= 1 && pageNumber <= viewer.pagesCount)) return false;
     const page = await pdfDocument.getPage(pageNumber);
     const [vx0, vy0, vx1, vy1] = page.view;
     const boxes = markBoxes(rects, vx1 - vx0, vy1 - vy0, page.rotate + viewer.pagesRotation);
     if (!boxes.length) return false;
+    if (!mark) {
+      // The page is laid out before it is drawn, so its place is known at once.
+      scrollTo({ page: pageNumber, boxes });
+      return true;
+    }
     const element = document.createElement('div');
     element.className = 'cite-mark';
     element.setAttribute('aria-hidden', 'true');

@@ -13,6 +13,7 @@ Code. What it may do without asking is set by two things, both passed as one set
 - The sandbox around Bash: a command runs without asking when it stays inside the sandbox,
   which writes only in the library, the PDFs and the engine's cache, and reaches only the
   listed domains.
+- The reader's stars and tags (`catalog/reader.yaml`) are never written, by Edit or by Bash.
 
 Anything else is put to the reader on the tablet as Allow / Deny.
 """
@@ -94,7 +95,9 @@ def agent_settings(library: Library) -> dict:
                 # An absolute path in a rule starts with "//".
                 *(f"Edit(/{folder}/**)" for folder in note_folders(library)),
             ],
-            "deny": [f"Read({path}/**)" for path in SECRETS],
+            "deny": [f"Read({path}/**)" for path in SECRETS]
+            # The reader's stars and tags are theirs alone: no agent writes them, asked or not.
+            + [f"Edit(/{library.reader_file})"],
         },
         "sandbox": {
             "enabled": True,
@@ -103,6 +106,7 @@ def agent_settings(library: Library) -> dict:
             "filesystem": {
                 "allowWrite": list(dict.fromkeys(str(folder) for folder in writable)),
                 "denyRead": SECRETS,
+                "denyWrite": [str(library.reader_file)],
             },
             "network": {"allowedDomains": ALLOWED_DOMAINS},
         },

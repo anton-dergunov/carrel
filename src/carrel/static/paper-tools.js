@@ -2,13 +2,15 @@
 // chat already share a small one:
 //
 // - the page badge, faint in the PDF's corner, which opens the paper's sheet: a field to go to a
-//   page, what the library knows of the paper (paper-sheet.js), and its contents. The sheet is
+//   page, what the library knows of the paper (paper-sheet.js), and its contents with the reader's
+//   highlights among the headings, each a jump to its place. The sheet is
 //   small, by the badge, and closes with a tap anywhere else; it opens out over the page below the
 //   tabs, chat and all, and then stays until it is closed. On a phone it opens over the whole page
 //   at once.
 // - find, which takes the place of the tabs in the bar while it is open.
 
-import { contentsNote, foldSection, startPaperSheet } from './paper-sheet.js';
+import { HIGHLIGHT_COLORS } from './highlight.js';
+import { contentsNote, foldSection, interleave, startPaperSheet } from './paper-sheet.js';
 
 /**
  * `showOverview()` shows the paper's overview note, beside it; `openPaper({pdf, title})` opens
@@ -91,17 +93,28 @@ export function startPaperTools({ reader, showOverview, openPaper = () => {}, on
   async function drawOutline(file) {
     outlineList.replaceChildren();
     contents.setNote('');
-    const items = await reader.outline();
+    const [items, highlights] = await Promise.all([reader.outline(), highlightsOf(file)]);
+    const places = items.length && highlights.length ? await reader.outlinePlaces(items) : [];
     if (file !== reader.file()) return;
-    contents.setNote(contentsNote(items));
-    if (!items.length) {
+    contents.setNote(contentsNote(items, highlights.length));
+    if (!items.length && !highlights.length) {
       outlineList.append(Object.assign(document.createElement('p'), { className: 'none', textContent: 'This PDF has no table of contents.' }));
       return;
     }
-    outlineList.append(outlineTree(items));
+    const { before, under } = interleave(places, highlights);
+    if (before.length) outlineList.append(highlightList(before));
+    if (items.length) outlineList.append(outlineTree(items, under, { next: 0 }));
   }
 
-  function outlineTree(items) {
+  /** The paper's highlights, read from its PDF on the laptop; none when it cannot answer. */
+  async function highlightsOf(file) {
+    const response = await fetch(`/api/highlights/${file.split('/').map(encodeURIComponent).join('/')}`).catch(() => null);
+    const found = response?.ok ? await response.json().catch(() => null) : null;
+    return Array.isArray(found?.items) ? found.items : [];
+  }
+
+  /** `under` holds the highlights after each entry, by its index depth first (`at.next`). */
+  function outlineTree(items, under, at) {
     const list = document.createElement('ul');
     for (const item of items) {
       const entry = list.appendChild(document.createElement('li'));
@@ -113,7 +126,39 @@ export function startPaperTools({ reader, showOverview, openPaper = () => {}, on
         openContents(false);
         void reader.goToDestination(item.dest);
       });
-      if (item.items?.length) entry.append(outlineTree(item.items));
+      const marked = under.get(at.next++);
+      if (marked) entry.append(highlightList(marked));
+      if (item.items?.length) entry.append(outlineTree(item.items, under, at));
+    }
+    return list;
+  }
+
+  /** Highlights as rows: the colour, the words under it (and its note), the page. */
+  function highlightList(highlights) {
+    const list = document.createElement('ol');
+    list.className = 'highlights';
+    for (const each of highlights) {
+      const row = list.appendChild(document.createElement('li')).appendChild(document.createElement('button'));
+      row.type = 'button';
+      row.className = 'highlight-entry';
+      const named = HIGHLIGHT_COLORS.find((color) => color.name === each.name);
+      row.style.setProperty('--swatch', each.color || named?.value || HIGHLIGHT_COLORS[0].value);
+      row.setAttribute('aria-label', `${named?.label ?? 'A'} highlight on page ${each.page}: ${each.text || 'no text'}`);
+      const words = row.appendChild(document.createElement('span'));
+      words.className = 'words';
+      words.textContent = each.text || 'A highlight with no text under it';
+      if (each.note) {
+        const note = row.appendChild(document.createElement('span'));
+        note.className = 'note';
+        note.textContent = each.note;
+      }
+      const page = row.appendChild(document.createElement('span'));
+      page.className = 'page';
+      page.textContent = `p. ${each.page}`;
+      row.addEventListener('click', () => {
+        openContents(false);
+        void reader.goTo({ page: each.page, rect: [each.rect], mark: false });
+      });
     }
     return list;
   }
@@ -204,6 +249,14 @@ export function startPaperTools({ reader, showOverview, openPaper = () => {}, on
       if (!findInput.value) findCount.textContent = '';
       else if (pending && !total) findCount.textContent = '…';
       else findCount.textContent = total ? `${current} of ${total}` : 'Not found';
+    },
+    /** A change to the paper's highlights was saved: its contents are drawn again. */
+    highlightsChanged() {
+      outlineOf = null;
+      if (!sheet.hidden) {
+        outlineOf = reader.file();
+        void drawOutline(outlineOf);
+      }
     },
     /** Another tab is showing: the tools of this paper close. */
     leave() {

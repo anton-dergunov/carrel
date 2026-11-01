@@ -16,6 +16,8 @@
   --chip-on: #d9e7f0;
   --mark-on: #1f5878;
   --mark-on-bg: #f6e3a1;
+  /* The reader's star: amber, apart from the accent and the six highlight colours. */
+  --star: #c4861a;
   --row-pad: 10px;
   /* The top-level areas' hues: muted, of one lightness, for the treemap, the bars and the tree. */
   --area-1: #5b8db8;
@@ -55,6 +57,7 @@
     --chip-on: #1f3a4b;
     --mark-on: #a9d3ea;
     --mark-on-bg: #6b5a1e;
+    --star: #e2b04e;
     --area-1: #6f9fc9;
     --area-2: #7fab7a;
     --area-3: #d38a72;
@@ -1598,3 +1601,78 @@ button.danger { background: var(--error); color: var(--surface); padding: 6px 14
 @media (prefers-reduced-motion: reduce) {
   .map-waiting, .map-legend, .map-peek { animation: none; }
 }
+
+/* The reader's own marks: the star (to read later) and the tags. */
+.star-button .icon { width: 19px; height: 19px; }
+.star-button[aria-pressed="true"] { color: var(--star); }
+.star-button[aria-pressed="true"] .icon,
+.marks .mark.starred .icon { fill: currentColor; }
+.marks .mark.starred { color: var(--star); }
+.peek-actions .star-button { width: 34px; height: 34px; padding: 0; border-radius: 50%; }
+#contents-sheet .title-row { display: flex; align-items: flex-start; gap: 4px; }
+#contents-sheet .title-row .paper-title { flex: 1; min-width: 0; }
+#contents-sheet .title-row .star-button { width: 40px; height: 40px; margin: -8px -8px 0 0; }
+
+.tag-line { margin-top: 8px; }
+.tag-pills { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tag-pill { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 2px 0 9px; border-radius: 999px; background: var(--chip); font-size: 13px; color: var(--text); }
+.tag-pill > .icon { width: 13px; height: 13px; color: var(--muted); }
+.tag-pill .remove { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border-radius: 50%; color: var(--muted); }
+.tag-pill .remove .icon { width: 12px; height: 12px; }
+button.tag-add { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 8px; font-size: 13px; }
+.tag-add .icon { width: 14px; height: 14px; }
+.tag-picker { display: grid; gap: 6px; margin-top: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); animation: fade-in 0.12s ease-out; }
+.tag-picker input { font: 16px var(--ui); padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); }
+.tag-picker input:focus { outline: none; border-color: var(--accent); }
+.tag-choices { display: grid; max-height: 220px; overflow: auto; }
+.tag-choice[aria-selected="true"] .check { border-color: var(--accent); background: var(--accent); }
+.tag-choice[aria-selected="true"] .check::after { content: ""; width: 9px; height: 5px; border: solid var(--surface); border-width: 0 0 2px 2px; transform: translateY(-1px) rotate(-45deg); }
+.tag-choice .about { flex: 2; min-width: 0; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag-new { color: var(--accent); }
+.tag-new .icon { color: var(--accent); }
+.tag-picker .none { margin: 4px 2px; font-size: 13px; color: var(--muted); }
+button.tag-done { justify-self: end; padding: 4px 8px; }
+
+/* A rich row names the paper's tags after its authors and type. */
+.paper-row .meta .tag-name { margin-left: 8px; color: var(--accent); }
+.paper-row .meta .tag-name::before { content: "#"; opacity: 0.6; }
+.paper-row .meta .meta-text:empty + .tag-name { margin-left: 0; }
+
+/* The reader's highlights among the contents: a bar of their colour, the words, the page. */
+#outline ol.highlights { list-style: none; margin: 0 0 4px; padding: 0; }
+#outline .highlight-entry {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 10px;
+  padding: 5px 0 5px 11px;
+  font: 14px/1.4 var(--reading);
+}
+#outline .highlight-entry::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 4px; border-radius: 2px; background: var(--swatch); }
+#outline .highlight-entry .words { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#outline .highlight-entry .note { grid-column: 1; font: 12.5px/1.35 var(--ui); color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#outline .highlight-entry .page { grid-column: 2; grid-row: 1; font: 12px/1.6 var(--ui); color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Desk: the tags, a card each. */
+.tag-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+.tag-card { display: flex; align-items: flex-start; min-height: 56px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+button.tag-open { flex: 1; min-width: 0; display: grid; gap: 2px; padding: 10px 4px 10px 12px; text-align: left; color: var(--text); border-radius: 12px 0 0 12px; white-space: normal; }
+button.tag-open:active { background: var(--question); }
+.tag-title { display: flex; align-items: center; gap: 6px; font: 600 15px/1.3 var(--ui); }
+.tag-title .icon { width: 14px; height: 14px; color: var(--muted); }
+.tag-title .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag-title .count { margin-left: auto; font-weight: 400; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tag-card .about { font-size: 13px; line-height: 1.35; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tag-card .tag-edit { margin: 6px 6px 0 0; width: 32px; height: 32px; }
+.tag-card .tag-edit .icon { width: 15px; height: 15px; }
+.tag-editor { display: grid; gap: 8px; padding: 10px 12px; }
+.tag-editor input, .tag-editor textarea { font: 16px var(--ui); padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); resize: vertical; }
+.tag-editor input:focus, .tag-editor textarea:focus { outline: none; border-color: var(--accent); }
+.tag-editor .buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
+.tag-editor button[type="submit"] { padding: 6px 14px; font-size: 14px; }
+button.plain.danger-text { color: var(--error); margin-left: auto; }
+.tag-editor .problem { margin: 0; font-size: 13px; color: var(--error); }
+
+/* The map's legend: the reader's own, under the areas. */
+.map-legend .legend-part { margin-top: 10px; }
+.map-legend [data-area="#starred"] .icon { color: var(--star); fill: currentColor; }

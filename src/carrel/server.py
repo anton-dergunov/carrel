@@ -12,9 +12,10 @@ keeps the Host the browser asked for, and says who is asking in `Tailscale-User-
 
 What a page can change on the laptop is a paper's PDF, with the highlights made in it
 (`PUT /pdf/…`), the chats' settings (`PUT /api/settings`), a paper's overview note, which it
-can only move to the Trash (`DELETE /api/overview/…`), and the library itself, through the
-engine's own add and remove (`POST /api/add`, `POST /api/remove`); and a page can write a
-line to the server's log.
+can only move to the Trash (`DELETE /api/overview/…`), the reader's stars and tags, through
+the engine's functions (`PUT /api/star/…`, `/api/tags/…`, `/api/tag/…`, `DELETE /api/tag/…`),
+and the library itself, through the engine's own add and remove (`POST /api/add`,
+`POST /api/remove`); and a page can write a line to the server's log.
 """
 
 import asyncio
@@ -49,6 +50,7 @@ from . import APP_NAME, __version__
 from .catalog import Catalog
 from .edits import EditError, Edits, discard_upload, save_upload
 from .engine import Library
+from .highlights import Highlights
 from .meaning import Meaning, MeaningError
 from .meaning_map import MeaningMap
 from .search import SearchError, search
@@ -69,6 +71,8 @@ MAX_LOG = 8192
 NO_STORE = {"Cache-Control": "no-store"}
 # The settings as a page sends them: the note and a little more.
 MAX_SETTINGS = 4 * LONGEST_NOTE + 1024
+# A star, a paper's tags or a tag's description, as a page sends them.
+MAX_MARKS = 16 * 1024
 
 
 def hostname(host_header: str) -> str:
@@ -185,17 +189,21 @@ def make_app(
     edits: Edits | None = None,
     meaning: Meaning | None = None,
     meaning_map: MeaningMap | None = None,
+    highlights: Highlights | None = None,
     tablet_url: str | None = None,
 ):
     """`tablet_url`: where the tablet opens this server on the tailnet, if it is published
     there, for the Mac app's menu."""
     sessions = sessions or Sessions(library, extra_folders, settings=settings)
-    catalog = catalog or Catalog(library)
+    highlights = highlights or Highlights(library)
+    catalog = catalog or Catalog(library, highlights=highlights)
     edits = edits or Edits(library)
     meaning = meaning or Meaning(library, catalog)
     meaning_map = meaning_map or MeaningMap(meaning)
     # One PDF written at a time: a save checks the file's version, then replaces it.
     writing = asyncio.Lock()
+    # The reader's marks are one file, written one change at a time.
+    marking = asyncio.Lock()
 
     def shell(
         request: Request, pdf: str = "", title: str = "", area: str = "", review: str = ""
@@ -379,12 +387,22 @@ def make_app(
         except LookupError:
             return JSONResponse({"error": "No such PDF in the library."}, status_code=404)
         found = library.paper_for_pdf(rel)
+        marks = library.marks() if found else None
         return JSONResponse(
             {
                 "pdf": rel,
                 "title": found.title if found else Path(rel).stem,
                 "pdf_url": "/pdf/" + quote(rel),
                 **({"info": library.paper_info(found)} if found else {}),
+                # The reader's star and tags, the latest: another device may have set them.
+                **(
+                    {
+                        "starred": marks["starred"].get(found.text),
+                        "tags": marks["paper_tags"].get(found.text, []),
+                    }
+                    if found
+                    else {}
+                ),
             }
         )
 
@@ -518,7 +536,96 @@ def make_app(
             log.info("not saved, changed elsewhere: %s", rel)
             return PlainTextResponse("The PDF changed since the page loaded it.", status_code=409)
         log.info("saved %s (%d bytes after the %d loaded)", rel, len(data) - base, base)
+        await asyncio.to_thread(highlights.items, rel)  # the row's mark and the contents, at once
         return Response(status_code=204, headers={"ETag": saved})
+
+    async def paper_highlights(request: Request) -> Response:
+        """A paper's highlights, read from its PDF: page, colour, rectangle, the words under
+        each, and its note."""
+        rel = request.path_params["path"]
+        try:
+            items = await asyncio.to_thread(highlights.items, rel)
+        except LookupError:
+            return JSONResponse({"error": "No such PDF in the library."}, status_code=404)
+        return JSONResponse({"pdf": rel, "items": items}, headers={"Cache-Control": "no-store"})
+
+    async def asked_for(request: Request) -> dict:
+        body = await request.body()
+        if len(body) > MAX_MARKS:
+            raise ValueError("Too long.")
+        try:
+            asked = json.loads(body or b"{}")
+        except ValueError:
+            asked = None
+        if not isinstance(asked, dict):
+            raise ValueError("Not a change to the marks.")
+        return asked
+
+    def marked_paper(rel: str):
+        try:
+            return library.paper_for_pdf(rel)
+        except LookupError:
+            return None
+
+    async def put_star(request: Request) -> Response:
+        """A paper starred to read, or not: {on}."""
+        rel = request.path_params["path"]
+        found = marked_paper(rel)
+        if not found:
+            return JSONResponse({"error": "No such paper in the library."}, status_code=404)
+        try:
+            on = (await asked_for(request)).get("on")
+            if not isinstance(on, bool):
+                raise ValueError("Say whether it is starred.")
+        except ValueError as error:
+            return JSONResponse({"error": str(error)}, status_code=400)
+        async with marking:
+            day = await asyncio.to_thread(library.star, found, on)
+        log.info("%s %s", "starred" if day else "unstarred", rel)
+        return JSONResponse({"pdf": rel, "starred": day})
+
+    async def put_tags(request: Request) -> Response:
+        """A paper's tags, the whole set: {tags: [name]}."""
+        rel = request.path_params["path"]
+        found = marked_paper(rel)
+        if not found:
+            return JSONResponse({"error": "No such paper in the library."}, status_code=404)
+        try:
+            names = (await asked_for(request)).get("tags")
+            if not isinstance(names, list) or not all(isinstance(name, str) for name in names):
+                raise ValueError("Say the paper's tags.")
+            async with marking:
+                tags = await asyncio.to_thread(library.set_tags, found, names)
+        except ValueError as error:
+            return JSONResponse({"error": str(error)}, status_code=400)
+        log.info("tags of %s: %s", rel, ", ".join(tags) or "none")
+        return JSONResponse({"pdf": rel, "tags": tags, "all": library.marks()["tags"]})
+
+    async def put_tag(request: Request) -> Response:
+        """A tag's description, or its new name: {about?, name?}."""
+        try:
+            asked = await asked_for(request)
+            about, rename = asked.get("about"), asked.get("name")
+            if not all(value is None or isinstance(value, str) for value in (about, rename)):
+                raise ValueError("A description and a name are text.")
+            async with marking:
+                name = await asyncio.to_thread(
+                    library.edit_tag, request.path_params["name"], about, rename
+                )
+        except ValueError as error:
+            return JSONResponse({"error": str(error)}, status_code=400)
+        log.info("tag %s edited", name)
+        return JSONResponse({"name": name, "all": library.marks()["tags"]})
+
+    async def delete_tag(request: Request) -> Response:
+        """A tag, off every paper."""
+        try:
+            async with marking:
+                await asyncio.to_thread(library.delete_tag, request.path_params["name"])
+        except ValueError as error:
+            return JSONResponse({"error": str(error)}, status_code=400)
+        log.info("tag %s deleted", request.path_params["name"])
+        return JSONResponse({"all": library.marks()["tags"]})
 
     async def page_log(request: Request) -> Response:
         """A line from a page's console: what goes wrong on the iPad is seen here."""
@@ -592,6 +699,7 @@ def make_app(
         reaper = asyncio.create_task(sessions.reap_forever())
         meaning.warm()
         meaning_map.warm()  # waits for the space, then draws the map if the library changed
+        highlights.refresh_soon(every=0)  # the first time, every PDF: about 14 s, in a thread
         freer = asyncio.create_task(free_meaning_forever())
         try:
             yield
@@ -616,6 +724,11 @@ def make_app(
             Route("/api/remove", remove_paper, methods=["POST"]),
             Route("/pdf/{path:path}", pdf, methods=["GET", "HEAD"]),
             Route("/pdf/{path:path}", save_pdf, methods=["PUT"]),
+            Route("/api/highlights/{path:path}", paper_highlights),
+            Route("/api/star/{path:path}", put_star, methods=["PUT"]),
+            Route("/api/tags/{path:path}", put_tags, methods=["PUT"]),
+            Route("/api/tag/{name}", put_tag, methods=["PUT"]),
+            Route("/api/tag/{name}", delete_tag, methods=["DELETE"]),
             Route("/api/log", page_log, methods=["POST"]),
             Route("/api/paper/{path:path}", paper),
             Route("/api/overview-note", overview_paper, methods=["GET", "HEAD"]),

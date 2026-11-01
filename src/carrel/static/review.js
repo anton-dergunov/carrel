@@ -2,13 +2,15 @@
 // paper and back, and a tab keeps its place. Each open review is drawn once and kept.
 //
 // Its links: a paper's (to its text file) opens a peek, a small card with the paper's title,
-// year and summary, and Open, plus Open at p. N for each page of it the same paragraph cites;
+// year and summary, and Open, plus Open at p. N for each page of it the same paragraph cites, and
+// the reader's star;
 // a page link (`http://pdf.invalid/…`) opens the paper there, as in the chat; a link to another
 // review opens that review's tab; a web link opens a new tab.
 
 import { decode, parsePaperLink, sameFile } from './links.js';
 import { loadLibrary, shortDate } from './library.js';
 import { drawCallouts, drawMarkdown } from './markdown.js';
+import { starButton } from './marks.js';
 import { element, marks, shortAuthors, typeIcon } from './rows.js';
 
 const PLACE_MS = 400;
@@ -146,6 +148,7 @@ export function startReviews({ openPaper, openTarget, openReview, onPlace, onTit
         openTarget({ file: value.pdf, page });
       });
     }
+    if (paper) actions.append(starButton(paper.pdf, paper.starred));
     peek.replaceChildren(...card, actions);
     peek.hidden = false;
     peeked = link;

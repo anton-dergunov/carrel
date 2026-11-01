@@ -7,7 +7,9 @@
 // - A tap on a paper peeks at it (its title, authors, summary and Open), and lines join it to its
 //   five nearest papers. A tap on a region's name flies to it.
 // - The search box lights the papers it finds and dims the rest, at each depth: titles on the
-//   device, text and meaning on the laptop. Areas lights one area's papers.
+//   device, text and meaning on the laptop. Areas lights one area's papers, or the reader's own:
+//   the starred papers, or a tag's, so the reader sees where a project's papers sit and what
+//   lies near them.
 // - While the laptop draws the map again (a paper added) or names its regions, the map shown is
 //   the last one, and it is asked for again every few seconds; the papers then glide to their new
 //   places, and the new ones ring.
@@ -16,6 +18,7 @@
 import { areaName, hueOf, hues, plural } from './areas.js';
 import { filterPapers } from './library.js';
 import { createMeaningMap, shortTitle } from './meaning-map.js';
+import { starButton } from './marks.js';
 import { element, icon, marks, shortAuthors, typeIcon } from './rows.js';
 import { startAsking } from './server-search.js';
 
@@ -24,6 +27,9 @@ const AGAIN_MS = 4000;
 const SHORTEST = 3;
 const SIDE_BY_SIDE = 760; // a map this wide docks the peek beside the paper, not above or below
 const number = new Intl.NumberFormat('en');
+// What Areas lights besides an area: the starred papers, or a tag's (TAG + its name).
+const STARRED = '#starred';
+const TAG = '#tag:';
 
 /**
  * The server's map joined to the library: only the papers the library holds, their neighbours
@@ -113,7 +119,7 @@ export function startMapView(container, { openPaper }) {
   let again = 0;
   let failure = '';
   let search = { query: '', depth: 'titles', note: '', lit: null };
-  let area = ''; // the area Areas lights, when the box is empty
+  let area = ''; // what Areas lights, when the box is empty: an area, STARRED, or TAG + a tag
   let peeked = -1;
   let peekSide = 'bottom'; // where the peek is docked: away from the paper
   const laptop = startAsking({ wait: 350 });
@@ -232,7 +238,13 @@ export function startMapView(container, { openPaper }) {
       }
     } else if (area) {
       const count = lit()?.size ?? 0;
-      parts.push(element('span', '', `${areaName(area)}: ${plural(count, 'paper')}`));
+      parts.push(element('span', '', `${litName(area)}: ${plural(count, 'paper')}`));
+      if (!isArea(area) && count) {
+        const fit = element('button', 'plain map-fit', 'Show them');
+        fit.type = 'button';
+        fit.addEventListener('click', () => map.fitIndices(lit()));
+        parts.push(fit);
+      }
       const clear = element('button', 'plain map-fit', 'Every area');
       clear.type = 'button';
       clear.addEventListener('click', () => chooseArea(''));
@@ -253,6 +265,8 @@ export function startMapView(container, { openPaper }) {
   function lit() {
     if (!data) return null;
     if (search.lit) return search.lit;
+    if (area === STARRED) return indicesOf(data.points, doc.papers.filter((paper) => paper.starred));
+    if (area.startsWith(TAG)) return indicesOf(data.points, doc.papers.filter((paper) => paper.tags?.includes(area.slice(TAG.length))));
     if (area) return indicesOf(data.points, doc.papers.filter((paper) => paper.topic === area || paper.topic.startsWith(`${area}/`)));
     return null;
   }
@@ -322,18 +336,39 @@ export function startMapView(container, { openPaper }) {
     const list = element('div', 'choices-scroll');
     list.append(legendRow('', 'Every area', data.points.length, null));
     for (const [top, count] of [...counts].sort((a, b) => b[1] - a[1])) list.append(legendRow(top, areaName(top), count, hueOf(top, hue)));
+    // The reader's own: what they starred, and each tag, the one used last first.
+    const onMap = new Set(data.points.map((p) => p.paper));
+    const starred = doc.papers.filter((paper) => paper.starred && onMap.has(paper)).length;
+    const tags = [...(doc.tags ?? [])].sort((a, b) => String(b.latest).localeCompare(String(a.latest)) || a.name.localeCompare(b.name));
+    if (starred || tags.length) {
+      list.append(element('div', 'sheet-header legend-part', 'Yours'));
+      if (starred) list.append(legendRow(STARRED, 'Starred to read', starred, null, 'star'));
+      for (const tag of tags) {
+        const count = doc.papers.filter((paper) => paper.tags?.includes(tag.name) && onMap.has(paper)).length;
+        list.append(legendRow(TAG + tag.name, tag.name, count, null, 'tag'));
+      }
+    }
     legend.replaceChildren(element('div', 'sheet-header', 'Coloured by area. Tap one to light its papers.'), list);
   }
 
-  function legendRow(path, name, count, hue) {
+  function legendRow(path, name, count, hue, iconName = '') {
     const button = element('button', 'choice');
     button.type = 'button';
     button.dataset.area = path;
     button.setAttribute('role', 'menuitemradio');
     button.setAttribute('aria-checked', String(area === path));
-    button.append(element('span', hue ? `dot hue-${hue}` : 'dot every-dot'), element('span', 'choice-label', name), element('span', 'count', number.format(count)));
+    button.append(iconName ? icon(iconName) : element('span', hue ? `dot hue-${hue}` : 'dot every-dot'), element('span', 'choice-label', name), element('span', 'count', number.format(count)));
     button.addEventListener('click', () => chooseArea(path));
     return button;
+  }
+
+  function isArea(path) {
+    return path !== STARRED && !path.startsWith(TAG);
+  }
+
+  function litName(path) {
+    if (path === STARRED) return 'Starred';
+    return path.startsWith(TAG) ? `Tagged ${path.slice(TAG.length)}` : areaName(path);
   }
 
   /** Lights an area's papers, or none; the list closes so the map shows, and its button names
@@ -341,7 +376,7 @@ export function startMapView(container, { openPaper }) {
   function chooseArea(path) {
     area = area === path ? '' : path;
     for (const row of legend.querySelectorAll('[data-area]')) row.setAttribute('aria-checked', String(row.dataset.area === area));
-    areasButton.textContent = area ? areaName(area) : 'Areas';
+    areasButton.textContent = area ? (isArea(area) ? areaName(area) : litName(area)) : 'Areas';
     areasButton.classList.toggle('on', Boolean(area));
     toggleLegend(false);
     closePeek();
@@ -374,6 +409,7 @@ export function startMapView(container, { openPaper }) {
       closePeek();
       openPaper({ pdf: paper.pdf, title: paper.title });
     });
+    actions.append(starButton(paper.pdf, paper.starred));
     if (point.near.length) actions.append(element('span', 'peek-near', 'Lines join its nearest papers.'));
     peek.replaceChildren(...card, actions);
     peek.hidden = false;
@@ -428,6 +464,8 @@ export function startMapView(container, { openPaper }) {
   });
   areasButton.addEventListener('click', () => {
     closePeek();
+    // Built again as it opens: a star or a tag may have changed since the map was drawn.
+    if (legend.hidden && data) buildLegend();
     toggleLegend();
   });
   canvas.addEventListener('pointerdown', () => toggleLegend(false));

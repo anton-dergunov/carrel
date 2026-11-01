@@ -81,7 +81,10 @@ const reader = createReader({
     keepSoon();
   },
   onFound: (found) => tools.showFound(found),
-  onSaved: (saved) => highlights.showSaved(saved),
+  onSaved: (saved) => {
+    highlights.showSaved(saved);
+    if (saved === 'saved') tools.highlightsChanged();
+  },
 });
 const tools = startPaperTools({
   reader,

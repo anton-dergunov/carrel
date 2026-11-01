@@ -1754,7 +1754,9 @@ button.plain.danger-text { color: var(--error); margin-left: auto; }
 [data-theme^="eink"] .model-choices .radio { border: 2px solid var(--line); }
 [data-theme^="eink"] .model-choices button[aria-checked="true"] .radio::after { inset: 3px; }
 [data-theme^="eink"] .switch-row .switch { border: 2px solid var(--line); background: var(--bg); }
-[data-theme^="eink"] .switch-row .switch::after { top: 2px; left: 2px; border: 2px solid var(--line); }
+/* The knob's border inside its size (a pseudo-element is not `*`): 20 px in the track's 42×24 inside
+   its border, 2 px clear all round, off or on (18 px across). */
+[data-theme^="eink"] .switch-row .switch::after { box-sizing: border-box; width: 20px; height: 20px; top: 2px; left: 2px; border: 2px solid var(--line); }
 [data-theme^="eink"] .switch-row[aria-checked="true"] .switch { background: var(--text); }
 [data-theme="eink"] mark, [data-theme="eink"] .snippet mark { text-decoration: underline 2px; }
 /* Black only: a tile is outlined, not tinted, and a bar is solid. */

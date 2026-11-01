@@ -2,6 +2,14 @@
 
 Scrolling and switching papers in carrel feel slower than vscode-pdf-viewer on the same Mac, with the same PDF.js (6.3.289). This is what could close the gap, roughly in the order worth trying. What is built is described in [architecture.md](architecture.md#layout-and-tabs); this file keeps only what is left.
 
+## What matters, and what to keep
+
+- **The iPad and the Mac first**, where the reader reads and notices speed. The e-ink tablet is slow by design and read at the pace of its page turns: what helps the others may help it as a bonus, but nothing is tuned for it at their cost.
+- **Keep what the crisp-pages research settled** ([experiments/crisp-pages](../experiments/crisp-pages/README.md), Settings → Pages in [architecture.md](architecture.md)). Nothing here may undo it:
+  - On e-ink each page is drawn once, whole and sharp (`maxCanvasPixels` 16.7 MP in `read.js`). PDF.js's capped first drawing plus a detail canvas made the text jump up on every turn there; don't bring the two drawings back on e-ink, as a smaller canvas or a lower cap would.
+  - Settings → Pages: letters as outlines (`disableFontFace`, which reloads the paper), bolder letters and sharper edges drawn on every canvas, the detail canvas too, at `pagerendered` (`page-adjust.js`), and the darker greys, contrast and scans' black and white as filters on the canvases alone. A change to how or when pages are drawn (kept documents, pages drawn ahead, PDF.js's newer drawing options) must keep these applied to every canvas the reader sees, once each: a page struck twice is bolder.
+  - The previews behind the pages, and the place each tab keeps.
+
 ## What we know
 
 - **carrel's own code costs nothing measurable.** A bare PDF.js viewer, made from the same vendored files, draws a page after a jump in the same time as carrel's page, in WebKit and in Chromium, and carrel's page does no work while idle.

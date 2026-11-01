@@ -1,10 +1,10 @@
 # Plan
 
-Carrel puts a paper's PDF and a Claude Code chat side by side on a tablet. The chat runs on the laptop (later the NAS) through the Agent SDK, and the app is served over Tailscale. This file is only what is left to build. What is built is described in [architecture.md](architecture.md) as soon as it is built; a faster PDF has its own plan, [plan-performance.md](plan-performance.md), and so does the research into crisp pages on e-ink, [plan-crisp-pages.md](plan-crisp-pages.md).
+Carrel puts a paper's PDF and a Claude Code chat side by side on a tablet. The chat runs on the laptop (later the NAS) through the Agent SDK, and the app is served over Tailscale. This file is only what is left to build. What is built is described in [architecture.md](architecture.md) as soon as it is built; a faster PDF has its own plan, [plan-performance.md](plan-performance.md).
 
 ## Steps
 
-Each step ends with a sitting on the iPad (and the e-ink tablet, where it says so); what the sitting finds goes into the step, or into architecture.md when it settles something. Steps 1–6 and 11, the library's views and their area maps, starting at login and the Mac app are built and described in [architecture.md](architecture.md): step 6 gathered the highlights, and step 11 became the reader's stars and tags. Step 7, the Settings dialog with its themes, text sizes and e-ink, is built too, and waits for its sitting.
+Each step ends with a sitting on the iPad (and the e-ink tablet, where it says so); what the sitting finds goes into the step, or into architecture.md when it settles something. Steps 1–6, 11 and 12, the library's views and their area maps, starting at login, the Mac app and crisp pages are built and described in [architecture.md](architecture.md): step 6 gathered the highlights, step 11 became the reader's stars and tags, and step 12, research with the reader judging on each device ([experiments/crisp-pages](../experiments/crisp-pages/README.md)), became Settings → Pages and e-ink's pages drawn whole. Step 7, the Settings dialog with its themes, text sizes and e-ink, is built too, and waits for its sitting.
 
 7. **Settings, the sitting.** On the iPad and the e-ink tablet: the chat below the paper or as a sheet over it on e-ink; how often the stream should draw there (3 s now); whether Dark pages keep up when scrolling a long paper on the iPad; the six themes against the area maps and the meaning map; on the Boox, whether the regular weight now keeps the chat quieter than the paper, and whether the paper's sheet opens in one repaint.
 
@@ -29,5 +29,3 @@ Each step ends with a sitting on the iPad (and the e-ink tablet, where it says s
     - What to keep on the device (everything, or chosen areas and recent papers), and when to sync.
     - Highlights made offline, written back to the laptop without clashing with the version check that guards saving a PDF.
     - The library's document, the overview notes and the reviews kept on the device; text search on the device; meaning search left out offline.
-
-12. **Crisp pages (research).** Done on the Boox, the iPad and the Mac's monitor, and its winners are in Settings → Pages (letters as outlines, bolder letters, darker greys, sharper edges, contrast, scans in black and white), each device's own. After the sitting, only e-ink starts with them on, and e-ink's pages are drawn once, whole, which ended a jump on every turn; left is to watch the Boox's memory with whole pages. The plan is [plan-crisp-pages.md](plan-crisp-pages.md).

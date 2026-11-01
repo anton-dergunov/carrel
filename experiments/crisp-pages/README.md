@@ -1,8 +1,8 @@
 # Crisp pages on e-ink
 
-**Question.** On the Boox Tab X C (13.3", 3200×2400, Kaleido 3, Chrome) a paper's text looks thin and grey, and turning the tablet's contrast up makes carrel's chat and library far too heavy. What, done to the page alone, makes it crisp enough that the tablet's contrast can stay at its default? The plan, the candidates and why: [docs/plan-crisp-pages.md](../../docs/plan-crisp-pages.md).
+**Question.** On the Boox Tab X C (13.3", 3200×2400, Kaleido 3, Chrome) a paper's text looks thin and grey, and turning the tablet's contrast up makes carrel's chat and library far too heavy. What, done to the page alone, makes it crisp enough that the tablet's contrast can stay at its default?
 
-**Status.** Done: rounds 1 and 2 on the Boox in two colour modes, the iPad and the Mac's monitor (550 picks, 35 measurements), every winner in carrel's Settings → Pages, and a sitting reading whole papers with them on every device ([NEXT.md](NEXT.md)). Where it stands and what is next: [NEXT.md](NEXT.md).
+**Status.** Done, 2 Nov 2026: rounds 1 and 2 on the Boox in two colour modes, the iPad and the Mac's monitor (550 picks, 35 measurements), every winner in carrel's Settings → Pages ([architecture.md](../../docs/architecture.md)), and a sitting reading whole papers with them on every device.
 
 ## Method
 
@@ -202,4 +202,4 @@ Reading whole papers in carrel with Settings → Pages on, every device, 1–2 N
 
 - **E-ink: far easier to read.** The defaults stay.
 - **The iPad: too crisp** with darker greys at 1.5 and sharper edges at 0.7, the winners on small crops; one step of crispness at most, or none, and a little slower with them on. A page read whole is perceived differently from a crop judged beside others. So every screen but e-ink now starts with the pages as they are, which also makes the defaults one rule.
-- **On e-ink, each turn the page jumped up a few pixels**, with Pages on or off. Measured in Chromium at the Boox's size and pixel ratio, by phase correlation of the screen with and without PDF.js's sharp detail canvas: PDF.js's first, capped drawing of the page (42% of the screen's pixels) sat 3–5 device px lower than the sharp one at the top of the screen and up to 15 (5 CSS px) at the bottom, so the text moved up as the sharp drawing landed; each repaint shows on e-ink. Not carrel's doing, but carrel's to fix: on e-ink the page is now drawn once, whole and sharp (`maxCanvasPixels` 16.7 MP), and the shift measures 0.0. To watch on the Boox: memory (up to about 300 MB of canvases) and the time a turn takes.
+- **On e-ink, each turn the page jumped up a few pixels**, with Pages on or off. Measured in Chromium at the Boox's size and pixel ratio, by phase correlation of the screen with and without PDF.js's sharp detail canvas: PDF.js's first, capped drawing of the page (42% of the screen's pixels) sat 3–5 device px lower than the sharp one at the top of the screen and up to 15 (5 CSS px) at the bottom, so the text moved up as the sharp drawing landed; each repaint shows on e-ink. Not carrel's doing, but carrel's to fix: on e-ink the page is now drawn once, whole and sharp (`maxCanvasPixels` 16.7 MP), and the shift measures 0.0. The reader confirmed the jump gone on the Boox; at the pace of reading on e-ink, a turn's time and the memory (up to about 300 MB of canvases) are fine.

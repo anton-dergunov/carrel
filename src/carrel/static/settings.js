@@ -203,11 +203,8 @@ export function startSettings({ liveModel, name, onOpen = () => {}, onModel = ()
   const scansHint = el('p', 'hint', 'Only on the pages of a paper that are scans.');
   const adjustments = el('div', 'pages-adjustments');
   adjustments.append(outlines, outlinesHint, embolden, tone, sharpen, contrast, scans, scansHint);
-  // Only where the Mac app says the window's monitor has fewer pixels than the screen.
-  const monitor = switchRow('At the monitor’s resolution', 'monitor');
-  const monitorHint = el('p', 'hint', 'Drawn for the monitor’s own pixels, about half as many as the screen’s: quicker to draw. Off, at the screen’s.');
   const pagesGroup = el('section', 'group look-group');
-  pagesGroup.append(groupTitle('div', 'Pages', 'this device'), monitor, monitorHint, pagesSwitch, pagesHint, adjustments);
+  pagesGroup.append(groupTitle('div', 'Pages', 'this device'), pagesSwitch, pagesHint, adjustments);
 
   // Where the chat sits: applied at once, behind the dialog.
   const places = el('div', 'place-choices');
@@ -256,7 +253,6 @@ export function startSettings({ liveModel, name, onOpen = () => {}, onModel = ()
       row.setAttribute('aria-checked', String(prefs[row.dataset.switch]));
     }
     adjustments.hidden = !prefs.pages;
-    monitor.hidden = monitorHint.hidden = !look.monitorBelowScreen();
     pagesHint.hidden = prefs.pages;
     const eink = prefs.family === 'eink';
     modes.hidden = eink;

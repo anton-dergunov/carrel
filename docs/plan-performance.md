@@ -14,7 +14,7 @@ Scrolling and switching papers in carrel feel slower than vscode-pdf-viewer on t
 
 - **carrel's own code costs nothing measurable.** A bare PDF.js viewer, made from the same vendored files, draws a page after a jump in the same time as carrel's page, in WebKit and in Chromium, and carrel's page does no work while idle.
 - **The engine differs.** vscode-pdf-viewer runs in VS Code's Chromium; carrel runs in WebKit (Safari, the iPad, the Mac app's WKWebView). In headless runs Chromium drew a page after a jump in 62 ms against WebKit's 72–78 ms. The gap the eye sees on the real screen is larger than that.
-- **Done so far:** the pages' canvases on the GPU (`enableHWA`): in WebKit at 2x, 74 → 46–63 ms after a jump, and the slowest scroll frames 25–33 → 18–19 ms. A preview behind each page until it is drawn, made by the laptop, so a fast scroll, a tab or a paper's first frame no longer shows white sheets. Nothing drawn while the paper flies past (`scroll-gate.js`), a tab put back from a copy of its pages (`snapshots.js`), the last three papers kept loaded, and the pages drawn for the monitor's own pixels on the Mac: what each does is in [architecture.md](architecture.md#layout-and-tabs).
+- **Done so far:** the pages' canvases on the GPU (`enableHWA`): in WebKit at 2x, 74 → 46–63 ms after a jump, and the slowest scroll frames 25–33 → 18–19 ms. A preview behind each page until it is drawn, made by the laptop, so a fast scroll, a tab or a paper's first frame no longer shows white sheets. Nothing drawn while the paper flies past (`scroll-gate.js`), a tab put back from a copy of its pages (`snapshots.js`), and the last three papers kept loaded: what each does is in [architecture.md](architecture.md#layout-and-tabs).
 - **The Mac was swapping** (9–12 GB of swap, 16 GB of RAM) while this was measured, which slows every app, WebKit's drawing included. Lowering it is a task of its own, outside carrel.
 
 ## What the Mac app showed (2026-11-01)
@@ -35,7 +35,7 @@ Measured with `scripts/mac-bench/bench.py`: wheel events as a free-spinning whee
 
 ### 1. Fewer canvas pixels
 
-Done in part: on the Mac the pages are drawn for the monitor rather than the screen (architecture.md, Drawn for the monitor), 1.5 rather than 2 pixels per point on the Crisp monitor. In alternating runs that day it did not change a flick's grey, while the 4 MP cap had halved it: the whole page at 860 px wide seems to be what it takes, which is the blur the reader postponed. Fewer pages kept drawn (PDF.js keeps ten) is the other way to fewer canvases, untried.
+Tried on 2026-11-01 and taken out. The Mac app told the page how many of the monitor's own pixels there are per point (Crisp's 4096-point screen at 2× is shown on a 5120-pixel panel, so 1.25), and the pages were drawn at 1.5. The reader saw them clearly softer than Preview's, though readable, and a little less flashing. The canvas is resampled twice on its way to such a monitor: up to the screen's 2× when WebKit composites it, then down to the panel; drawn at 2×, as Preview draws, only the second remains. Any ratio but 2 adds the first, so drawing at the panel's exact 1.25 would be softer still. It did not change a flick's grey measurably either, while the 4 MP cap had halved it. Fewer pages kept drawn (PDF.js keeps ten) is the way to fewer canvases left, untried.
 
 ### 2. Previews made by the server
 

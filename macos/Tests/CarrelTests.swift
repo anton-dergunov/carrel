@@ -123,23 +123,3 @@ final class RouteTests: XCTestCase {
         XCTAssertEqual(route(URL(string: "carrel-app://retry")!, origin: origin), .action("retry"))
     }
 }
-
-final class MonitorDensityTests: XCTestCase {
-    func testAScreenScaledDownOntoAMonitorGivesTheMonitorsPixels() {
-        // Crisp: a 4096-point screen at 2×, shown on a 5120-pixel panel.
-        XCTAssertEqual(MonitorDensity.density(native: 5120, points: 4096, backing: 2), 1.25)
-        // A MacBook Air's screen at its default 1470 points, on 2560 pixels.
-        XCTAssertEqual(MonitorDensity.density(native: 2560, points: 1470, backing: 2)!, 1.741, accuracy: 0.001)
-    }
-
-    func testAMonitorShowingEveryPixelSaysNothing() {
-        XCTAssertNil(MonitorDensity.density(native: 2880, points: 1440, backing: 2))
-        XCTAssertNil(MonitorDensity.density(native: 2560, points: 2560, backing: 1))
-        XCTAssertNil(MonitorDensity.density(native: 0, points: 4096, backing: 2))
-    }
-
-    func testThePageHearsOfIt() {
-        XCTAssertEqual(MonitorDensity.script(1.25), "window.carrelScreen = { density: 1.25 }; document.dispatchEvent(new Event('carrel:screen'));")
-        XCTAssertTrue(MonitorDensity.script(nil).hasPrefix("window.carrelScreen = null;"))
-    }
-}

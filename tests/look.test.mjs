@@ -7,7 +7,7 @@ import vm from 'node:vm';
 // functions on the global object.
 const context = {};
 vm.runInNewContext(readFileSync(new URL('../src/carrel/static/boot.js', import.meta.url), 'utf8'), context);
-const { readPrefs, themeOf, deviceDefaults, scaleOf, pageFilters, drawRatioOf, DEFAULTS, EINK_PAGES } = context.carrelLook;
+const { readPrefs, themeOf, deviceDefaults, scaleOf, pageFilters, DEFAULTS, EINK_PAGES } = context.carrelLook;
 
 test('saved prefs are checked: what is missing or does not fit is the default', () => {
   assert.deepEqual({ ...readPrefs(null) }, { ...DEFAULTS });
@@ -93,14 +93,4 @@ test('every tone the settings offer has its filter in the page', () => {
   const page = readFileSync(new URL('../src/carrel/pages/app.html', import.meta.url), 'utf8');
   for (const tone of context.carrelLook.TONES.filter((t) => t !== 1)) assert.match(page, new RegExp(`id="page-tone-${Math.round(tone * 100)}"`));
   assert.match(page, /id="page-scan"/);
-});
-
-test("pages are drawn for the monitor's own pixels when it has fewer than the screen", () => {
-  const on = readPrefs({});
-  assert.equal(on.monitor, true);
-  assert.equal(drawRatioOf(on, 2, 1.25), 1.5); // Crisp's 4096 points on a 5120-pixel panel
-  assert.equal(drawRatioOf(on, 2, 1.741), 2); // a Mac's own screen, scaled: the margin reaches 2
-  assert.equal(drawRatioOf(on, 2, undefined), 2); // no word from the Mac app: the iPad, a browser
-  assert.equal(drawRatioOf(on, 1, 0.5), 1);
-  assert.equal(drawRatioOf(readPrefs({ monitor: false }), 2, 1.25), 2);
 });

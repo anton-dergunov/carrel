@@ -41,9 +41,6 @@ const canvasPixels = () => (window.carrelLook.eink() ? EINK_CANVAS_PIXELS : unde
 const KEPT_PAPERS = 3;
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${ASSETS}pdf.worker.min.mjs`;
-// How many pixels a canvas has per CSS pixel: the screen's, or the monitor's where the Mac app says
-// it has fewer (boot.js's drawRatio). PDF.js reads it here for every page and its detail canvas.
-Object.defineProperty(pdfjsLib.OutputScale, 'pixelRatio', { configurable: true, get: () => window.carrelLook.drawRatio() });
 
 /**
  * The viewer in `#viewerContainer`. `onPage(number, count)` follows the page in view,
@@ -76,7 +73,7 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   // Nothing drawn while the paper scrolls fast, but on e-ink, where a page turn is a jump.
   holdWhileFast({ viewer, container, when: () => !window.carrelLook.eink() });
   // The pages a tab showed, over the pane when it comes back until they are drawn again.
-  // A copy is the canvases in view, 30–70 MB on the Mac: fewer papers' on a tablet, whose browser
+  // A copy is the canvases in view, some 70 MB on the Mac: fewer papers' on a tablet, whose browser
   // drops a page that takes much memory, and one on e-ink, whose pages are drawn whole at full size.
   const snapshots = createSnapshots({ viewer, eventBus, container, papers: snapshotPapers() });
   // Links inside the PDF go through this too.
@@ -101,8 +98,6 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   // sharpened (Settings → Pages): drawn on each canvas once PDF.js has drawn it (page-adjust.js).
   let embolden = window.carrelLook.embolden();
   let sharpening = window.carrelLook.sharpen();
-  // The pixels per CSS pixel the pages showing were drawn at.
-  let drawRatio = window.carrelLook.drawRatio();
 
   eventBus.on('pagesinit', () => {
     viewer.currentScaleValue = 'page-width';
@@ -141,17 +136,11 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
       file = null;
       embolden = window.carrelLook.embolden();
       sharpening = window.carrelLook.sharpen();
-      drawRatio = window.carrelLook.drawRatio();
       void open(pdf, url, { place: lastPlace }).catch((error) => console.warn(`The paper was not loaded again: ${error}`));
-    } else if (
-      window.carrelLook.embolden() !== embolden ||
-      window.carrelLook.sharpen() !== sharpening ||
-      window.carrelLook.drawRatio() !== drawRatio
-    ) {
-      // All three are how the pages are drawn: they are drawn again.
+    } else if (window.carrelLook.embolden() !== embolden || window.carrelLook.sharpen() !== sharpening) {
+      // Both are drawn on the pages: they are drawn again.
       embolden = window.carrelLook.embolden();
       sharpening = window.carrelLook.sharpen();
-      drawRatio = window.carrelLook.drawRatio();
       if (pdfDocument) viewer.refresh();
     }
   });

@@ -45,7 +45,8 @@ test('a text size is a scale of 17 px', () => {
 });
 
 const BOOX = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36';
-const pagesOf = (prefs) => ({ pages: prefs.pages, outlines: prefs.outlines, tone: prefs.tone, contrast: prefs.contrast, scans: prefs.scans });
+const PAGE_KEYS = ['pages', 'outlines', 'embolden', 'tone', 'sharpen', 'contrast', 'scans'];
+const pagesOf = (prefs) => Object.fromEntries(PAGE_KEYS.map((key) => [key, prefs[key]]));
 
 test('each kind of screen starts with the pages crisp-pages found it preferred', () => {
   assert.deepEqual(pagesOf(deviceDefaults('Mozilla/5.0 (Linux; Android 12; BOOX Tab Ultra)', false, true)), { ...PAGES.eink });
@@ -64,7 +65,9 @@ test('e-ink chosen on a screen that did not say so starts with e-ink pages, unti
 });
 
 test('page strengths outside the choices are the default', () => {
-  const prefs = readPrefs({ pages: true, tone: 2.7, contrast: '1.3', outlines: 1, scans: true });
+  const prefs = readPrefs({ pages: true, tone: 2.7, contrast: '1.3', outlines: 1, scans: true, embolden: 0.25, sharpen: 3 });
+  assert.equal(prefs.embolden, 0);
+  assert.equal(prefs.sharpen, 0);
   assert.equal(prefs.tone, 1);
   assert.equal(prefs.contrast, 1);
   assert.equal(prefs.outlines, false);
@@ -80,9 +83,12 @@ test('the filters: none when off, the tone and contrast on a page, black and whi
     scan: 'url(#page-scan) url(#page-tone-125) contrast(1.3)',
   });
   assert.deepEqual({ ...pageFilters(readPrefs({ pages: true, scans: true })) }, { page: 'none', scan: 'url(#page-scan)' });
+  // Emboldening and sharpening are drawn on the canvas (page-adjust.js), not filters.
+  assert.equal(pageFilters(readPrefs({ pages: true, sharpen: 0.7, tone: 1.5 })).page, 'url(#page-tone-150)');
+  assert.equal(pageFilters(readPrefs({ pages: true, embolden: 0.1 })).page, 'none');
 });
 
-test("every tone the settings offer has its filter in the page", () => {
+test('every tone the settings offer has its filter in the page', () => {
   const page = readFileSync(new URL('../src/carrel/pages/app.html', import.meta.url), 'utf8');
   for (const tone of context.carrelLook.TONES.filter((t) => t !== 1)) assert.match(page, new RegExp(`id="page-tone-${Math.round(tone * 100)}"`));
   assert.match(page, /id="page-scan"/);

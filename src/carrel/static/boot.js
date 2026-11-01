@@ -21,20 +21,24 @@
     // switch that keeps them when off. Each device starts with PAGES' choice for its kind.
     pages: false,
     outlines: false, // PDF.js draws each letter's outline itself, instead of the browser's font
+    embolden: 0, // pt: each page drawn again over itself, this far to the side (read.js)
     tone: 1, // a gamma on the page's greys: above 1, the grey edges of letters darker
+    sharpen: 0, // an unsharp mask's amount, about one device pixel wide (page-adjust.js)
     contrast: 1,
     scans: false, // the pages that are scans, in black and white
   };
+  const EMBOLDENS = [0, 0.05, 0.1, 0.18];
   const TONES = [1, 1.25, 1.5, 1.8];
+  const SHARPENS = [0, 0.4, 0.7, 1];
   const CONTRASTS = [1, 1.15, 1.3, 1.5];
-  const PAGE_PREFS = ['pages', 'outlines', 'tone', 'contrast', 'scans'];
-  // What crisp-pages' round 1 found each kind of screen preferred: on e-ink the letters' own
-  // outlines and black-and-white scans; on a tablet or phone a darker tone; on a desktop's
-  // monitor nothing.
+  const PAGE_PREFS = ['pages', 'outlines', 'embolden', 'tone', 'sharpen', 'contrast', 'scans'];
+  // What crisp-pages found each kind of screen preferred: on e-ink the letters' own outlines, a
+  // light embolden and black-and-white scans; on a tablet or phone a darker tone and sharpening;
+  // on a desktop's monitor nothing on (a light embolden, if turned on).
   const PAGES = {
-    eink: { pages: true, outlines: true, tone: 1, contrast: 1, scans: true },
-    touch: { pages: true, outlines: false, tone: 1.5, contrast: 1, scans: false },
-    desktop: { pages: false, outlines: false, tone: 1, contrast: 1, scans: false },
+    eink: { pages: true, outlines: true, embolden: 0.05, tone: 1, sharpen: 0, contrast: 1, scans: true },
+    touch: { pages: true, outlines: false, embolden: 0, tone: 1.5, sharpen: 0.7, contrast: 1, scans: false },
+    desktop: { pages: false, outlines: false, embolden: 0.05, tone: 1, sharpen: 0, contrast: 1, scans: false },
   };
   const SIZES = { ui: [14, 22], library: [14, 24], chat: [14, 26] };
   const FAMILIES = ['carrel', 'plain', 'eink'];
@@ -75,7 +79,9 @@
     // E-ink chosen by hand on a screen that did not say it is one (the Boox's Chrome says only
     // "Android"), with no pages chosen yet: e-ink's pages.
     if (prefs.family === 'eink' && typeof saved.pages !== 'boolean') Object.assign(prefs, PAGES.eink);
+    if (!EMBOLDENS.includes(prefs.embolden)) prefs.embolden = defaults.embolden;
     if (!TONES.includes(prefs.tone)) prefs.tone = defaults.tone;
+    if (!SHARPENS.includes(prefs.sharpen)) prefs.sharpen = defaults.sharpen;
     if (!CONTRASTS.includes(prefs.contrast)) prefs.contrast = defaults.contrast;
     for (const [name, [min, max]] of Object.entries(SIZES)) {
       const size = Number.isFinite(prefs[name]) ? Math.round(prefs[name]) : defaults[name];
@@ -111,7 +117,7 @@
 
   // The page, when there is one; a test runs the functions above without it.
   if (typeof document === 'undefined' || typeof localStorage === 'undefined') {
-    globalThis.carrelLook = { readPrefs, themeOf, deviceDefaults, scaleOf, pageFilters, DEFAULTS, SIZES, TONES, CONTRASTS, PAGES };
+    globalThis.carrelLook = { readPrefs, themeOf, deviceDefaults, scaleOf, pageFilters, DEFAULTS, SIZES, EMBOLDENS, TONES, SHARPENS, CONTRASTS, PAGES };
     return;
   }
 
@@ -157,7 +163,9 @@
     prefs,
     sizes: SIZES,
     base: BASE,
+    emboldens: EMBOLDENS,
     tones: TONES,
+    sharpens: SHARPENS,
     contrasts: CONTRASTS,
     pagePrefs: PAGE_PREFS,
     set(name, value) {
@@ -177,6 +185,10 @@
     motion: () => !reduced.matches && !root.dataset.theme.startsWith('eink'),
     /** Whether PDF.js draws the letters' outlines itself (read.js loads the paper so). */
     outlines: () => prefs.pages && prefs.outlines,
+    /** How far, in pt, read.js draws each page again over itself to embolden it: 0 for not. */
+    embolden: () => (prefs.pages ? prefs.embolden : 0),
+    /** How much read.js sharpens each page once drawn: 0 for not. */
+    sharpen: () => (prefs.pages ? prefs.sharpen : 0),
     /** A part's text scale: 'ui', 'library' or 'chat'. */
     scale: (part) => scaleOf(prefs[part]),
   });

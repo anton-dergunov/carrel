@@ -10,6 +10,7 @@
 import './polyfill.js'; // before PDF.js
 import * as pdfjsLib from './vendor/pdfjs/pdf.min.mjs';
 import { createCiteMark } from './cite-mark.js';
+import { redrawn, sharpen, strike } from './page-adjust.js';
 import { HIGHLIGHT_COLORS, lineBoxes } from './highlight.js';
 import { pinchToZoom, stopPageZoom } from './pinch.js';
 import { createPreviews } from './previews.js';
@@ -68,6 +69,10 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   // Pages), and which of its pages are scans, for the black-and-white option.
   let outlines = window.carrelLook.outlines();
   let scans = new Set();
+  // How far each page is drawn again over itself to embolden it, in pt, and how much it is
+  // sharpened (Settings → Pages): drawn on each canvas once PDF.js has drawn it (page-adjust.js).
+  let embolden = window.carrelLook.embolden();
+  let sharpening = window.carrelLook.sharpen();
 
   eventBus.on('pagesinit', () => {
     viewer.currentScaleValue = 'page-width';
@@ -81,12 +86,35 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   // A page that is a scan is marked before it is drawn, for the CSS's black and white.
   eventBus.on('pagerender', ({ source, pageNumber }) => source.div?.toggleAttribute('data-scan', scans.has(pageNumber)));
 
-  // The letters' outlines are a way of loading the paper: a change loads it again, in place.
+  // A page, and the detail canvas over the part in view, once drawn: emboldened by the width
+  // chosen (as a share of the page's width in pt, so in the canvas's own pixels), then sharpened.
+  // A page only scaled while a pinch settles (cssTransform) was not drawn again, and is left be.
+  eventBus.on('pagerender', ({ source }) => source?.canvas && redrawn(source.canvas));
+  eventBus.on('pagerendered', ({ source, cssTransform, error }) => {
+    const canvas = source?.canvas;
+    const view = source?.pageView ?? source;
+    if (cssTransform || error || !canvas?.width || !view?.div) return;
+    if (embolden) {
+      const share = canvas.getBoundingClientRect().width / view.div.getBoundingClientRect().width;
+      const pageWidth = view.viewport.width / view.viewport.scale; // in pt, turned with the page
+      if (share > 0) strike(canvas, (embolden * canvas.width) / (share * pageWidth));
+    }
+    if (sharpening) void sharpen(canvas, sharpening);
+  });
+
   document.addEventListener('carrel:look', () => {
+    // The letters' outlines are a way of loading the paper: a change loads it again, in place.
     if (window.carrelLook.outlines() !== outlines && file && paper) {
       const { file: pdf, url } = paper;
       file = null;
+      embolden = window.carrelLook.embolden();
+      sharpening = window.carrelLook.sharpen();
       void open(pdf, url, { place: lastPlace }).catch((error) => console.warn(`The paper was not loaded again: ${error}`));
+    } else if (window.carrelLook.embolden() !== embolden || window.carrelLook.sharpen() !== sharpening) {
+      // Both are drawn on the pages: they are drawn again.
+      embolden = window.carrelLook.embolden();
+      sharpening = window.carrelLook.sharpen();
+      if (pdfDocument) viewer.refresh();
     }
   });
   eventBus.on('updateviewarea', ({ location }) => {

@@ -195,12 +195,14 @@ export function startSettings({ liveModel, name, onOpen = () => {}, onModel = ()
     row.append(el('span', 'pages-name', label), control);
     return row;
   };
+  const embolden = labelled('Bolder letters', choiceRow('Bolder letters', 'embolden', look.emboldens.map((v, i) => [v, STRENGTHS[i]])));
   const tone = labelled('Darker greys', choiceRow('Darker greys', 'tone', look.tones.map((v, i) => [v, STRENGTHS[i]])));
+  const sharpen = labelled('Sharper edges', choiceRow('Sharper edges', 'sharpen', look.sharpens.map((v, i) => [v, STRENGTHS[i]])));
   const contrast = labelled('Contrast', choiceRow('Contrast', 'contrast', look.contrasts.map((v, i) => [v, STRENGTHS[i]])));
   const scans = switchRow('Scans in black and white', 'scans');
   const scansHint = el('p', 'hint', 'Only on the pages of a paper that are scans.');
   const adjustments = el('div', 'pages-adjustments');
-  adjustments.append(outlines, outlinesHint, tone, contrast, scans, scansHint);
+  adjustments.append(outlines, outlinesHint, embolden, tone, sharpen, contrast, scans, scansHint);
   const pagesGroup = el('section', 'group look-group');
   pagesGroup.append(groupTitle('div', 'Pages', 'this device'), pagesSwitch, pagesHint, adjustments);
 

@@ -2,7 +2,7 @@
 
 **Question.** On the Boox Tab X C (13.3", 3200×2400, Kaleido 3, Chrome) a paper's text looks thin and grey, and turning the tablet's contrast up makes carrel's chat and library far too heavy. What, done to the page alone, makes it crisp enough that the tablet's contrast can stay at its default? The plan, the candidates and why: [docs/plan-crisp-pages.md](../../docs/plan-crisp-pages.md).
 
-**Status.** Round 1 done: the Boox in two colour modes, the iPad and the Mac's monitor, 498 picks and 35 measurements. Its winners are in carrel's Settings → Pages; round 2, embolden and sharpening by routes carrel can ship, is on the bench ([NEXT.md](NEXT.md)). Where it stands and what is next: [NEXT.md](NEXT.md).
+**Status.** Rounds 1 and 2 done: the Boox in two colour modes, the iPad and the Mac's monitor, 550 picks and 35 measurements. Every winner is in carrel's Settings → Pages; left is a sitting reading with them ([NEXT.md](NEXT.md)). Where it stands and what is next: [NEXT.md](NEXT.md).
 
 ## Method
 
@@ -169,7 +169,7 @@ Decided with the reader on 1 Nov 2026, and built ([architecture.md](../../docs/a
 
 - **Each device's own, not each paper's.** Which adjustment helps changes from paper to paper, but a choice kept per paper would leave the reader unsure what is on and why a paper looks as it does. So one switch, Adjust pages, over the adjustments, which keeps them when off: a paper can be seen as it is and back in a tap. No presets.
 - **The controls**: letters as outlines; darker greys (gamma 1.25, 1.5, 1.8); contrast (1.15, 1.3, 1.5), which the tallies did not favour but the reader wants for pictures on the colour e-ink screen, which cannot show every colour; scans in black and white (ink below 55%), on the pages that are scans alone.
-- **Where each kind of screen starts**: e-ink with outlines and black-and-white scans; a touch screen with darker greys at 1.5; a desktop with nothing on. Embolden would join e-ink at 0.1 pt, and sharpening a touch screen, after round 2.
+- **Where each kind of screen starts**: e-ink with outlines, bolder letters at 0.05 pt and black-and-white scans; a touch screen with darker greys at 1.5 and sharper edges at 0.7; a desktop with nothing on.
 - **Left out**: drawing on the laptop (worse on the iPad, slower everywhere), more resolution than the screen's, Sauvola's threshold (the one cut is as good on these scans, and runs on the GPU).
 
 ## Round 2: routes carrel can ship
@@ -180,3 +180,18 @@ Embolden and sharpening were drawn in round 1 in ways carrel cannot use. Embolde
 - **Sharpen, shippable**: the same unsharp mask as one 3×3 SVG convolution on the canvas, on the GPU, as the other filters are.
 
 If the shippable route is picked as often as the round-1 one, it ships at the strength the reader chose; if it is worse, the next idea is tried there.
+
+### Round 2's results
+
+52 picks, 1 Nov 2026, on the first screen of each knob (the shippable route and the round-1 one at the lowest strength, and the shippable one a step stronger). Scores against chance, as in the conclusions:
+
+| | Baseline | Shippable, lowest | Round 1's, lowest | Shippable, a step up |
+|---|---|---|---|---|
+| Embolden, Boox Optimal | 0.40 | strike 0.05 pt: 1.20 | stroke 0.05 pt: 1.20 | strike 0.1 pt: 1.20 |
+| Embolden, Boox High Contrast | 0.80 | 2.00 | 1.20 | 0.00 |
+| Embolden, Mac monitor | 0.33 | 1.00 | 2.67 | 0.00 |
+| Sharpen, iPad | 0.25 | GPU 0.4: 0.75 | worker 0.4: 1.00 | GPU 0.7: 2.00 |
+
+The reader: both very shippable. The double strike now and then looked a little bolder than the stroke, and was preferred about half as often as the stroke was, otherwise even; the GPU sharpening was more than enough. On the Boox the strike matches the stroke; on the Mac's monitor it reads bolder at the same width, and 0.1 pt is too much there.
+
+**What shipped.** The double strike, as bolder letters (0.05, 0.1, 0.18 pt; e-ink starts at 0.05, the step that matched the stroke everywhere). Sharpening as round 1's worker, not the GPU's SVG filter the reader also liked: as a CSS filter on the page the convolution was worked out at every frame of a scroll, 600–950 ms a frame in headless Chromium and stalls of 280 ms in WebKit, and baking it into the canvas with a canvas filter is ignored by WebKit. The worker sharpens each page once it is drawn (scrolling stayed at 17 ms frames); round 2 found the two alike. A touch screen starts at 0.7.

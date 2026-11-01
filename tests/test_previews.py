@@ -77,3 +77,25 @@ def test_the_page_asks_for_a_picture_by_its_version(library):
         assert client.get("/api/preview/nowhere.pdf?page=1").status_code == 404
     finally:
         target.write_bytes(original)
+
+
+def test_the_papers_used_longest_ago_go_past_the_limit(library):
+    previews = Previews(library, most_bytes=1)
+    target = library.resolve_pdf(WIDE)
+    original = target.read_bytes()
+    try:
+        old = previews.folder / "old-paper"
+        old.mkdir(parents=True)
+        (old / "1-1.jpg").write_bytes(b"x" * 100)
+        two_pages(target)
+        _, version = previews.picture(WIDE, 1)
+        drawn(previews, 2, version)
+        for _ in range(200):
+            if not old.exists():
+                break
+            time.sleep(0.01)
+        # The paper just drawn stays, over the limit as it is; the other goes.
+        assert not old.exists()
+        assert len(list(previews.folder.rglob("*.jpg"))) == 2
+    finally:
+        target.write_bytes(original)

@@ -11,6 +11,7 @@ device, and the tablet draws nothing for them.
 import hashlib
 import logging
 import os
+import shutil
 import tempfile
 import threading
 from pathlib import Path
@@ -29,6 +30,9 @@ WIDTH = 540
 QUALITY = 72
 # The pages of a paper drawn ahead of being asked for: a book's are drawn as they are asked.
 MOST_PAGES = 400
+# The pictures kept on disk, at most: the papers used longest ago go first. Some 90 KB a page, so
+# about 250 papers of twenty pages.
+MOST_BYTES = 500 * 2**20
 
 
 def render(path: Path, page: int, width: int = WIDTH) -> bytes:
@@ -49,9 +53,10 @@ class Previews:
     paper is drawn after it in the background, a page at a time, so that a request never waits for
     a whole paper."""
 
-    def __init__(self, library: Library, folder: Path | None = None):
+    def __init__(self, library: Library, folder: Path | None = None, most_bytes: int = MOST_BYTES):
         self.library = library
         self.folder = folder or state_dir() / "previews" / library.root.name
+        self.most_bytes = most_bytes
         self._lock = threading.Lock()
         self._filling: set[tuple[str, str]] = set()  # (pdf, version) being drawn in the background
 
@@ -68,6 +73,7 @@ class Previews:
         kept = self._kept(rel, version, page)
         try:
             data = kept.read_bytes()
+            kept.parent.touch()  # used now: the last of the papers to go
         except FileNotFoundError:
             data = self._draw(path, page, kept)
         self._fill(rel, path, version)
@@ -97,6 +103,23 @@ class Previews:
             os.replace(temporary, kept)
         return data
 
+    def _trim(self, keep: Path) -> None:
+        """Removes the papers used longest ago until the pictures fit in `most_bytes`, but `keep`."""
+        papers = []
+        for paper in self.folder.iterdir():
+            if paper.is_dir():
+                size = sum(file.stat().st_size for file in paper.iterdir())
+                papers.append((paper.stat().st_mtime, size, paper))
+        total = sum(size for _, size, _ in papers)
+        for _, size, paper in sorted(papers):
+            if total <= self.most_bytes:
+                break
+            if paper == keep:
+                continue
+            with self._lock:
+                shutil.rmtree(paper, ignore_errors=True)
+            total -= size
+
     def _fill(self, rel: str, path: Path, version: str) -> None:
         """Draws the paper's other pages in the background, once for each version."""
         with self._lock:
@@ -116,6 +139,7 @@ class Previews:
                 if file_version(path.stat()) != version:
                     return  # changed again: the next version's request draws it
                 self._draw(path, page, kept)
+            self._trim(keep=self._kept(rel, version, 1).parent)
         except Exception as error:
             log.warning("previews: stopped drawing %s: %s", path.name, error)
         # Done, the set keeps the version so it is not drawn again; one per paper is remembered.

@@ -13,7 +13,6 @@ import { createCiteMark } from './cite-mark.js';
 import { redrawn, sharpen, strike } from './page-adjust.js';
 import { HIGHLIGHT_COLORS, lineBoxes } from './highlight.js';
 import { panAlongAxis } from './pan.js';
-import { createPanTrace } from './pan-trace.js';
 import { pinchToZoom, stopPageZoom } from './pinch.js';
 import { createPreviews } from './previews.js';
 
@@ -187,9 +186,7 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
 
   stopPageZoom();
   pinchToZoom({ container, viewer, eventBus });
-  // The trace is temporary: it goes once the stutter in pan.js is found.
-  const motion = () => window.carrelLook?.motion() ?? true;
-  panAlongAxis({ container, motion, trace: createPanTrace({ container, eventBus, motion }) });
+  panAlongAxis({ container });
 
   /**
    * Fits the width again, unless the reader zoomed in or out. Not while the split is dragged:

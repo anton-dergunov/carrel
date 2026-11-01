@@ -132,13 +132,9 @@ function timeOf(event) {
   return t > 0 && t <= now && now - t < 1000 ? t : now;
 }
 
-/**
- * Pans `container` along an axis; `motion()` says whether it may coast. `trace` (pan-trace.js)
- * is told what it decides and does.
- */
-export function panAlongAxis({ container, motion = () => window.carrelLook?.motion() ?? true, trace = null }) {
+/** Pans `container` along an axis; `motion()` says whether it may coast. */
+export function panAlongAxis({ container, motion = () => window.carrelLook?.motion() ?? true }) {
   if (!iosTouch()) return;
-  const note = (kind, data) => trace?.note(kind, data);
   let pan = null;
   let coast = null;
   let quietUntil = -Infinity;
@@ -149,16 +145,11 @@ export function panAlongAxis({ container, motion = () => window.carrelLook?.moti
     'touchstart',
     (event) => {
       // What the coast this touch stops was doing, for a flick that carries it on.
-      const was = stopCoasting('touch');
+      const was = stopCoasting();
       pan = null;
-      const decision =
-        event.touches.length !== 1 ? 'fingers'
-        : container.style.overflow === 'hidden' ? 'pinch'
-        : container.scrollWidth <= container.clientWidth + 1 ? 'page-width'
-        : 'pan';
-      note('start', { decision, was });
-      // Two fingers; a pinch has the container (pinch.js); or there is nothing sideways to drift into.
-      if (decision !== 'pan') return;
+      if (event.touches.length !== 1) return;
+      // A pinch has the container (pinch.js), or there is nothing sideways to drift into.
+      if (container.style.overflow === 'hidden' || container.scrollWidth <= container.clientWidth + 1) return;
       const { clientX: x, clientY: y } = event.touches[0];
       const t = timeOf(event);
       pan = { from: { x, y }, at: { x, y }, began: t, axis: null, safari: false, samples: [{ t, x, y }], was, rested: false };
@@ -171,7 +162,6 @@ export function panAlongAxis({ container, motion = () => window.carrelLook?.moti
     (event) => {
       if (!pan || pan.safari) return;
       if (event.touches.length !== 1 || container.style.overflow === 'hidden') {
-        note('drop', { fingers: event.touches.length, axis: pan.axis });
         pan = null;
         return;
       }
@@ -182,7 +172,6 @@ export function panAlongAxis({ container, motion = () => window.carrelLook?.moti
       if (!pan.axis) {
         if (pan.samples.length === 1 && t - pan.began > LONG_PRESS_MS) {
           pan.safari = true;
-          note('long-press', { held: t - pan.began });
           return;
         }
         event.preventDefault();
@@ -198,7 +187,6 @@ export function panAlongAxis({ container, motion = () => window.carrelLook?.moti
         const last = lately().at(-1);
         pan.place = last && isEcho(read, lately()) ? { left: last.left, top: last.top } : read;
         remember(pan.place);
-        note('lock', { axis: pan.axis, dx, dy, after: t - pan.began });
       } else {
         event.preventDefault();
         record(t, x, y);
@@ -226,26 +214,12 @@ export function panAlongAxis({ container, motion = () => window.carrelLook?.moti
       if (done.was) quietUntil = performance.now() + CLICK_AFTER_PAN_MS;
       if (!done.axis) return;
       quietUntil = performance.now() + CLICK_AFTER_PAN_MS;
-      if (type !== 'touchend' || event.touches.length || !motion()) {
-        note('end', { type, fingers: event.touches.length, motion: motion() });
-        return;
-      }
-      const lifted = timeOf(event);
-      const release = releaseVelocity(done.samples, done.axis, lifted);
-      let { vx, vy } = release;
+      if (type !== 'touchend' || event.touches.length || !motion()) return;
+      let { vx, vy } = releaseVelocity(done.samples, done.axis, timeOf(event));
       if (done.was && !done.rested) {
         vx = withCarry(vx, carriedSpeed(done.was.vx));
         vy = withCarry(vy, carriedSpeed(done.was.vy));
       }
-      note('release', {
-        release,
-        vx,
-        vy,
-        was: done.was,
-        rested: done.rested,
-        // The finger's last places, as [ms before it lifted, x, y].
-        last: done.samples.slice(-5).map((sample) => [lifted - sample.t, sample.x, sample.y]),
-      });
       startCoasting({ vx, vy }, done.place);
     });
   }
@@ -263,9 +237,7 @@ export function panAlongAxis({ container, motion = () => window.carrelLook?.moti
     { capture: true },
   );
 
-  container.addEventListener('wheel', () => stopCoasting('wheel'), { passive: true });
-
-  trace?.listen();
+  container.addEventListener('wheel', stopCoasting, { passive: true });
 
   /**
    * Scrolls from `place` ({left, top}, kept in fractions of a pixel, which the container may
@@ -278,16 +250,11 @@ export function panAlongAxis({ container, motion = () => window.carrelLook?.moti
     if (dx) container.scrollLeft = left;
     if (dy) container.scrollTop = top;
     remember({ left, top });
-    note('set', { left, top });
     return { left, top, edgeX: left !== place.left - dx, edgeY: top !== place.top - dy };
   }
 
   function startCoasting({ vx, vy }, place) {
-    if (Math.hypot(vx, vy) < STOP_SPEED) {
-      note('no-coast', { vx, vy });
-      return;
-    }
-    note('coast', { vx, vy });
+    if (Math.hypot(vx, vy) < STOP_SPEED) return;
     coast = { vx, vy, released: performance.now(), last: null, place, frame: 0 };
     coast.frame = requestAnimationFrame(glide);
   }
@@ -298,13 +265,10 @@ export function panAlongAxis({ container, motion = () => window.carrelLook?.moti
     // Moved by anything else (a link, a tab, a turn), it stops; a stale report of a place it set
     // is put right by this frame's.
     const read = { left: container.scrollLeft, top: container.scrollTop };
-    if (Math.abs(read.left - place.left) > 1 || Math.abs(read.top - place.top) > 1) {
-      if (!isEcho(read, lately())) {
-        note('stop', { reason: 'moved', ...read, place });
-        coast = null;
-        return;
-      }
-      note('echo', { ...read, place });
+    const off = Math.abs(read.left - place.left) > 1 || Math.abs(read.top - place.top) > 1;
+    if (off && !isEcho(read, lately())) {
+      coast = null;
+      return;
     }
     // The first frame goes as far as the time since the finger lifted, so the page never pauses.
     const dt = coast.last === null ? performance.now() - coast.released : now - coast.last;
@@ -313,9 +277,7 @@ export function panAlongAxis({ container, motion = () => window.carrelLook?.moti
     // At an edge the speed along it is spent.
     const vx = next.edgeX ? 0 : step.vx;
     const vy = next.edgeY ? 0 : step.vy;
-    note('frame', { dt, dx: step.dx, dy: step.dy, vx, vy, late: performance.now() - now });
     if (step.done || Math.hypot(vx, vy) < STOP_SPEED) {
-      note('stop', { reason: step.done ? 'slow' : 'edge' });
       coast = null;
       return;
     }
@@ -334,10 +296,9 @@ export function panAlongAxis({ container, motion = () => window.carrelLook?.moti
     return recent.filter((place) => place.t >= since);
   }
 
-  /** Stops a coast, for `reason`; returns its speed then, or null when none was running. */
-  function stopCoasting(reason) {
+  /** Stops a coast; returns its speed then, or null when none was running. */
+  function stopCoasting() {
     if (!coast) return null;
-    note('stop', { reason });
     cancelAnimationFrame(coast.frame);
     const { vx, vy } = coast;
     coast = null;

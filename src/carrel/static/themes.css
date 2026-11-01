@@ -246,6 +246,8 @@
   /* The lines that frame the page: grey, which nearly every e-ink screen can show, so they sit
      behind the text instead of competing with it. */
   --edge: #555555;
+  /* The gap between two pages is as white as the pages: a faint rule in it shows where one ends. */
+  --page-rule: #b8b8b8;
   color-scheme: light;
 }
 

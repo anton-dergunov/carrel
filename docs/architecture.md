@@ -112,6 +112,12 @@ One dialog, as in Lectern, holds the look and the chat's settings. The gear in t
 - **On a Mac's trackpad.** A pinch arrives as wheel events with `ctrlKey`, as ctrl and a mouse wheel do, and nothing says the fingers lifted. It is the same pinch: the pages scaled as a picture, and the viewer rescaled once no wheel event has come for 200 ms. The steps are the meaning map's.
 - **On the chat.** iOS ignores `user-scalable=no`, and it ignored `touch-action` on `body`, so a pinch there still zoomed the whole page. Cancelling Safari's `gesturestart`/`gesturechange` events stops it.
 
+**One finger keeps to an axis on the iPad.** Zoomed past the page's width, a swipe down drifted sideways: iPad Safari scrolls a box exactly as the finger goes, where Android's Chrome locks the scroll to the axis the swipe mostly runs along.
+- **Why carrel pans.** WebKit has no axis lock for a box that scrolls, and no CSS gives one: `touch-action` is fixed when the finger lands, before its direction is known. Setting the sideways scroll back while Safari scrolls fights its scrolling, which runs apart from the page. So `pan.js` cancels one finger's moves and scrolls the container itself.
+- **The lock.** Chosen when the finger has gone 10 px and kept until it lifts, as UIScrollView's directional lock does: within 30° of vertical it scrolls only up and down, within 30° of horizontal only sideways, and a diagonal moves freely.
+- **Coasting.** At UIScrollView's normal deceleration (0.998 a millisecond), on the locked axis; none on e-ink or with reduced motion. There is no bounce at the ends.
+- **What stays Safari's.** A paper at page width (there is nothing sideways to drift into), a long press (selecting text, the pen, a selection's handles), two fingers, and every device but an iPad or iPhone.
+
 **The keyboard.**
 - **Fitted above it.** Safari sometimes scrolls the page up to show the box being typed in, and sometimes doesn't. So the page is fitted to the area above the keyboard (the visual viewport). The PDF gets shorter, and a chat above or below keeps up to 70% of what is left.
 - **Focused without a scroll.** Safari slides the whole page up while its keyboard rises and reports where it went only now and then, so fitting the page put it back a moment late. A tap on a box therefore focuses it without that scroll, and while the keyboard comes and goes the page is fitted at every frame.

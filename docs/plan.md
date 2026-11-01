@@ -2,13 +2,9 @@
 
 Carrel puts a paper's PDF and a Claude Code chat side by side on a tablet. The chat runs on the laptop (later the NAS) through the Agent SDK, and the app is served over Tailscale. This file is only what is left to build. What is built is described in [architecture.md](architecture.md) as soon as it is built; a faster PDF has its own plan, [plan-performance.md](plan-performance.md).
 
-## Steps
+## Tasks
 
-Each step ends with a sitting on the iPad (and the e-ink tablet, where it says so); what the sitting finds goes into the step, or into architecture.md when it settles something. Steps 1–6, 11 and 12, the library's views and their area maps, starting at login, the Mac app and crisp pages are built and described in [architecture.md](architecture.md): step 6 gathered the highlights, step 11 became the reader's stars and tags, and step 12, research with the reader judging on each device ([experiments/crisp-pages](../experiments/crisp-pages/README.md)), became Settings → Pages and e-ink's pages drawn whole. Step 7, the Settings dialog with its themes, text sizes and e-ink, is built too, and waits for its sitting.
-
-7. **Settings, the sitting.** On the iPad and the e-ink tablet: the chat below the paper or as a sheet over it on e-ink; how often the stream should draw there (3 s now); whether Dark pages keep up when scrolling a long paper on the iPad; the six themes against the area maps and the meaning map; on the Boox, whether the regular weight now keeps the chat quieter than the paper, and whether the paper's sheet opens in one repaint.
-
-8. **The NAS, and a Mac app that stands alone.** Both package carrel with its engine, so they are one step.
+1. **The NAS, and a Mac app that stands alone.** Both package carrel with its engine, so they are one step.
    - A Docker image, and the instructions to install it:
      - logging in to the Claude subscription there (a long-lived token from `claude setup-token`, kept out of the image);
      - Tailscale, on the NAS or in the container, and who is let in;
@@ -22,9 +18,7 @@ Each step ends with a sitting on the iPad (and the e-ink tablet, where it says s
      - updates, through Sparkle rather than an updater of our own;
      - the app's setup choosing the bundled `carrel` when there is one, ahead of the agent's and the shell's.
 
-9. **The Mac app, after a sitting.** What a week of use on the Mac settles: the chat's width beside the paper on a large screen, the keys worth adding to the menus, whether the menu bar item earns its place.
-
-10. **Offline on the tablet.** A copy of the library on the iPad or an Android phone (the PDFs are 7 GB now), so carrel works with no server: the library, the papers, their highlights and overviews. The chat is not available offline, and the page says so.
+2.  **Offline on the tablet.** A copy of the library on the iPad or an Android phone (the PDFs are 7 GB now), so carrel works with no server: the library, the papers, their highlights and overviews. The chat is not available offline, and the page says so.
     - A Home Screen web app with a service worker and storage on the device, or a native wrapper; Safari's storage quota and when it evicts.
     - What to keep on the device (everything, or chosen areas and recent papers), and when to sync.
     - Highlights made offline, written back to the laptop without clashing with the version check that guards saving a PDF.

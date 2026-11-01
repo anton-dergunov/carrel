@@ -45,6 +45,7 @@ const paperTabs = document.getElementById('paper-tabs');
 const papersTab = document.getElementById('tab-papers');
 const chatTab = document.getElementById('tab-chat');
 const chatToggle = document.getElementById('chat-toggle');
+const settingsButton = document.getElementById('settings-button');
 const question = document.getElementById('question');
 papersTab.dataset.key = PAPERS;
 chatTab.dataset.key = CHAT;
@@ -325,6 +326,7 @@ function render() {
   chatTab.setAttribute('aria-selected', String(state.active === CHAT));
   chatTab.classList.toggle('unseen', unseen);
   chatToggle.classList.toggle('unseen', unseen);
+  settingsButton.classList.toggle('unseen', unseen && layout.place !== 'tab');
   tabStrip.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 
   // The paper or review a question is about, said where the question is typed.
@@ -388,7 +390,7 @@ const commands = {
     go(PAPERS);
     document.getElementById('library-add').click();
   },
-  settings: () => document.getElementById('settings-button').click(),
+  settings: () => settingsButton.click(),
 };
 // + − 0 alone zoom the paper, as they do the map (which takes them itself).
 startCommands(commands, { plainZoom: () => Boolean(shownPaper()) });

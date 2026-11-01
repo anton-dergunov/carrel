@@ -190,8 +190,23 @@ export function startSettings({ liveModel, name, onOpen = () => {}, onModel = ()
   resetSize.addEventListener('click', () => layout.resetShare());
   const placeFoot = el('div', 'place-foot');
   placeFoot.append(el('span', 'hint', 'Drag the split between them to resize the chat.'), resetSize);
+  // On a phone the bar has no room for the Chat button, so it is here.
+  const chatShown = el('button', 'switch-row phone-only');
+  chatShown.type = 'button';
+  chatShown.setAttribute('role', 'switch');
+  chatShown.append(el('span', 'words', 'Show the chat'), el('span', 'switch'));
+  chatShown.addEventListener('click', () => {
+    layout.set({ hidden: !layout.get().hidden });
+    drawLook();
+  });
   const layoutGroup = el('section', 'group look-group');
-  layoutGroup.append(groupTitle('div', 'Layout', 'this device'), places, placeFoot);
+  layoutGroup.append(groupTitle('div', 'Layout', 'this device'), chatShown, places, placeFoot);
+
+  // Two columns where the dialog is wide enough (the CSS decides): the look, then the rest.
+  const columns = el('div', 'settings-columns');
+  const lookColumn = columns.appendChild(el('div', 'settings-column'));
+  const restColumn = columns.appendChild(el('div', 'settings-column'));
+  lookColumn.append(colourGroup, sizeGroup);
 
   function drawLook() {
     const { prefs, sizes: range } = look;
@@ -210,10 +225,12 @@ export function startSettings({ liveModel, name, onOpen = () => {}, onModel = ()
       more.disabled = prefs[part] >= range[part][1];
     }
     if (!layout) return;
-    const { place } = layout.get();
+    const { place, hidden } = layout.get();
     for (const choice of places.children) choice.setAttribute('aria-checked', String(choice.dataset.place === place));
     // On a tab of its own, the chat has no split to size.
     placeFoot.hidden = place === 'tab';
+    chatShown.hidden = place === 'tab';
+    chatShown.setAttribute('aria-checked', String(!hidden));
   }
 
   function groupTitle(tag, text, scope) {
@@ -307,14 +324,15 @@ export function startSettings({ liveModel, name, onOpen = () => {}, onModel = ()
       return;
     }
     const section = sectionFor(asked);
-    // The dialog scrolls; the chat's part is below the look's.
-    const reveal = () => (sheet.scrollTop = section === 'chat' ? chatPart.offsetTop - 12 : 0);
+    // The dialog scrolls, under its title; in one column, the chat's part is below the look's.
+    const reveal = () => (sheet.scrollTop = section === 'chat' ? chatPart.offsetTop - title.offsetHeight - 12 : 0);
     (section === 'chat' ? button : gear).setAttribute('aria-expanded', 'true');
     if (sheet.open) return reveal();
     onOpen();
     drawLook();
     chatPart.replaceChildren(loading);
-    sheet.replaceChildren(title, colourGroup, sizeGroup, ...(layout ? [layoutGroup] : []), chatPart);
+    restColumn.replaceChildren(...(layout ? [layoutGroup] : []), chatPart);
+    sheet.replaceChildren(title, columns);
     sheet.showModal();
     noteSays('');
     reveal();

@@ -73,7 +73,7 @@ This came from the first sitting, where the chat closed after the first question
 
 ## Settings
 
-One dialog, as in Lectern, holds the look and the chat's settings. The gear in the strip opens it at the top, the model's name on the chat's status line opens it at the chat's part, and so does the Mac app's View ▸ Page Settings… (⌥⌘,; ⌘, is the app's own Settings). It is a small dialog over the page, not a sheet over the chat, which was too cramped below the paper. It sits near the top and within the area above the keyboard, so the note being typed stays in sight. Each part says where it is kept: on this device, or on the server for every device.
+One dialog, as in Lectern, holds the look and the chat's settings. The gear in the strip opens it at the top, the model's name on the chat's status line opens it at the chat's part, and so does the Mac app's View ▸ Page Settings… (⌥⌘,; ⌘, is the app's own Settings). It is a dialog over the page, not a sheet over the chat, which was too cramped below the paper: two columns where it is 760 px wide or more (the look, then the layout and the chat's), so it is not too tall on the Mac and the iPad, and the whole screen on a phone, its title with Done staying in view as it scrolls. It sits near the top and within the area above the keyboard, so the note being typed stays in sight. Each part says where it is kept: on this device, or on the server for every device.
 
 **Where the chat sits** is chosen here too, by layout.js's control: six places, applied at once behind the dialog, and the size back to where it started. It used to have a button in the strip, which the iPad needs room for.
 
@@ -134,7 +134,7 @@ A paper set to the page width is about as tall as the iPad's screen, so the cont
   - The library is an icon that stays at the left while the papers' tabs scroll.
   - Every paper's tab has its close button, so any tab closes with one tap.
 - **Find** (for the paper showing) takes the place of the tabs while it is open.
-- **The chat button** draws where the chat is, dashed when it is hidden, and shows and hides it. A dot on it marks an answer or a permission request that came while the chat was out of sight.
+- **The chat button** draws where the chat is, dashed when it is hidden, and shows and hides it. A dot on it marks an answer or a permission request that came while the chat was out of sight. On a phone the bar has no room for it: it is a switch in the Settings' Layout, and the gear carries the dot.
 - **The page number** is a faint badge in the PDF's corner. A tap opens the paper's sheet: a field to go to a page, what the library knows of the paper with the reader's star and tags, and its contents with their highlights ([below](#the-overview-and-the-properties)).
 - **Settings** is the gear at the strip's end.
 - **The chat has no header.** Its status line names the model, which opens the settings at the chat's part, and holds two icons, for earlier chats and a new chat. The box says which paper a question is about.

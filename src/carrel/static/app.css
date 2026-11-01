@@ -189,6 +189,10 @@ body:not([data-active="paper"]) :is(#find-button, #pen) { display: none; }
   border-radius: 50%;
   background: var(--accent);
 }
+/* A phone's bar has no room for the Chat button: it is a switch in the Settings, whose gear then
+   carries the Chat button's dot. */
+@media (max-width: 599px) { #chat-toggle { display: none; } }
+@media (min-width: 600px) { #settings-button.unseen::after { display: none; } }
 #tab-chat { position: relative; }
 /* A change to the highlights that has not reached the laptop yet. */
 #pen.unsaved::after { content: ""; position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--error); }
@@ -1094,13 +1098,40 @@ button.plain {
 @keyframes settings-in { from { opacity: 0; transform: translateY(6px); } }
 @media (prefers-reduced-motion: reduce) { #settings-dialog[open] { animation: none; } }
 .settings-title {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin: 0 -24px;
   padding: 14px 24px;
+  background: var(--surface);
   border-bottom: 1px solid var(--line);
 }
+/* One column, or two side by side where the dialog is wide: the look, then the layout and the chat. */
+.settings-columns, .settings-column { display: flex; flex-direction: column; gap: 24px; }
+@media (min-width: 760px) {
+  #settings-dialog { width: min(900px, calc(100vw - 48px)); }
+  .settings-columns { flex-direction: row; gap: 32px; }
+  .settings-column { flex: 1; min-width: 0; }
+}
+/* A phone: the whole screen, as its own settings are, inside the safe areas. */
+@media (max-width: 599px) {
+  #settings-dialog {
+    --lift: 0px;
+    inset: var(--area-top, 0px) 0 var(--area-bottom, 0px);
+    width: 100%;
+    max-width: none;
+    height: auto;
+    max-height: none;
+    padding: 0 16px max(22px, env(safe-area-inset-bottom));
+    border: 0;
+    border-radius: 0;
+  }
+  .settings-title { margin: 0 -16px; padding: calc(10px + env(safe-area-inset-top)) 16px 10px; }
+}
+@media (min-width: 600px) { #settings-dialog .phone-only { display: none; } }
 .settings-title h2 { margin: 0; font: 600 calc(17px * var(--scale)) var(--ui); color: var(--text); }
 /* Its box is even around the word, and stands out past the edge so the word lines up with it. */
 .settings-title .plain { margin-right: -12px; padding: 6px 12px; border-radius: 8px; font-size: calc(16px * var(--scale)); font-weight: 600; }

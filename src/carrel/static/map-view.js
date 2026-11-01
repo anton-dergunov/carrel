@@ -5,7 +5,8 @@
 // - The server's map carries positions, regions and their names, and no titles: they are joined
 //   here to the library's document, so a paper's title is the library's.
 // - A tap on a paper peeks at it (its title, authors, summary and Open), and lines join it to its
-//   five nearest papers. A tap on a region's name flies to it.
+//   five nearest papers, which the peek lists under Similar papers, folded at first: a tap on one
+//   moves the peek and the lines to it. A tap on a region's name flies to it.
 // - The search box lights the papers it finds and dims the rest, at each depth: titles on the
 //   device, text and meaning on the laptop. Areas lights one area's papers, or the reader's own:
 //   the starred papers, or a tag's, so the reader sees where a project's papers sit and what
@@ -19,6 +20,7 @@ import { areaName, hueOf, hues, plural } from './areas.js';
 import { filterPapers } from './library.js';
 import { createMeaningMap, shortTitle } from './meaning-map.js';
 import { starButton } from './marks.js';
+import { foldSection, similarList } from './paper-sheet.js';
 import { element, icon, marks, shortAuthors, typeIcon } from './rows.js';
 import { startAsking } from './server-search.js';
 
@@ -410,8 +412,16 @@ export function startMapView(container, { openPaper }) {
       openPaper({ pdf: paper.pdf, title: paper.title });
     });
     actions.append(starButton(paper.pdf, paper.starred));
-    if (point.near.length) actions.append(element('span', 'peek-near', 'Lines join its nearest papers.'));
-    peek.replaceChildren(...card, actions);
+    const parts = [...card, actions];
+    if (point.near.length) {
+      const near = point.near.map((j) => ({ ...data.points[j].paper, index: j }));
+      const list = similarList(near, (each) => {
+        map.select(each.index);
+        showPeek(each.index);
+      });
+      parts.push(foldSection('map-similar', 'orbit', 'Similar papers', list, { note: `${near.length}, joined by the lines` }).box);
+    }
+    peek.replaceChildren(...parts);
     peek.hidden = false;
     toggleLegend(false);
     const box = canvas.getBoundingClientRect();

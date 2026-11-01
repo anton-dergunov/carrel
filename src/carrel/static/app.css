@@ -374,8 +374,8 @@ body.finding #strip > :not(#find) { display: none; }
 #contents-sheet .source { text-decoration: none; }
 
 /* A section that folds: its icon, its title, a note on what it holds, and a chevron. */
-#contents-sheet .fold { border-top: 1px solid var(--line); }
-#contents-sheet .fold-head {
+:is(#contents-sheet, .map-peek) .fold { border-top: 1px solid var(--line); }
+:is(#contents-sheet, .map-peek) .fold-head {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -389,10 +389,10 @@ body.finding #strip > :not(#find) { display: none; }
   font: 600 13.5px var(--ui);
   -webkit-tap-highlight-color: transparent;
 }
-#contents-sheet .fold-head:active { background: color-mix(in srgb, var(--question) 60%, transparent); }
-#contents-sheet .fold-icon { width: 17px; height: 17px; color: var(--muted); }
-#contents-sheet .fold-title { flex: none; }
-#contents-sheet .fold-note {
+:is(#contents-sheet, .map-peek) .fold-head:active { background: color-mix(in srgb, var(--question) 60%, transparent); }
+:is(#contents-sheet, .map-peek) .fold-icon { width: 17px; height: 17px; color: var(--muted); }
+:is(#contents-sheet, .map-peek) .fold-title { flex: none; }
+:is(#contents-sheet, .map-peek) .fold-note {
   flex: 1;
   min-width: 0;
   text-align: right;
@@ -404,10 +404,10 @@ body.finding #strip > :not(#find) { display: none; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-#contents-sheet .fold-head[aria-expanded="true"] .folded-only { visibility: hidden; }
-#contents-sheet .fold-head .chevron { width: 14px; height: 14px; color: var(--muted); transition: transform 0.12s ease-out; }
-#contents-sheet .fold-head[aria-expanded="true"] .chevron { transform: rotate(90deg); }
-#contents-sheet .fold-body { padding: 0 0 12px 29px; animation: fade-in 0.12s ease-out; }
+:is(#contents-sheet, .map-peek) .fold-head[aria-expanded="true"] .folded-only { visibility: hidden; }
+:is(#contents-sheet, .map-peek) .fold-head .chevron { width: 14px; height: 14px; color: var(--muted); transition: transform 0.12s ease-out; }
+:is(#contents-sheet, .map-peek) .fold-head[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+:is(#contents-sheet, .map-peek) .fold-body { padding: 0 0 12px 29px; animation: fade-in 0.12s ease-out; }
 
 /* About: the summary, then the facts as label and value. */
 #contents-sheet .summary { margin: 0 0 10px; font: 15px/1.45 var(--reading); text-wrap: pretty; }
@@ -426,12 +426,12 @@ body.finding #strip > :not(#find) { display: none; }
 #contents-sheet .digest > :first-child { margin-top: 0; }
 #contents-sheet .digest > :last-child { margin-bottom: 0; }
 /* The similar papers, a row each. */
-#contents-sheet ul.similar { list-style: none; margin: -4px 0 0; padding: 0; }
-#contents-sheet .similar li + li { border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
-#contents-sheet .similar button { display: flex; align-items: baseline; gap: 10px; width: 100%; min-height: 40px; padding: 8px 0; text-align: left; color: var(--text); border-radius: 0; white-space: normal; }
-#contents-sheet .similar button:active { background: var(--question); }
-#contents-sheet .similar .name { flex: 1; min-width: 0; font: 14.5px/1.35 var(--reading); }
-#contents-sheet .similar .year { flex: none; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+:is(#contents-sheet, .map-peek) ul.similar { list-style: none; margin: -4px 0 0; padding: 0; }
+:is(#contents-sheet, .map-peek) .similar li + li { border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+:is(#contents-sheet, .map-peek) .similar button { display: flex; align-items: baseline; gap: 10px; width: 100%; min-height: 40px; padding: 8px 0; text-align: left; color: var(--text); border-radius: 0; white-space: normal; }
+:is(#contents-sheet, .map-peek) .similar button:active { background: var(--question); }
+:is(#contents-sheet, .map-peek) .similar .name { flex: 1; min-width: 0; font: 14.5px/1.35 var(--reading); }
+:is(#contents-sheet, .map-peek) .similar .year { flex: none; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 /* The contents. */
 #outline ul { list-style: none; margin: 0; padding: 0; }
 #outline ul ul { padding-left: 14px; }
@@ -506,8 +506,8 @@ body.finding #strip > :not(#find) { display: none; }
 #contents-sheet.full .summary { font-size: 16px; }
 #contents-sheet.full .fold-body { padding-left: 0; }
 @media (prefers-reduced-motion: reduce) {
-  #contents-sheet, #contents-sheet .fold-body { animation: none; }
-  #contents-sheet .fold-head .chevron { transition: none; }
+  #contents-sheet, :is(#contents-sheet, .map-peek) .fold-body { animation: none; }
+  :is(#contents-sheet, .map-peek) .fold-head .chevron { transition: none; }
 }
 
 /* A tap on a highlight: its colours, Remove, and Ask (highlight.js places it). */
@@ -1602,8 +1602,10 @@ button.danger { background: var(--error); color: var(--surface); padding: 6px 14
 .map-legend .choice[aria-checked="true"] { background: var(--chip-on); }
 .map-peek { display: grid; gap: 4px; padding: 14px 16px 12px; overflow-y: auto; overscroll-behavior: contain; z-index: 4; animation: fade-in 0.12s ease-out; }
 .map-peek[hidden] { display: none; }
+/* Its similar papers, folded at first: the fold's line runs the peek's width. */
+.map-peek .fold { margin-top: 6px; }
+.map-peek .fold-head { min-height: 40px; }
 .map-peek .peek-summary { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
-.peek-near { align-self: center; margin-left: 4px; font-size: 12.5px; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) {
   .map-waiting, .map-legend, .map-peek { animation: none; }
 }

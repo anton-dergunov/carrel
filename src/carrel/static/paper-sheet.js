@@ -13,13 +13,14 @@ import { element, icon } from './rows.js';
 
 const SHEET_KEY = 'carrel.sheet';
 
-/** The sections, in their order, and whether each is open on a new device. */
+/** The sections, in their order, and whether each is open on a new device; then the map's peek's. */
 export const SECTIONS = {
   about: true,
   reading: false,
   digest: false,
   similar: false,
   contents: true,
+  'map-similar': false,
 };
 
 /** The folded sections from what was stored: unknown names and bad shapes are dropped. */
@@ -93,6 +94,19 @@ function saveFolds() {
   } catch {
     // Private browsing: the folds last as long as the page.
   }
+}
+
+/** Papers as rows of their title and year, each a tap: `pick(paper)`. */
+export function similarList(papers, pick) {
+  const list = element('ul', 'similar');
+  for (const paper of papers) {
+    const button = list.appendChild(element('li')).appendChild(element('button', 'plain'));
+    button.type = 'button';
+    button.append(element('span', 'name', paper.title));
+    if (paper.year) button.append(element('span', 'year', paper.year));
+    button.addEventListener('click', () => pick(paper));
+  }
+  return list;
 }
 
 /**
@@ -211,17 +225,10 @@ export function startPaperSheet({ info, similar, actions, isCurrent, close, show
   async function drawSimilar(file) {
     const found = await getJson(`/api/similar/${pathUrl(file)}`);
     if (!found?.papers?.length || !isCurrent(file)) return;
-    const list = element('ul', 'similar');
-    for (const paper of found.papers) {
-      const button = list.appendChild(element('li')).appendChild(element('button', 'plain'));
-      button.type = 'button';
-      button.append(element('span', 'name', paper.title));
-      if (paper.year) button.append(element('span', 'year', paper.year));
-      button.addEventListener('click', () => {
-        close();
-        openPaper({ pdf: paper.pdf, title: paper.title });
-      });
-    }
+    const list = similarList(found.papers, (paper) => {
+      close();
+      openPaper({ pdf: paper.pdf, title: paper.title });
+    });
     similar.replaceChildren(foldSection('similar', 'orbit', 'Similar papers', list, { note: String(found.papers.length) }).box);
     similar.hidden = false;
   }

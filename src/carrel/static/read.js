@@ -24,6 +24,15 @@ const { AnnotationEditorParamsType, AnnotationEditorType } = pdfjsLib;
 const ASSETS = '/static/vendor/pdfjs/';
 // Room left above a destination: hyperref anchors a float below its caption.
 const DEST_CONTEXT_PX = 72;
+// On e-ink each page is drawn once, at the screen's full resolution. Under PDF.js's own cap on a
+// phone or tablet (5.24 MP) a page at page width on the Boox (7.4 MP) was drawn twice: whole at
+// 42% of the screen's pixels, then the part in view sharp, and the first drawing sat up to 5 CSS
+// px lower than the second, so on every turn the text jumped up as the sharp one landed, on a
+// screen where each repaint shows. 16.7 MP draws a page whole up to about 1.5× page width; zoomed
+// in further, the two drawings come back. PDF.js keeps about ten pages drawn: some 300 MB of
+// canvases at most, against 80 under its cap.
+const EINK_CANVAS_PIXELS = 2 ** 24;
+const canvasPixels = () => (window.carrelLook.eink() ? EINK_CANVAS_PIXELS : undefined);
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${ASSETS}pdf.worker.min.mjs`;
 
@@ -46,6 +55,7 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     linkService,
     findController,
     removePageBorders: true,
+    maxCanvasPixels: canvasPixels(),
     annotationEditorMode: AnnotationEditorType.NONE,
     annotationEditorHighlightColors: HIGHLIGHT_COLORS.map((color) => `${color.name}=${color.value}`).join(','),
   });
@@ -103,6 +113,8 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   });
 
   document.addEventListener('carrel:look', () => {
+    // E-ink's full-size pages: from the next paper loaded (the viewer reads it laying a paper out).
+    viewer.maxCanvasPixels = canvasPixels();
     // The letters' outlines are a way of loading the paper: a change loads it again, in place.
     if (window.carrelLook.outlines() !== outlines && file && paper) {
       const { file: pdf, url } = paper;

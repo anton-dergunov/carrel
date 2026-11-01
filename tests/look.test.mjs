@@ -7,7 +7,7 @@ import vm from 'node:vm';
 // functions on the global object.
 const context = {};
 vm.runInNewContext(readFileSync(new URL('../src/carrel/static/boot.js', import.meta.url), 'utf8'), context);
-const { readPrefs, themeOf, deviceDefaults, scaleOf, pageFilters, DEFAULTS, PAGES } = context.carrelLook;
+const { readPrefs, themeOf, deviceDefaults, scaleOf, pageFilters, DEFAULTS, EINK_PAGES } = context.carrelLook;
 
 test('saved prefs are checked: what is missing or does not fit is the default', () => {
   assert.deepEqual({ ...readPrefs(null) }, { ...DEFAULTS });
@@ -48,18 +48,19 @@ const BOOX = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like
 const PAGE_KEYS = ['pages', 'outlines', 'embolden', 'tone', 'sharpen', 'contrast', 'scans'];
 const pagesOf = (prefs) => Object.fromEntries(PAGE_KEYS.map((key) => [key, prefs[key]]));
 
-test('each kind of screen starts with the pages crisp-pages found it preferred', () => {
-  assert.deepEqual(pagesOf(deviceDefaults('Mozilla/5.0 (Linux; Android 12; BOOX Tab Ultra)', false, true)), { ...PAGES.eink });
-  assert.deepEqual(pagesOf(deviceDefaults('Mozilla/5.0 (iPad; CPU OS 26_6 like Mac OS X)', false, true)), { ...PAGES.touch });
-  assert.deepEqual(pagesOf(deviceDefaults('Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0)', false, false)), { ...PAGES.desktop });
-  assert.equal(PAGES.desktop.pages, false);
+test('e-ink starts with its pages; every other screen with the pages as they are', () => {
+  assert.deepEqual(pagesOf(deviceDefaults('Mozilla/5.0 (Linux; Android 12; BOOX Tab Ultra)', false)), { ...EINK_PAGES });
+  const asTheyAre = { pages: false, outlines: false, embolden: 0, tone: 1, sharpen: 0, contrast: 1, scans: false };
+  assert.deepEqual(pagesOf(deviceDefaults('Mozilla/5.0 (iPad; CPU OS 26_6 like Mac OS X)', false)), asTheyAre);
+  assert.deepEqual(pagesOf(deviceDefaults('Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0)', false)), asTheyAre);
+  assert.deepEqual(pagesOf(DEFAULTS), asTheyAre);
 });
 
 test('e-ink chosen on a screen that did not say so starts with e-ink pages, until pages are chosen', () => {
-  // The Boox's Chrome says only "Android": a touch screen, until the reader chose E-ink.
-  const boox = deviceDefaults(BOOX, false, true);
+  // The Boox's Chrome says only "Android", until the reader chose E-ink.
+  const boox = deviceDefaults(BOOX, false);
   assert.equal(boox.family, 'carrel');
-  assert.deepEqual(pagesOf(readPrefs({ family: 'eink' }, boox)), { ...PAGES.eink });
+  assert.deepEqual(pagesOf(readPrefs({ family: 'eink' }, boox)), { ...EINK_PAGES });
   assert.equal(readPrefs({ family: 'eink', pages: false }, boox).pages, false);
   assert.equal(readPrefs({ family: 'eink', pages: true, outlines: false }, boox).outlines, false);
 });

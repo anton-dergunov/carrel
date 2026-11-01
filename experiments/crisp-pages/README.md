@@ -2,7 +2,7 @@
 
 **Question.** On the Boox Tab X C (13.3", 3200×2400, Kaleido 3, Chrome) a paper's text looks thin and grey, and turning the tablet's contrast up makes carrel's chat and library far too heavy. What, done to the page alone, makes it crisp enough that the tablet's contrast can stay at its default? The plan, the candidates and why: [docs/plan-crisp-pages.md](../../docs/plan-crisp-pages.md).
 
-**Status.** Rounds 1 and 2 done: the Boox in two colour modes, the iPad and the Mac's monitor, 550 picks and 35 measurements. Every winner is in carrel's Settings → Pages; left is a sitting reading with them ([NEXT.md](NEXT.md)). Where it stands and what is next: [NEXT.md](NEXT.md).
+**Status.** Done: rounds 1 and 2 on the Boox in two colour modes, the iPad and the Mac's monitor (550 picks, 35 measurements), every winner in carrel's Settings → Pages, and a sitting reading whole papers with them on every device ([NEXT.md](NEXT.md)). Where it stands and what is next: [NEXT.md](NEXT.md).
 
 ## Method
 
@@ -169,7 +169,7 @@ Decided with the reader on 1 Nov 2026, and built ([architecture.md](../../docs/a
 
 - **Each device's own, not each paper's.** Which adjustment helps changes from paper to paper, but a choice kept per paper would leave the reader unsure what is on and why a paper looks as it does. So one switch, Adjust pages, over the adjustments, which keeps them when off: a paper can be seen as it is and back in a tap. No presets.
 - **The controls**: letters as outlines; darker greys (gamma 1.25, 1.5, 1.8); contrast (1.15, 1.3, 1.5), which the tallies did not favour but the reader wants for pictures on the colour e-ink screen, which cannot show every colour; scans in black and white (ink below 55%), on the pages that are scans alone.
-- **Where each kind of screen starts**: e-ink with outlines, bolder letters at 0.05 pt and black-and-white scans; a touch screen with darker greys at 1.5 and sharper edges at 0.7; a desktop with nothing on.
+- **Where each kind of screen starts**: e-ink with outlines, bolder letters at 0.05 pt and black-and-white scans; every other screen with nothing on (after the sitting below).
 - **Left out**: drawing on the laptop (worse on the iPad, slower everywhere), more resolution than the screen's, Sauvola's threshold (the one cut is as good on these scans, and runs on the GPU).
 
 ## Round 2: routes carrel can ship
@@ -195,3 +195,11 @@ If the shippable route is picked as often as the round-1 one, it ships at the st
 The reader: both very shippable. The double strike now and then looked a little bolder than the stroke, and was preferred about half as often as the stroke was, otherwise even; the GPU sharpening was more than enough. On the Boox the strike matches the stroke; on the Mac's monitor it reads bolder at the same width, and 0.1 pt is too much there.
 
 **What shipped.** The double strike, as bolder letters (0.05, 0.1, 0.18 pt; e-ink starts at 0.05, the step that matched the stroke everywhere). Sharpening as round 1's worker, not the GPU's SVG filter the reader also liked: as a CSS filter on the page the convolution was worked out at every frame of a scroll, 600–950 ms a frame in headless Chromium and stalls of 280 ms in WebKit, and baking it into the canvas with a canvas filter is ignored by WebKit. The worker sharpens each page once it is drawn (scrolling stayed at 17 ms frames); round 2 found the two alike. A touch screen starts at 0.7.
+
+## The sitting
+
+Reading whole papers in carrel with Settings → Pages on, every device, 1–2 Nov 2026. The reader:
+
+- **E-ink: far easier to read.** The defaults stay.
+- **The iPad: too crisp** with darker greys at 1.5 and sharper edges at 0.7, the winners on small crops; one step of crispness at most, or none, and a little slower with them on. A page read whole is perceived differently from a crop judged beside others. So every screen but e-ink now starts with the pages as they are, which also makes the defaults one rule.
+- **On e-ink, each turn the page jumped up a few pixels**, with Pages on or off. Measured in Chromium at the Boox's size and pixel ratio, by phase correlation of the screen with and without PDF.js's sharp detail canvas: PDF.js's first, capped drawing of the page (42% of the screen's pixels) sat 3–5 device px lower than the sharp one at the top of the screen and up to 15 (5 CSS px) at the bottom, so the text moved up as the sharp drawing landed; each repaint shows on e-ink. Not carrel's doing, but carrel's to fix: on e-ink the page is now drawn once, whole and sharp (`maxCanvasPixels` 16.7 MP), and the shift measures 0.0. To watch on the Boox: memory (up to about 300 MB of canvases) and the time a turn takes.

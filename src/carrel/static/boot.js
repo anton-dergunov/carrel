@@ -18,7 +18,7 @@
     library: 17,
     chat: 15,
     // The pages (experiments/crisp-pages): adjustments to how a paper's pages are drawn, under one
-    // switch that keeps them when off. Each device starts with PAGES' choice for its kind.
+    // switch that keeps them when off. Off, and each adjustment off, except on e-ink (EINK_PAGES).
     pages: false,
     outlines: false, // PDF.js draws each letter's outline itself, instead of the browser's font
     embolden: 0, // pt: each page drawn again over itself, this far to the side (read.js)
@@ -32,14 +32,11 @@
   const SHARPENS = [0, 0.4, 0.7, 1];
   const CONTRASTS = [1, 1.15, 1.3, 1.5];
   const PAGE_PREFS = ['pages', 'outlines', 'embolden', 'tone', 'sharpen', 'contrast', 'scans'];
-  // What crisp-pages found each kind of screen preferred: on e-ink the letters' own outlines, a
-  // light embolden and black-and-white scans; on a tablet or phone a darker tone and sharpening;
-  // on a desktop's monitor nothing on (a light embolden, if turned on).
-  const PAGES = {
-    eink: { pages: true, outlines: true, embolden: 0.05, tone: 1, sharpen: 0, contrast: 1, scans: true },
-    touch: { pages: true, outlines: false, embolden: 0, tone: 1.5, sharpen: 0.7, contrast: 1, scans: false },
-    desktop: { pages: false, outlines: false, embolden: 0.05, tone: 1, sharpen: 0, contrast: 1, scans: false },
-  };
+  // What e-ink starts with: crisp-pages' winners there, the letters' own outlines, a light
+  // embolden and black-and-white scans. The reader saw a page made far crisper by them on the
+  // Boox, and too crisp, read whole, on the iPad, which judging small crops had favoured: so every
+  // other screen starts with the pages as they are.
+  const EINK_PAGES = { pages: true, outlines: true, embolden: 0.05, tone: 1, sharpen: 0, contrast: 1, scans: true };
   const SIZES = { ui: [14, 22], library: [14, 24], chat: [14, 26] };
   const FAMILIES = ['carrel', 'plain', 'eink'];
   const MODES = ['light', 'dark', 'system'];
@@ -56,14 +53,11 @@
   // Reading devices whose browsers say what they are; the rest are caught by the media query.
   const EINK_DEVICE = /\b(BOOX|Onyx|Kindle|Kobo|PocketBook|reMarkable|Bigme|Meebook|Likebook|Boyue)\b/i;
 
-  /**
-   * What a device starts with before anything is chosen on it: e-ink on an e-ink screen, and the
-   * pages its kind of screen wants (a touch screen is a tablet's or a phone's).
-   */
-  function deviceDefaults(userAgent, monochrome, touch = false) {
+  /** What a device starts with before anything is chosen on it: e-ink, with its pages, on an e-ink screen. */
+  function deviceDefaults(userAgent, monochrome) {
     const defaults = { ...DEFAULTS };
-    if (EINK_DEVICE.test(userAgent) || monochrome) defaults.family = 'eink';
-    return { ...defaults, ...PAGES[defaults.family === 'eink' ? 'eink' : touch ? 'touch' : 'desktop'] };
+    if (EINK_DEVICE.test(userAgent) || monochrome) Object.assign(defaults, { family: 'eink' }, EINK_PAGES);
+    return defaults;
   }
 
   /** The saved prefs, checked: whatever is missing or does not fit is the device's default. */
@@ -78,7 +72,7 @@
     if (!INKS.includes(prefs.ink)) prefs.ink = defaults.ink;
     // E-ink chosen by hand on a screen that did not say it is one (the Boox's Chrome says only
     // "Android"), with no pages chosen yet: e-ink's pages.
-    if (prefs.family === 'eink' && typeof saved.pages !== 'boolean') Object.assign(prefs, PAGES.eink);
+    if (prefs.family === 'eink' && typeof saved.pages !== 'boolean') Object.assign(prefs, EINK_PAGES);
     if (!EMBOLDENS.includes(prefs.embolden)) prefs.embolden = defaults.embolden;
     if (!TONES.includes(prefs.tone)) prefs.tone = defaults.tone;
     if (!SHARPENS.includes(prefs.sharpen)) prefs.sharpen = defaults.sharpen;
@@ -117,7 +111,7 @@
 
   // The page, when there is one; a test runs the functions above without it.
   if (typeof document === 'undefined' || typeof localStorage === 'undefined') {
-    globalThis.carrelLook = { readPrefs, themeOf, deviceDefaults, scaleOf, pageFilters, DEFAULTS, SIZES, EMBOLDENS, TONES, SHARPENS, CONTRASTS, PAGES };
+    globalThis.carrelLook = { readPrefs, themeOf, deviceDefaults, scaleOf, pageFilters, DEFAULTS, SIZES, EMBOLDENS, TONES, SHARPENS, CONTRASTS, EINK_PAGES };
     return;
   }
 
@@ -130,10 +124,7 @@
   } catch {
     // Private browsing, or nothing kept yet: the device's defaults.
   }
-  const prefs = readPrefs(
-    saved,
-    deviceDefaults(navigator.userAgent, matchMedia('(monochrome)').matches, matchMedia('(pointer: coarse)').matches),
-  );
+  const prefs = readPrefs(saved, deviceDefaults(navigator.userAgent, matchMedia('(monochrome)').matches));
 
   function apply() {
     const theme = themeOf(prefs, dark.matches);

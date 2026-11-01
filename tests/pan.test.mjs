@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { axisFor, carriedSpeed, coastStep, onAxis, releaseVelocity, withCarry } from '../src/carrel/static/pan.js';
+import { axisFor, carriedSpeed, coastStep, isEcho, onAxis, releaseVelocity, withCarry } from '../src/carrel/static/pan.js';
 
 /** A move of `length` px at `degrees` from straight down. */
 function at(degrees, length = 100) {
@@ -109,4 +109,26 @@ test('coasting stops once slow', () => {
   assert.ok(state.done);
   // A 3 px/ms flick coasts about 3 / -ln(0.998) ≈ 1500 px, less the slow tail cut off.
   assert.ok(travelled > 1400 && travelled < 1500, String(travelled));
+});
+
+test('a scroll Safari reports late is one carrel set, not a move', () => {
+  // b5ghwp-24 on the iPad: set 11595 then 11565; 8 ms after the finger lifted, 11595 came back.
+  const recent = [
+    { left: 177, top: 11791 },
+    { left: 177, top: 11650 },
+    { left: 177, top: 11595 },
+    { left: 177, top: 11565 },
+  ];
+  assert.equal(isEcho({ left: 177, top: 11595 }, recent), true);
+  assert.equal(isEcho({ left: 177, top: 11700.5 }, recent), true);
+});
+
+test('a jump elsewhere, or sideways, is a move', () => {
+  const recent = [
+    { left: 177, top: 11650 },
+    { left: 177, top: 11565 },
+  ];
+  assert.equal(isEcho({ left: 177, top: 2000 }, recent), false);
+  assert.equal(isEcho({ left: 0, top: 11600 }, recent), false);
+  assert.equal(isEcho({ left: 177, top: 11600 }, []), false);
 });

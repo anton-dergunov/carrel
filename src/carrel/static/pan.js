@@ -36,6 +36,9 @@ const CARRY_REST_MS = 50;
 // The fastest a finger's release counts for, and a coast with what flicks before it carried (px/ms).
 const MAX_RELEASE = 8;
 const MAX_SPEED = 40;
+// Safari may report a scroll carrel set this long ago as the scroll now: it keeps its own copy of
+// the position, and when the finger lifts it sends back one a move or three old.
+const ECHO_MS = 500;
 // After a pan, or a tap that stopped a coast, the click that lifting the finger sends is not a tap.
 const CLICK_AFTER_PAN_MS = 400;
 
@@ -105,6 +108,18 @@ export function coastStep({ vx, vy }, dt) {
   return { dx: vx * reach, dy: vy * reach, ...next, done: Math.hypot(next.vx, next.vy) < STOP_SPEED };
 }
 
+/**
+ * Whether the scroll read back, `now` ({left, top}), is one carrel set lately rather than a move
+ * by anything else: within the span of the places it set (`recent`), on both axes.
+ */
+export function isEcho(now, recent, slack = 2) {
+  if (!recent.length) return false;
+  const lefts = recent.map((place) => place.left);
+  const tops = recent.map((place) => place.top);
+  const within = (value, values) => value >= Math.min(...values) - slack && value <= Math.max(...values) + slack;
+  return within(now.left, lefts) && within(now.top, tops);
+}
+
 /** Whether this is an iPad or an iPhone: touches, and WebKit's own gesture events. */
 function iosTouch() {
   return 'ontouchstart' in window && 'ongesturestart' in window;
@@ -127,6 +142,8 @@ export function panAlongAxis({ container, motion = () => window.carrelLook?.moti
   let pan = null;
   let coast = null;
   let quietUntil = -Infinity;
+  // The places carrel set lately, {t, left, top}, to tell Safari's stale reports from a move.
+  let recent = [];
 
   container.addEventListener(
     'touchstart',
@@ -176,7 +193,11 @@ export function panAlongAxis({ container, motion = () => window.carrelLook?.moti
         // Chosen: the way the finger has come so far is scrolled at once, on that axis.
         pan.axis = axisFor(dx, dy);
         pan.at = pan.from;
-        pan.place = { left: container.scrollLeft, top: container.scrollTop };
+        // A swipe that stops a coast starts where the coast was, not where Safari last said.
+        const read = { left: container.scrollLeft, top: container.scrollTop };
+        const last = lately().at(-1);
+        pan.place = last && isEcho(read, lately()) ? { left: last.left, top: last.top } : read;
+        remember(pan.place);
         note('lock', { axis: pan.axis, dx, dy, after: t - pan.began });
       } else {
         event.preventDefault();
@@ -256,6 +277,7 @@ export function panAlongAxis({ container, motion = () => window.carrelLook?.moti
     const top = clamp(place.top - dy, 0, container.scrollHeight - container.clientHeight);
     if (dx) container.scrollLeft = left;
     if (dy) container.scrollTop = top;
+    remember({ left, top });
     note('set', { left, top });
     return { left, top, edgeX: left !== place.left - dx, edgeY: top !== place.top - dy };
   }
@@ -273,11 +295,16 @@ export function panAlongAxis({ container, motion = () => window.carrelLook?.moti
   function glide(now) {
     if (!coast) return;
     const { place } = coast;
-    // Moved by anything else (a link, a tab, a turn), it stops.
-    if (Math.abs(container.scrollLeft - place.left) > 1 || Math.abs(container.scrollTop - place.top) > 1) {
-      note('stop', { reason: 'moved', left: container.scrollLeft, top: container.scrollTop, place });
-      coast = null;
-      return;
+    // Moved by anything else (a link, a tab, a turn), it stops; a stale report of a place it set
+    // is put right by this frame's.
+    const read = { left: container.scrollLeft, top: container.scrollTop };
+    if (Math.abs(read.left - place.left) > 1 || Math.abs(read.top - place.top) > 1) {
+      if (!isEcho(read, lately())) {
+        note('stop', { reason: 'moved', ...read, place });
+        coast = null;
+        return;
+      }
+      note('echo', { ...read, place });
     }
     // The first frame goes as far as the time since the finger lifted, so the page never pauses.
     const dt = coast.last === null ? performance.now() - coast.released : now - coast.last;
@@ -294,6 +321,17 @@ export function panAlongAxis({ container, motion = () => window.carrelLook?.moti
     }
     coast = { ...coast, vx, vy, last: now, place: next };
     coast.frame = requestAnimationFrame(glide);
+  }
+
+  function remember({ left, top }) {
+    recent = lately();
+    recent.push({ t: performance.now(), left, top });
+  }
+
+  /** The places carrel set within `ECHO_MS`. */
+  function lately() {
+    const since = performance.now() - ECHO_MS;
+    return recent.filter((place) => place.t >= since);
   }
 
   /** Stops a coast, for `reason`; returns its speed then, or null when none was running. */

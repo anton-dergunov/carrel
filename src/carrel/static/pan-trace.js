@@ -191,6 +191,7 @@ export function summarise({ touches, notes, scrolls, frames, renders }) {
     decision: notes.find((note) => note[1] === 'start')?.[2]?.decision ?? null,
     axis: notes.find((note) => note[1] === 'lock')?.[2]?.axis ?? null,
     stop: notes.find((note) => note[1] === 'stop')?.[2]?.reason ?? null,
+    echoes: notes.filter((note) => note[1] === 'echo').length,
     moves: moves.length,
     uncancelable: moves.filter((touch) => !touch[5]).length,
     notPrevented: moves.filter((touch) => !touch[6]).length,

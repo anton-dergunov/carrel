@@ -1,6 +1,6 @@
 # Plan: crisp pages on e-ink (research)
 
-**This is research, with the reader in the loop.** It is a session of its own, not a change to make between others. Nothing is chosen in advance: the reader looks at the candidates on the e-ink tablet itself and picks, round after round, and the settings carrel ends up with come from those picks. E-ink is the reader's main reading device, so this is worth doing thoroughly. Built so far: nothing.
+**This is research, with the reader in the loop.** It is a session of its own, not a change to make between others. Nothing is chosen in advance: the reader looks at the candidates on the e-ink tablet itself and picks, round after round, and the settings carrel ends up with come from those picks. E-ink is the reader's main reading device, so this is worth doing thoroughly. Built so far: the bench and round 1's crops, in [experiments/crisp-pages](../experiments/crisp-pages/README.md); no picks yet.
 
 ## The problem
 
@@ -9,8 +9,8 @@ On the Boox Tab X C (13.3", 3200×2400, Kaleido 3, Chrome), a paper's text looks
 ## What we know
 
 - **Pages are PDF.js canvases** (6.3.289), drawn at the device pixel ratio, with the text layer transparent over them (`read.js`).
-- **PDF.js caps a canvas on Android at 5.24 MP** (`maxCanvasPixels`). A page at page width on a 2400 px-wide screen is about 7.4 MP, so the page's canvas is drawn smaller and scaled up, and PDF.js's detail canvas redraws the part in view at full size. How sharp the page in view really is on the Boox, and how long it is soft after a turn, is to be measured there first (the backing size of the canvases against their CSS size, `devicePixelRatio`).
-- **Android draws PDF.js's text with its own fonts off** (`useSystemFonts: false`) and grey anti-aliasing with no hinting, which is where thin stems come from.
+- **PDF.js caps a canvas on Android and iOS at 5.24 MP** (`maxCanvasPixels`, which its viewer component takes from its own options). A page at page width on a 2400 px-wide screen is about 7.4 MP, so the page's canvas is drawn at 42% of the device's pixels (the cap, halved because a detail canvas follows), and the detail canvas redraws the part in view at full size, uncapped. So the page in view is at full resolution once the detail canvas is drawn, and soft between a turn and then. How long that is on the Boox is for the bench's Measure.
+- **Android draws PDF.js's text with grey anti-aliasing and no hinting**, which is where thin stems come from. (`useSystemFonts: false` on Android is a setting of PDF.js's own viewer app; carrel's `getDocument` passes none, so PDF.js's default, true, applies, and it only matters for fonts a PDF does not embed.)
 - **The only filter on pages today is Dark pages** (`--pdf-filter` on `.pdfViewer .page`, with the previews behind it). A new one has to compose with it, in the one `filter` property, or on the canvas alone.
 - **E-ink shows 16 greys**, and the tablet's own per-app settings (contrast, dithering, text enhancement, refresh mode) act on everything carrel draws.
 

@@ -1,0 +1,111 @@
+# The crops the bench shows, the same every round. `pdf` is relative to the library's pdf_root;
+# `rect` is [x0, y0, x1, y1] in PDF points, filled by `find_papers.py --crops` from the page's
+# text (or around `near`, a phrase on the page) and kept from then on. Papers are named here by
+# title only: their pages are not ours to commit.
+crops:
+- id: gpt3-body
+  kind: latex
+  title: Language Models are Few-Shot Learners
+  pdf: llm/foundation-models/Language Models are Few-Shot Learners.pdf
+  page: 4
+  rect: [68.0, 504.0, 349.5, 715.1]
+  size: [612.0, 792.0]
+- id: depth-body
+  kind: latex
+  title: 'Scaling up Test-Time Compute with Latent Reasoning: A Recurrent Depth Approach'
+  pdf: llm/reasoning/Scaling up Test-Time Compute with Latent Reasoning. A Recurrent Depth Approach.pdf
+  page: 3
+  rect: [50.0, 516.0, 331.5, 727.1]
+  size: [612.0, 792.0]
+- id: gpt3-table
+  kind: table
+  title: Language Models are Few-Shot Learners
+  pdf: llm/foundation-models/Language Models are Few-Shot Learners.pdf
+  page: 23
+  rect: [120.0, 70.0, 401.5, 281.1]
+  size: [612.0, 792.0]
+- id: ocx-body
+  kind: word
+  title: Online controlled experiments at large scale
+  pdf: experimentation-and-metrics/ab-testing/Online controlled experiments at large scale.pdf
+  page: 4
+  rect: [314.0, 492.0, 595.5, 703.1]
+  size: [612.0, 792.0]
+- id: busters-body
+  kind: word
+  title: 'A/B testing intuition busters: common misunderstandings in online controlled experiments'
+  pdf: experimentation-and-metrics/ab-testing/A B testing intuition busters. common misunderstandings in online controlled experiments.pdf
+  page: 2
+  rect: [314.0, 144.0, 595.5, 355.1]
+  size: [612.0, 792.0]
+- id: counterfactual-body
+  kind: word
+  title: 'Counterfactual Explanations without Opening the Black Box: Automated Decisions and the GDPR'
+  pdf: interpretability/explainability/Counterfactual Explanations without Opening the Black Box. Automated Decisions and the GDPR.pdf
+  page: 3
+  rect: [118.0, 98.0, 391.9, 303.4]
+  size: [595.4, 841.7]
+- id: err-body
+  kind: type1
+  title: Expected Reciprocal Rank for Graded Relevance
+  pdf: search-and-ranking/evaluation/Expected Reciprocal Rank for Graded Relevance.pdf
+  page: 2
+  rect: [314.0, 264.0, 595.5, 475.1]
+  size: [612.0, 792.0]
+- id: demsar-body
+  kind: type1
+  title: Statistical Comparisons of Classifiers over Multiple Data Sets
+  pdf: ml-foundations/evaluation-and-model-selection/Statistical Comparisons of Classifiers over Multiple Data Sets.pdf
+  page: 3
+  rect: [86.0, 468.0, 367.5, 679.1]
+  size: [612.0, 792.0]
+- id: implicit-body
+  kind: type1
+  title: Collaborative Filtering for Implicit Feedback Datasets
+  pdf: recommender-systems/collaborative-filtering/Collaborative Filtering for Implicit Feedback Datasets.pdf
+  page: 2
+  rect: [65.0, 360.0, 346.5, 571.1]
+  size: [612.0, 792.0]
+- id: lamport-scan
+  kind: scanned
+  title: Time, Clocks, and the Ordering of Events in a Distributed System
+  pdf: computer-systems/Time, Clocks, and the Ordering of Events in a Distributed System.pdf
+  page: 2
+  rect: [56.0, 504.0, 337.5, 715.1]
+  size: [612.0, 792.0]
+- id: mixtures-scan
+  kind: scanned
+  title: Adaptive Mixtures of Local Experts
+  pdf: deep-learning/architectures/Adaptive Mixtures of Local Experts.pdf
+  page: 3
+  rect: [158.0, 395.0, 437.1, 604.3]
+  size: [606.7, 840.0]
+- id: svn-figure
+  kind: scanned-figure
+  title: Support-Vector Networks
+  pdf: ml-foundations/classical-ml/Support-Vector Networks.pdf
+  page: 3
+  near: Figure
+  rect: [121.2, 195.1, 402.7, 406.2]
+  size: [612.0, 792.0]
+- id: sgdr-maths
+  kind: maths
+  title: 'SGDR: Stochastic Gradient Descent with Warm Restarts'
+  pdf: deep-learning/optimizers-and-schedules/SGDR. Stochastic Gradient Descent with Warm Restarts.pdf
+  page: 2
+  rect: [104.0, 395.0, 385.5, 606.1]
+  size: [612.0, 792.0]
+- id: cmc-maths
+  kind: maths
+  title: Contrastive Multiview Coding
+  pdf: representation-learning/self-supervised/Contrastive Multiview Coding.pdf
+  page: 4
+  rect: [47.0, 204.0, 328.5, 415.1]
+  size: [612.0, 792.0]
+- id: transcoders-maths
+  kind: maths
+  title: Transcoders Find Interpretable LLM Feature Circuits
+  pdf: interpretability/mechanistic/Transcoders Find Interpretable LLM Feature Circuits.pdf
+  page: 2
+  rect: [104.0, 72.0, 385.5, 283.1]
+  size: [612.0, 792.0]

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Crisp pages bench</title>
+<link rel="stylesheet" href="/static/vendor/pdfjs/pdf_viewer.css">
+<link rel="stylesheet" href="/bench/bench.css">
+<script type="module" src="/bench/bench.js"></script>
+</head>
+<body>
+<nav id="bar">
+  <button data-mode="device" aria-pressed="true">Device</button>
+  <button data-mode="measure">Measure</button>
+  <button data-mode="compare">Compare</button>
+  <span id="status"></span>
+</nav>
+
+<section id="device" class="mode">
+  <h1>This device</h1>
+  <dl id="facts"></dl>
+  <h2>Its own settings, recorded with every pick</h2>
+  <form id="tablet">
+    <label>Device <input name="device" placeholder="Boox Tab X C, iPad, phone"></label>
+    <label>Contrast <input name="contrast" placeholder="the tablet's own, e.g. default, +2"></label>
+    <label>Text enhancement <input name="enhance" placeholder="off, on, level"></label>
+    <label>Dithering <input name="dither" placeholder="off, on, level"></label>
+    <label>Refresh mode <input name="refresh" placeholder="HD, Balanced, Fast, Ultrafast"></label>
+    <label>Paper width, CSS px <input name="width" inputmode="numeric" placeholder="the window's width"></label>
+    <label>Notes <input name="notes"></label>
+  </form>
+</section>
+
+<section id="measure" class="mode" hidden>
+  <div class="controls">
+    <label>Paper <select id="measure-paper"></select></label>
+    <label>Canvas cap <select id="measure-cap">
+      <option value="carrel">PDF.js's own (as carrel)</option>
+      <option value="none">None</option>
+    </select></label>
+    <button id="measure-run">Run</button>
+  </div>
+  <p class="hint">Opens the paper as carrel does (page width, PDF.js's viewer), then turns five pages a screen at a time, and records how the canvases are drawn.</p>
+  <pre id="measure-log"></pre>
+  <div id="measure-viewer"><div id="viewerContainer"><div id="viewer" class="pdfViewer"></div></div></div>
+</section>
+
+<section id="compare" class="mode" hidden>
+  <div class="controls">
+    <label>Crop <select id="crop"></select></label>
+    <label>Knob <select id="knob"></select></label>
+    <label>Over <select id="base">
+      <option value="full">full resolution</option>
+      <option value="laptop">drawn on the laptop</option>
+    </select></label>
+    <label>Cells <select id="count"><option>2</option><option>3</option><option selected>4</option></select></label>
+    <button id="gentler">◀ Gentler</button>
+    <button id="stronger">Stronger ▶</button>
+    <label class="check"><input type="checkbox" id="blind" checked> Blind</label>
+  </div>
+  <div id="grid"></div>
+  <div class="verdict">
+    <button id="same">No difference</button>
+    <input id="note" placeholder="A note with the pick">
+    <button id="next">Next crop ▶</button>
+  </div>
+</section>
+
+<!-- The SVG filters the variants use, made by bench.js. -->
+<svg id="filters" width="0" height="0" aria-hidden="true"><defs></defs></svg>
+</body>
+</html>

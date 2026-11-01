@@ -11,3 +11,7 @@ __pycache__/
 /macos/Carrel.xcodeproj/
 /macos/Resources/Info.plist
 /macos/build/
+
+# The crisp-pages bench: pictures of papers' pages, which are not ours to commit
+/experiments/crisp-pages/stills/
+/experiments/crisp-pages/photos/

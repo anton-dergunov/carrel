@@ -74,6 +74,9 @@ enum Menus {
         menu.addItem(page("Ask", "ask", "l", target: target))
         menu.addItem(page("Show or Hide Chat", "toggle-chat", "l", [.command, .shift], target: target))
         menu.addItem(.separator())
+        // The page's own settings (colours, text sizes, the chat's); ⌘, is the app's.
+        menu.addItem(page("Page Settings…", "settings", ",", [.command, .option], target: target))
+        menu.addItem(.separator())
         menu.addItem(item("Actual Size", #selector(AppDelegate.actualSize), "0", target: target))
         menu.addItem(item("Zoom In", #selector(AppDelegate.zoomIn), "=", target: target))
         menu.addItem(item("Zoom Out", #selector(AppDelegate.zoomOut), "-", target: target))

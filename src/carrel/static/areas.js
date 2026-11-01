@@ -290,19 +290,26 @@ function areaMap(doc, area) {
   const hue = hues(doc);
   let drawnWidth = 0;
   let drawnHeight = 0;
+  let drawnScale = 0;
   const draw = () => {
-    if (!box.isConnected) return observer.disconnect();
+    if (!box.isConnected) {
+      document.removeEventListener('carrel:look', draw);
+      return observer.disconnect();
+    }
     const width = box.clientWidth;
     if (!width) return;
     const height = area ? 0 : libraryHeight(box, width);
-    if (width === drawnWidth && height === drawnHeight) return;
+    // The labels are laid out for the library's text size (boot.js).
+    const scale = window.carrelLook?.scale('library') ?? 1;
+    if (width === drawnWidth && height === drawnHeight && scale === drawnScale) return;
     // The keyboard takes from the pane while the search box has it: the map stays as it was.
-    if (width === drawnWidth && document.activeElement?.matches('input, textarea')) return;
+    if (width === drawnWidth && scale === drawnScale && document.activeElement?.matches('input, textarea')) return;
     drawnWidth = width;
     drawnHeight = height;
+    drawnScale = scale;
     const laid = area
-      ? layoutToFit(nodes, width, { min: AREA_MAP.min, max: Math.round(Math.min(AREA_MAP.max, width * AREA_MAP.share)), measure })
-      : { ...layoutTreemap(nodes, { x: 0, y: 0, width, height }, { measure, more: 'areas' }), height };
+      ? layoutToFit(nodes, width, { min: AREA_MAP.min, max: Math.round(Math.min(AREA_MAP.max, width * AREA_MAP.share)), measure, scale })
+      : { ...layoutTreemap(nodes, { x: 0, y: 0, width, height }, { measure, more: 'areas', scale }), height };
     box.style.height = `${laid.height}px`;
     // What the map names, for scripts/shots.py.
     Object.assign(box.dataset, { named: `${laid.named}/${laid.of}`, inner: `${laid.inner}/${laid.innerOf}`, smallest: String(laid.smallest ?? '') });
@@ -311,6 +318,7 @@ function areaMap(doc, area) {
   const observer = new ResizeObserver(draw);
   observer.observe(box);
   if (!area) observer.observe(document.getElementById('papers-pane'));
+  document.addEventListener('carrel:look', draw);
   requestAnimationFrame(draw);
   return box;
 }

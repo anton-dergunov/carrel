@@ -109,7 +109,7 @@ test('the address names the paper showing', () => {
 });
 
 test('a remembered layout is checked', () => {
-  const shares = { bottom: 0.4, top: 0.4, left: 0.4, right: 0.4 };
+  const shares = { bottom: 0.4, top: 0.4, left: 0.4, right: 0.4, sheet: 0.4 };
   assert.deepEqual(restoreLayout(null), { place: 'bottom', hidden: false, shares });
   assert.deepEqual(restoreLayout({ place: 'left', hidden: true, shares: { left: 0.99, top: 'x' } }), {
     place: 'left',
@@ -117,6 +117,8 @@ test('a remembered layout is checked', () => {
     shares: { ...shares, left: 0.85 },
   });
   assert.equal(restoreLayout({ place: 'sideways' }).place, 'bottom');
+  // The sheet over the page keeps a size of its own, as a side does.
+  assert.equal(shareOf(restoreLayout({ place: 'sheet', shares: { sheet: 0.5 } })), 0.5);
   assert.equal(clampShare(0), 0.15);
 });
 
@@ -132,6 +134,7 @@ test('the split follows the finger', () => {
   assert.equal(shareAt('top', 0, 300, 800, 1000), 0.3);
   assert.equal(shareAt('left', 200, 0, 800, 1000), 0.25);
   assert.equal(shareAt('right', 600, 0, 800, 1000), 0.25);
+  assert.equal(shareAt('sheet', 0, 700, 800, 1000), 0.3);
   assert.equal(shareAt('tab', 0, 0, 800, 1000), null);
 });
 

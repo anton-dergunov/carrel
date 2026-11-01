@@ -27,6 +27,15 @@ const RECENT_S = 300;
 
 // A passage quoted in a question, as its bubble shows it; the agent gets all of it.
 const QUOTE_SHOWN = 280;
+// On e-ink an answer streams in a few large updates, each a repaint of the screen: its whole
+// paragraphs, at most this often, and all of it once it is complete.
+export const EINK_DRAW_MS = 3000;
+
+/** The part of a streaming answer drawn on e-ink: up to its last blank line. */
+export function wholeParagraphs(text) {
+  const end = text.lastIndexOf('\n\n');
+  return end < 0 ? '' : text.slice(0, end);
+}
 
 /**
  * `currentPaper()` and `currentPage()` say what a question is about, or `currentReview()` the
@@ -564,6 +573,17 @@ export function startChat({
     turn?.texts.push(element);
     const asked = turn?.pdf;
     let frame = 0;
+    let later = 0; // e-ink's next draw
+    let drawnAt = 0;
+    let drawn = '';
+    const paint = (text) => {
+      const stick = nearBottom();
+      drawn = text;
+      drawnAt = performance.now();
+      drawMarkdown(element, text, { diagrams: block.complete });
+      linkPages(element, asked, papers());
+      if (stick) log.scrollTop = log.scrollHeight;
+    };
     const block = {
       text: '',
       complete: false,
@@ -571,15 +591,20 @@ export function startChat({
       update(text, complete = false) {
         block.text = text;
         block.complete = complete;
-        if (!frame) {
-          frame = requestAnimationFrame(() => {
-            frame = 0;
-            const stick = nearBottom();
-            drawMarkdown(element, block.text, { diagrams: block.complete });
-            linkPages(element, asked, papers());
-            if (stick) log.scrollTop = log.scrollHeight;
-          });
+        if (!complete && window.carrelLook?.eink()) {
+          later ||= setTimeout(() => {
+            later = 0;
+            const whole = wholeParagraphs(block.text);
+            if (whole.length > drawn.length) paint(whole);
+          }, Math.max(0, drawnAt + EINK_DRAW_MS - performance.now()));
+          return;
         }
+        clearTimeout(later);
+        later = 0;
+        frame ||= requestAnimationFrame(() => {
+          frame = 0;
+          paint(block.text);
+        });
       },
     };
     return block;

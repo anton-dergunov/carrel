@@ -4,11 +4,9 @@ Carrel puts a paper's PDF and a Claude Code chat side by side on a tablet. The c
 
 ## Steps
 
-Each step ends with a sitting on the iPad (and the e-ink tablet, where it says so); what the sitting finds goes into the step, or into architecture.md when it settles something. Steps 1–6 and 11, the library's views and their area maps, starting at login and the Mac app are built and described in [architecture.md](architecture.md): step 6 gathered the highlights, and step 11 became the reader's stars and tags.
+Each step ends with a sitting on the iPad (and the e-ink tablet, where it says so); what the sitting finds goes into the step, or into architecture.md when it settles something. Steps 1–6 and 11, the library's views and their area maps, starting at login and the Mac app are built and described in [architecture.md](architecture.md): step 6 gathered the highlights, and step 11 became the reader's stars and tags. Step 7, the Settings dialog with its themes, text sizes and e-ink, is built too, and waits for its sitting.
 
-7. **Settings: themes, font sizes, e-ink.** One Settings dialog, as in [Lectern](https://github.com/anton-dergunov/lectern), reusing its implementation where it fits:
-   - themes and font sizes for the page, the chat and the library;
-   - e-ink, as Lectern does it: no animation, pages turned rather than scrolled, the chat's stream shown in a few large updates. Try both the chat below the PDF and the chat as a sheet over the page.
+7. **Settings, the sitting.** On the iPad and the e-ink tablet: the chat below the paper or as a sheet over it on e-ink; how often the stream should draw there (3 s now); whether Dark pages keep up when scrolling a long paper on the iPad; and the six themes against the area maps and the meaning map.
 
 8. **The NAS, and a Mac app that stands alone.** Both package carrel with its engine, so they are one step.
    - A Docker image, and the instructions to install it:

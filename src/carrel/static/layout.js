@@ -1,10 +1,13 @@
-// Where the chat sits: below, above, left or right of the paper, or on a tab of its own; shown
-// or hidden; and how much of the screen it takes, dragged at the split, kept for each side, since
+// Where the chat sits: below, above, left or right of the paper, as a sheet over the bottom of
+// it, or on a tab of its own; shown or hidden; and how much of the screen it takes, dragged at the split, kept for each side, since
 // a chat below wants a share of the height and one beside a share of the width. Each device
 // remembers its own, since a tablet held upright, one held sideways and the laptop want different ones.
 
-export const PLACES = ['bottom', 'top', 'left', 'right', 'tab'];
-const SIDES = ['bottom', 'top', 'left', 'right'];
+export const PLACES = ['bottom', 'top', 'left', 'right', 'sheet', 'tab'];
+const SIDES = ['bottom', 'top', 'left', 'right', 'sheet'];
+// The Chat button's icon for each place, and for each place with the chat hidden.
+const ICONS = { bottom: 'panel-bottom', top: 'panel-top', left: 'panel-left', right: 'panel-right', sheet: 'panel-bottom-open' };
+const HIDDEN_ICONS = { ...ICONS, sheet: 'panel-bottom' };
 export const DEFAULT_SHARE = 0.4;
 export const DEFAULT_LAYOUT = {
   place: 'bottom',
@@ -48,6 +51,7 @@ export function clampShare(share) {
 export function shareAt(place, x, y, width, height) {
   switch (place) {
     case 'bottom':
+    case 'sheet':
       return clampShare((height - y) / height);
     case 'top':
       return clampShare(y / height);
@@ -82,7 +86,7 @@ export function startLayout({ onChange, onResize, onDragEnd }) {
     toggle.hidden = layout.place === 'tab';
     toggle.setAttribute('aria-pressed', String(!layout.hidden));
     if (layout.place !== 'tab') {
-      toggle.querySelector('use').setAttribute('href', `#i-panel-${layout.place}${layout.hidden ? '-dashed' : ''}`);
+      toggle.querySelector('use').setAttribute('href', `#i-${layout.hidden ? `${HIDDEN_ICONS[layout.place]}-dashed` : ICONS[layout.place]}`);
     }
     for (const choice of sheet.querySelectorAll('[data-place]')) {
       choice.setAttribute('aria-checked', String(choice.dataset.place === layout.place));

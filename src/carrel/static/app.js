@@ -10,6 +10,7 @@ import { restoreLayout, shareOf, startLayout } from './layout.js';
 import { sameFile } from './links.js';
 import { startPaperTools } from './paper-tools.js';
 import { loadLibrary } from './library.js';
+import { startPaging } from './pager.js';
 import { startLibrary } from './papers.js';
 import { createReader } from './read.js';
 import { startReviews } from './review.js';
@@ -385,9 +386,11 @@ const commands = {
     go(PAPERS);
     document.getElementById('library-add').click();
   },
+  settings: () => document.getElementById('settings-button').click(),
 };
 // + − 0 alone zoom the paper, as they do the map (which takes them itself).
 startCommands(commands, { plainZoom: () => Boolean(shownPaper()) });
+startPaging();
 
 tabStrip.addEventListener('click', (event) => {
   const tab = event.target.closest('[data-key]');

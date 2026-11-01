@@ -59,6 +59,8 @@ export function wrapLines(text, width, most = 3) {
 export function createMeaningMap(canvas, { onSelect = () => {}, onRegion = () => {}, onCamera = () => {} } = {}) {
   const ctx = canvas.getContext('2d');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  // Still, with reduced motion and on e-ink (carrel's boot.js), where every frame is a repaint.
+  const still = () => (window.carrelLook ? !window.carrelLook.motion() : reduced.matches);
   const scheme = matchMedia('(prefers-color-scheme: dark)');
 
   let data = null;
@@ -128,7 +130,7 @@ export function createMeaningMap(canvas, { onSelect = () => {}, onRegion = () =>
   }
   function flyTo(cx, cy, k, ms = 520) {
     k = clamp(k, minK(), maxK());
-    if (reduced.matches || ms === 0) {
+    if (still() || ms === 0) {
       place(cx, cy, k);
       flight = null;
       request();
@@ -204,7 +206,7 @@ export function createMeaningMap(canvas, { onSelect = () => {}, onRegion = () =>
   // each paper where the previous map had it, and fades the new ones in after.
   function startAnimation(opts) {
     anim = null;
-    if (!opts.animate || reduced.matches || !data) return;
+    if (!opts.animate || still() || !data) return;
     const now = performance.now();
     if (opts.animate === 'grow') {
       const centres = new Map(regionList.map((r) => [r.index, r]));
@@ -256,7 +258,10 @@ export function createMeaningMap(canvas, { onSelect = () => {}, onRegion = () =>
   // the scheme's change events kept the dark ones in a light page. So each frame also checks that
   // its colours were read under the scheme that holds now.
   let styledFor = '';
-  const styleKey = () => `${scheme.matches}|${document.documentElement.dataset.theme ?? ''}`;
+  // The labels' sizes follow the library's text size (carrel's boot.js); 1 is Acervo's.
+  const textScale = () => window.carrelLook?.scale('library') ?? 1;
+  let ts = 1;
+  const styleKey = () => `${scheme.matches}|${document.documentElement.dataset.theme ?? ''}|${textScale()}`;
 
   function readStyle() {
     styledFor = styleKey();
@@ -269,13 +274,14 @@ export function createMeaningMap(canvas, { onSelect = () => {}, onRegion = () =>
     };
     const reading = v('--reading') || 'Georgia, serif';
     const ui = v('--ui') || 'system-ui, sans-serif';
+    ts = textScale();
     fonts = {
-      region: `600 13px ${reading}`,
-      regionList: `italic 600 15px ${reading}`,
-      hood: `italic 400 14.5px ${reading}`,
-      title: `500 13px ${ui}`,
-      titleOn: `600 13.5px ${ui}`,
-      full: `400 12.5px ${ui}`,
+      region: `600 ${13 * ts}px ${reading}`,
+      regionList: `italic 600 ${15 * ts}px ${reading}`,
+      hood: `italic 400 ${14.5 * ts}px ${reading}`,
+      title: `500 ${13 * ts}px ${ui}`,
+      titleOn: `600 ${13.5 * ts}px ${ui}`,
+      full: `400 ${12.5 * ts}px ${ui}`,
     };
     widths.clear();
   }
@@ -293,11 +299,11 @@ export function createMeaningMap(canvas, { onSelect = () => {}, onRegion = () =>
 
   // Spaced capitals, drawn a letter at a time: a canvas's own letter spacing is not in every
   // WebKit this has to run in.
-  const TRACK = 0.13 * 13;
+  const track = () => 0.13 * 13 * ts;
   function spacedWidth(text) {
     let w = 0;
-    for (const ch of text) w += width(fonts.region, ch) + TRACK;
-    return w - TRACK;
+    for (const ch of text) w += width(fonts.region, ch) + track();
+    return w - track();
   }
   function drawSpaced(text, x, y) {
     let cx = x - spacedWidth(text) / 2;
@@ -305,7 +311,7 @@ export function createMeaningMap(canvas, { onSelect = () => {}, onRegion = () =>
     for (const ch of text) {
       ctx.strokeText(ch, cx, y);
       ctx.fillText(ch, cx, y);
-      cx += width(fonts.region, ch) + TRACK;
+      cx += width(fonts.region, ch) + track();
     }
   }
   // A screen-space grid of placed boxes, so testing a label against everything placed costs a
@@ -467,7 +473,7 @@ export function createMeaningMap(canvas, { onSelect = () => {}, onRegion = () =>
       const whole = fullAlpha > 0.05;
       const lines = whole ? wrapLines(p.title, 30, 3) : [p.short];
       const font = on ? fonts.titleOn : whole ? fonts.full : fonts.title;
-      const lh = 15;
+      const lh = 15 * ts;
       const w = Math.max(...lines.map((line) => width(font, line)));
       const h = lines.length * lh + 3;
       const gap = 7;
@@ -516,7 +522,7 @@ export function createMeaningMap(canvas, { onSelect = () => {}, onRegion = () =>
       // their own case: shouted, a list of folders reads as a warning.
       const named = r.level === 'region' && r.named;
       const lines = named ? wrapLines(text.toUpperCase(), 18) : wrapLines(text, r.level === 'region' ? 24 : 20);
-      const lh = r.level === 'region' ? 19 : 18;
+      const lh = (r.level === 'region' ? 19 : 18) * ts;
       const font = named ? fonts.region : r.level === 'region' ? fonts.regionList : fonts.hood;
       const lw = Math.max(...lines.map((l) => (named ? spacedWidth(l) : width(font, l))));
       const box = { x: x - lw / 2 - 4, y: y - (lines.length * lh) / 2 - 2, w: lw + 8, h: lines.length * lh + 4 };
@@ -721,7 +727,7 @@ export function createMeaningMap(canvas, { onSelect = () => {}, onRegion = () =>
         const s = gesture.samples;
         const a = s[0], b = s[s.length - 1];
         const dt = b.t - a.t;
-        if (dt > 0 && e.timeStamp - b.t < 80 && !reduced.matches) {
+        if (dt > 0 && e.timeStamp - b.t < 80 && !still()) {
           inertia = { vx: (b.x - a.x) / dt, vy: (b.y - a.y) / dt };
           request();
         } else onCamera(getCamera());

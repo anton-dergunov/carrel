@@ -168,7 +168,8 @@ export function mapNodes(topics, root, name) {
 // A label is measured before it is drawn, so it is never cut: the name wraps between words,
 // never inside one, at the largest size from its own down to 11 px at which it fits; the count
 // follows on the name's last line when there is room, else on a line of its own. A label that
-// does not fit at 11 px is not drawn, and its tile is merged.
+// does not fit at 11 px is not drawn, and its tile is merged. The sizes are at the library's text
+// size of 17 px, and scale with it (`scale`).
 
 export const TOP_TEXT = { size: 15, weight: 600, count: 12 };
 export const SUB_TEXT = { size: 13.5, weight: 400, count: 11.5 };
@@ -195,12 +196,17 @@ function wrap(words, width, size, weight, measure) {
   return lines;
 }
 
+/** `text` (TOP_TEXT or SUB_TEXT) at the text scale `scale`, with the smallest size it may fall to. */
+export function scaledText(text, scale = 1) {
+  return { ...text, size: text.size * scale, count: text.count * scale, smallest: SMALLEST_TEXT * scale };
+}
+
 /** How a label of {name, count} fits in `width` × `height` px: {size, countSize, below, height, said}, or null. */
 export function fitLabel({ name, count }, width, height, text, measure) {
   const said = { name, count };
   width -= SAFETY;
   if (width <= 0 || height <= 0) return null;
-  for (let size = text.size; size >= SMALLEST_TEXT; size -= 0.5) {
+  for (let size = text.size; size >= (text.smallest ?? SMALLEST_TEXT); size -= 0.5) {
     const countSize = Math.min(text.count, size);
     const lines = wrap(name.split(' '), width, size, text.weight, measure);
     if (!lines || lines.length > MOST_LINES) continue;
@@ -237,14 +243,16 @@ const merge = (members) => ({ merged: true, last: true, members, value: members.
  * how many of the nodes are named, how many of their children are named inside them, and the
  * smallest label's size.
  */
-export function layoutTreemap(nodes, rect, { measure, more = '' }) {
+export function layoutTreemap(nodes, rect, { measure, more = '', scale = 1 }) {
+  const topText = scaledText(TOP_TEXT, scale);
+  const subText = scaledText(SUB_TEXT, scale);
   const half = GUTTER / 2;
   const inset = (tile) => ({ ...tile, x: tile.x + half, y: tile.y + half, width: Math.max(0, tile.width - GUTTER), height: Math.max(0, tile.height - GUTTER) });
   // Each tolerance, with the labels deciding the rows and without.
   const candidates = (items, area, fits) =>
     TOLERANCES.flatMap((tolerance) => [squarify(items, area, { tolerance, fits: (tile) => fits(inset(tile)) }), squarify(items, area, { tolerance })]).map((tiles) => tiles.map(inset));
-  const topLabel = (tile, height = tile.height) => fitLabel(tileText(tile.item, more), tile.width - 2 * PAD.x, height - 2 * PAD.y, TOP_TEXT, measure);
-  const subLabel = (child) => fitLabel(tileText(child.item), child.width - 2 * SUB_PAD.x, child.height - 2 * SUB_PAD.y, SUB_TEXT, measure);
+  const topLabel = (tile, height = tile.height) => fitLabel(tileText(tile.item, more), tile.width - 2 * PAD.x, height - 2 * PAD.y, topText, measure);
+  const subLabel = (child) => fitLabel(tileText(child.item), child.width - 2 * SUB_PAD.x, child.height - 2 * SUB_PAD.y, subText, measure);
   const topFits = (tile) => topLabel(tile) !== null;
   const subFits = (child) => subLabel(child) !== null;
   const { tiles: tops, kept } = keepLargest(nodes, (items) => candidates(items, rect, topFits), topFits, merge);
@@ -278,12 +286,12 @@ export function layoutTreemap(nodes, rect, { measure, more = '' }) {
 /**
  * The layout of `nodes` at `width`, as short as it can be: the least height from `min` (in
  * steps of `step`) up to `max` at which it names as many tiles, at both levels, as at `max`,
- * with labels no smaller than there (or 13 px). Returns layoutTreemap's answer with its height.
+ * with labels no smaller than there (or 13 px, scaled). Returns layoutTreemap's answer with its height.
  */
 export function layoutToFit(nodes, width, { min, max, step = 20, ...options }) {
   const full = layoutTreemap(nodes, { x: 0, y: 0, width, height: max }, options);
   const named = full.named + full.inner;
-  const size = Math.min(full.smallest ?? 0, 13);
+  const size = Math.min(full.smallest ?? 0, 13 * (options.scale ?? 1));
   for (let height = min; height < max; height += step) {
     const laid = layoutTreemap(nodes, { x: 0, y: 0, width, height }, options);
     if (laid.named + laid.inner >= named && (laid.smallest ?? 0) >= size) return { ...laid, height };

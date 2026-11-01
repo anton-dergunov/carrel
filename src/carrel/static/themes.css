@@ -1,0 +1,288 @@
+/* The colours of each theme, and nowhere else: app.css uses only these variables, so a theme is
+   one block here and one entry in boot.js (its bar colour). boot.js sets data-theme on <html>
+   before the first paint. Carrel's own two are the default; Black & white and E-ink are
+   Lectern's (its static/themes.css), with carrel's extra tokens added to them. */
+
+:root {
+  --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --reading: "Iowan Old Style", "Charter", Georgia, serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
+  --row-pad: 10px;
+  /* What a sheet's shadow and a dialog's backdrop are tinted with. */
+  --shade: 0 0 0;
+  --backdrop: rgb(20 18 12 / 0.25);
+  /* A citation's mark over the page: one ink, none of the six highlight colours, as the page is
+     white (and dark pages darken the mark with it). */
+  --cite-ink: 42 111 151;
+}
+
+:root,
+[data-theme="carrel-light"] {
+  --bg: #fdf6e3;
+  --surface: #fffdf6;
+  --text: #2b2b28;
+  --muted: #6f6c62;
+  --line: #e4dcc6;
+  --accent: #2a6f97;
+  --question: #efe7d1;
+  --error: #a23b2a;
+  --pdf-bg: #e9e4d6;
+  --chip: #efe8d4;
+  --chip-on: #d9e7f0;
+  --mark-on: #1f5878;
+  --mark-on-bg: #f6e3a1;
+  /* The reader's star: amber, apart from the accent and the six highlight colours. */
+  --star: #c4861a;
+  /* The top-level areas' hues: muted, of one lightness, for the treemap, the bars and the tree. */
+  --area-1: #5b8db8;
+  --area-2: #6f9b6b;
+  --area-3: #c97b63;
+  --area-4: #b58a3c;
+  --area-5: #8c6bb1;
+  --area-6: #4f9a9a;
+  --area-7: #c06c8a;
+  --area-8: #7d8f4e;
+  --area-9: #6d7fae;
+  --area-10: #a5674e;
+  --area-11: #5f8e85;
+  --area-12: #9a7aa6;
+  /* The meaning map: an atlas of land (where papers are thick) in a sea a shade darker. */
+  --map-sea: #f1ead4;
+  --map-land: #fefaee;
+  --map-coast: #cbbf9e;
+  --map-contour: #e6dcc3;
+  --map-halo: #fefaee;
+  --map-ink-2: #4a473f;
+  /* Code's colours: Solarized's accents, which read on the light page and the dark one alike. */
+  --syn-kw: #859900;
+  --syn-str: #2aa198;
+  --syn-num: #d33682;
+  --syn-fn: #268bd2;
+  --syn-builtin: #b58900;
+  --syn-attr: #6c71c4;
+  --syn-meta: #cb4b16;
+  color-scheme: light;
+}
+
+[data-theme="carrel-dark"] {
+  --bg: #1d2021;
+  --surface: #24282a;
+  --text: #e6e1d3;
+  --muted: #9d998c;
+  --line: #3a3f41;
+  --accent: #7fb6d6;
+  --question: #2f3436;
+  --error: #e0806e;
+  --pdf-bg: #151718;
+  --chip: #2f3436;
+  --chip-on: #1f3a4b;
+  --mark-on: #a9d3ea;
+  --mark-on-bg: #6b5a1e;
+  --star: #e2b04e;
+  --area-1: #6f9fc9;
+  --area-2: #7fab7a;
+  --area-3: #d38a72;
+  --area-4: #c39a4d;
+  --area-5: #9c7dc1;
+  --area-6: #5fabab;
+  --area-7: #cd7d99;
+  --area-8: #8e9f5e;
+  --area-9: #7f90bd;
+  --area-10: #b5785f;
+  --area-11: #6f9e95;
+  --area-12: #aa8ab6;
+  --map-sea: #131516;
+  --map-land: #282d30;
+  --map-coast: #59615f;
+  --map-contour: #383f42;
+  --map-halo: #282d30;
+  --map-ink-2: #cfcabc;
+  --syn-kw: #859900;
+  --syn-str: #2aa198;
+  --syn-num: #d33682;
+  --syn-fn: #268bd2;
+  --syn-builtin: #b58900;
+  --syn-attr: #6c71c4;
+  --syn-meta: #cb4b16;
+  color-scheme: dark;
+}
+
+/* Black & white: Lectern's plain themes, with carrel's area hues of the same lightness. */
+[data-theme="plain-light"] {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --text: #222222;
+  --muted: #717171;
+  --line: #dddddd;
+  --accent: #0b57d0;
+  --question: #f3f3f1;
+  --error: #c0261d;
+  --pdf-bg: #e8e8e6;
+  --chip: #f0f0ee;
+  --chip-on: #dce7fb;
+  --mark-on: #0b45a8;
+  --mark-on-bg: #fff3a3;
+  --star: #b8760d;
+  --area-1: #5b8db8;
+  --area-2: #6f9b6b;
+  --area-3: #c97b63;
+  --area-4: #b58a3c;
+  --area-5: #8c6bb1;
+  --area-6: #4f9a9a;
+  --area-7: #c06c8a;
+  --area-8: #7d8f4e;
+  --area-9: #6d7fae;
+  --area-10: #a5674e;
+  --area-11: #5f8e85;
+  --area-12: #9a7aa6;
+  --map-sea: #f0f0ee;
+  --map-land: #ffffff;
+  --map-coast: #c4c4c0;
+  --map-contour: #e6e6e3;
+  --map-halo: #ffffff;
+  --map-ink-2: #444444;
+  --syn-kw: #a31f34;
+  --syn-str: #0f5a8a;
+  --syn-num: #0f5a8a;
+  --syn-fn: #6b3fb3;
+  --syn-builtin: #8a4a00;
+  --syn-attr: #6b3fb3;
+  --syn-meta: #a4380f;
+  --backdrop: rgb(0 0 0 / 0.25);
+  color-scheme: light;
+}
+
+[data-theme="plain-dark"] {
+  --bg: #000000;
+  --surface: #111111;
+  --text: #dcdcdc;
+  --muted: #8c8c8c;
+  --line: #2e2e2e;
+  --accent: #7ab7ff;
+  --question: #1e1e1e;
+  --error: #ff7b72;
+  --pdf-bg: #0a0a0a;
+  --chip: #1e1e1e;
+  --chip-on: #10305c;
+  --mark-on: #a8ccff;
+  --mark-on-bg: #5c4d07;
+  --star: #e3b341;
+  --area-1: #6f9fc9;
+  --area-2: #7fab7a;
+  --area-3: #d38a72;
+  --area-4: #c39a4d;
+  --area-5: #9c7dc1;
+  --area-6: #5fabab;
+  --area-7: #cd7d99;
+  --area-8: #8e9f5e;
+  --area-9: #7f90bd;
+  --area-10: #b5785f;
+  --area-11: #6f9e95;
+  --area-12: #aa8ab6;
+  --map-sea: #000000;
+  --map-land: #191919;
+  --map-coast: #4a4a4a;
+  --map-contour: #2a2a2a;
+  --map-halo: #191919;
+  --map-ink-2: #c8c8c8;
+  --syn-kw: #ff7b72;
+  --syn-str: #a5d6ff;
+  --syn-num: #79c0ff;
+  --syn-fn: #d2a8ff;
+  --syn-builtin: #ffa657;
+  --syn-attr: #d2a8ff;
+  --syn-meta: #ffa657;
+  --backdrop: rgb(0 0 0 / 0.6);
+  color-scheme: dark;
+}
+
+/* Black on white with nothing in between, for e-ink: greys dither, colours vanish, and every
+   repaint is slow and leaves ghosts. app.css turns off everything that moves and draws borders
+   where the other themes have fills; the areas are told apart by their names alone. */
+[data-theme^="eink"] {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --text: #000000;
+  --muted: #000000;
+  --line: #000000;
+  --accent: #000000;
+  --question: #ffffff;
+  --error: #000000;
+  --pdf-bg: #ffffff;
+  --chip: #ffffff;
+  --chip-on: #000000;
+  --mark-on: #ffffff;
+  --mark-on-bg: transparent;
+  --star: #000000;
+  --area-1: #000000;
+  --area-2: #000000;
+  --area-3: #000000;
+  --area-4: #000000;
+  --area-5: #000000;
+  --area-6: #000000;
+  --area-7: #000000;
+  --area-8: #000000;
+  --area-9: #000000;
+  --area-10: #000000;
+  --area-11: #000000;
+  --area-12: #000000;
+  --map-sea: #ffffff;
+  --map-land: #ffffff;
+  --map-coast: #000000;
+  --map-contour: #a0a0a0;
+  --map-halo: #ffffff;
+  --map-ink-2: #000000;
+  --syn-kw: #000000;
+  --syn-str: #000000;
+  --syn-num: #000000;
+  --syn-fn: #000000;
+  --syn-builtin: #000000;
+  --syn-attr: #000000;
+  --syn-meta: #000000;
+  --accent-soft: transparent;
+  --backdrop: transparent;
+  --cite-ink: 0 0 0;
+  /* The lines that frame the page: grey, which nearly every e-ink screen can show, so they sit
+     behind the text instead of competing with it. */
+  --edge: #555555;
+  color-scheme: light;
+}
+
+/* The same for an e-ink screen that has colour. Text and rules stay black; links, code, the
+   areas and marks get colour back, darker and more saturated, as such screens wash it out. */
+[data-theme="eink-colour"] {
+  --accent: #0033b3;
+  --error: #b00000;
+  --mark-on-bg: #ffe14d;
+  --mark-on: #000000;
+  --chip-on: #c9d8ff;
+  --star: #b06000;
+  --area-1: #1d5fa8;
+  --area-2: #2f7a2a;
+  --area-3: #b53d1c;
+  --area-4: #8a6100;
+  --area-5: #6a2ea8;
+  --area-6: #00727a;
+  --area-7: #a8235c;
+  --area-8: #5a6e12;
+  --area-9: #3346a0;
+  --area-10: #8a3a12;
+  --area-11: #1f6b5c;
+  --area-12: #7a3a8a;
+  --syn-kw: #0033b3;
+  --syn-str: #067d17;
+  --syn-num: #1750eb;
+  --syn-fn: #7a2e9d;
+  --syn-builtin: #9a4a00;
+  --syn-attr: #7a2e9d;
+  --syn-meta: #9a4a00;
+  --cite-ink: 0 51 179;
+}
+
+/* Dark pages: the PDF drawn light on dark, its hues turned back so a highlight keeps its colour.
+   app.css filters each page whole, with what is drawn over it (a citation's mark, a selection),
+   so they are darkened with the paper as if printed on it. */
+[data-dark-pages] {
+  --pdf-filter: invert(0.88) hue-rotate(180deg);
+}

@@ -1,6 +1,7 @@
 """Look at carrel the way the iPad shows it, in WebKit at 820x1180.
 
     uv run --group shots python scripts/shots.py URL --out DIR [--size WxH | --landscape] [--dark]
+        [--theme THEME] [--dark-pages] [--sizes UI,LIBRARY,CHAT]
         [--layout PLACE] [--tabs] [--find QUERY] [--highlight] [--settings] [--note TEXT]
         [--info] [--overview] [--type TEXT] [--chat ID] [--ask QUESTION] [--model M]
         [--view areas|all|map] [--area TOPIC] [--more] [--rich] [--search Q [--text | --meaning]]
@@ -8,7 +9,10 @@
 
 URL is a page of a running carrel: a reading page, e.g. http://127.0.0.1:8517/read/<pdf>, or
 the library, http://127.0.0.1:8517/. Takes a shot once the PDF, or the library, is drawn.
---size sets the window (--landscape: 1180x820), --dark the dark theme. The library: --view
+--size sets the window (--landscape: 1180x820), --dark the system's dark scheme (which the
+default theme follows), --theme one of the six themes (carrel-light, plain-dark, eink, ...),
+--dark-pages darkens the PDF in a dark theme, and --sizes the text sizes in px of the rest of the
+page, the library and the chat (17 each by default). The library: --view
 starts it in Areas or All, --area at a topic (--rich with rich rows), and prints how many of
 the area map's tiles are named; --more taps the map's "+N more" and shoots its card. --search types Q into its
 search box, and with --text searches the papers' text and taps the first snippet, which opens
@@ -16,15 +20,15 @@ the paper at that page with Q in find; with --meaning it describes Q to meaning 
 the nearest papers. --view map shows the meaning map whole, zooms in twice on a paper, taps it
 for its peek, lights an area from Areas, and with --search lights the papers found and fits them.
 --review opens the review of SCOPE in its tab; --peek
-taps a paper it cites, then the peek's first page. --layout puts the chat below, above, left, right, on a tab, or
+taps a paper it cites, then the peek's first page. --layout puts the chat below, above, left, right, over the page (sheet), on a tab, or
 hides it, as this device's choice. With --tabs, it opens the list, a second paper, goes back
 to the first and checks it comes back at the page it was on, closes the second, and reloads
 to see the tabs come back. --find types QUERY into find a letter at a time and prints what it
 found. --highlight turns the pen on, selects a line on page 1 and checks it is highlighted, saved
 and quoted for the chat; reloads, taps the highlight, recolours it, asks about it, and removes it,
 checking each save. It writes into the served PDF: run it against a carrel serving a throwaway
-library, never the reader's own. --settings opens the chat's settings from the model's name and
-takes a shot; --note also types TEXT into the note about the reader and checks it is saved,
+library, never the reader's own. --settings opens the settings from the gear and takes a shot,
+then from the model's name, at the chat's part, and takes another; --note also types TEXT into the note about the reader and checks it is saved,
 which changes the note every chat carries: serve with XDG_STATE_HOME set to a scratch folder
 for it. --info opens the page badge's sheet, with what the library knows of the paper, then
 opens every section and opens the sheet out over the pane (on a phone it is over the page already).
@@ -50,7 +54,21 @@ from playwright.sync_api import sync_playwright
 
 IPAD = {"width": 820, "height": 1180}
 LIBRARY_DRAWN = "#area-page .area-title, #all-view .rows, #all-view .list-note, #map-view canvas"
-LAYOUTS = ["bottom", "top", "left", "right", "tab", "hidden"]
+LAYOUTS = ["bottom", "top", "left", "right", "sheet", "tab", "hidden"]
+THEMES = ["carrel-light", "carrel-dark", "plain-light", "plain-dark", "eink", "eink-colour"]
+
+
+def look_script(theme: str | None, dark_pages: bool, sizes: str | None) -> str:
+    """Sets this device's look (boot.js's `carrel.look`) before the page's own script reads it."""
+    look: dict = {"darkPages": dark_pages}
+    if theme in ("eink", "eink-colour"):
+        look |= {"family": "eink", "ink": "colour" if theme == "eink-colour" else "mono"}
+    elif theme:
+        family, mode = theme.split("-")
+        look |= {"family": family, "mode": mode}
+    if sizes:
+        look |= dict(zip(("ui", "library", "chat"), (int(n) for n in sizes.split(","))))
+    return f"localStorage.setItem('carrel.look', {json.dumps(json.dumps(look))});"
 
 
 def layout_script(layout: str) -> str:
@@ -196,7 +214,22 @@ def highlight_pass(page, out: Path) -> None:
 
 
 def settings_pass(page, note: str | None, out: Path) -> None:
-    """The chat's settings, opened from the model's name on the status line."""
+    """The settings, opened from the gear, then at the chat's part from the model's name."""
+    page.click("#settings-button")
+    page.wait_for_selector("#reader-note")
+    page.wait_for_timeout(400)  # the dialog's fade
+    print(
+        "settings: look",
+        page.eval_on_selector_all(
+            '#settings-dialog [data-pref][aria-checked="true"]',
+            "els => els.map(e => e.textContent)",
+        ),
+        "| sizes:",
+        page.eval_on_selector_all(".size-value", "els => els.map(e => e.textContent)"),
+    )
+    page.screenshot(path=out / "settings-0-look.png")
+    page.click("#settings-dialog .settings-title button")  # Done
+    page.wait_for_timeout(300)
     page.click("#model")
     page.wait_for_selector("#reader-note")
     page.wait_for_timeout(400)  # the dialog's fade
@@ -668,7 +701,10 @@ def main() -> None:
     parser.add_argument("--browser", default="webkit", choices=["webkit", "chromium"])
     parser.add_argument("--size", help="the window, WxH (default: the iPad in portrait, 820x1180)")
     parser.add_argument("--landscape", action="store_true", help="the iPad in landscape, 1180x820")
-    parser.add_argument("--dark", action="store_true", help="the dark theme")
+    parser.add_argument("--dark", action="store_true", help="the system's dark scheme")
+    parser.add_argument("--theme", choices=THEMES, help="this device's theme")
+    parser.add_argument("--dark-pages", action="store_true", help="darken the PDF in a dark theme")
+    parser.add_argument("--sizes", help="the text sizes in px: UI,LIBRARY,CHAT")
     parser.add_argument("--view", choices=["areas", "all", "map"], help="the library's view")
     parser.add_argument("--area", help="the library open at this topic")
     parser.add_argument("--more", action="store_true", help="open the area map's +N more card")
@@ -709,6 +745,8 @@ def main() -> None:
         )
         page.on("pageerror", lambda e: print(f"page error: {e}"))
         page.add_init_script(f"localStorage.setItem('carrel.model', {json.dumps(args.model)});")
+        if args.theme or args.dark_pages or args.sizes:
+            page.add_init_script(look_script(args.theme, args.dark_pages, args.sizes))
         if args.layout:
             page.add_init_script(layout_script(args.layout))
         if args.chat:

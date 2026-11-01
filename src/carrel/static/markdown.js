@@ -158,34 +158,53 @@ export function drawCallouts(element) {
 
 // Diagrams.
 
-const DIAGRAM_TEXT = '14px';
+const DIAGRAM_TEXT = 14; // px, at the chat's text size of 17 px
 // Mermaid lets a diagram shrink to any width; below this share its text is too small to read.
 const SMALLEST_DIAGRAM = 0.8;
-const drawnDiagrams = new Map(); // source → its drawing, so drawing an answer again is instant
+// The look and source → its drawing, so drawing an answer again is instant.
+const drawnDiagrams = new Map();
 let mermaid = null; // loading Mermaid: a promise
 let drawing = Promise.resolve(); // one at a time: Mermaid keeps state between drawings
 let drawings = 0;
 
+// A diagram is drawn in the colours and text size of the look it was drawn in (boot.js).
+const lookKey = () => `${document.documentElement.dataset.theme ?? ''}|${window.carrelLook?.scale('chat') ?? 1}`;
+
 async function drawDiagram(figure, source) {
-  if (!drawnDiagrams.has(source)) {
+  const key = `${lookKey()}\u0000${source}`;
+  if (!drawnDiagrams.has(key)) {
     try {
       const svg = await draw(source);
-      drawnDiagrams.set(source, DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } }));
+      drawnDiagrams.set(key, DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } }));
     } catch {
       return; // its source stays
     }
   }
   if (!figure.isConnected || figure.querySelector(':scope > svg')) return;
-  figure.insertAdjacentHTML('beforeend', drawnDiagrams.get(source));
+  figure.insertAdjacentHTML('beforeend', drawnDiagrams.get(key));
   const svg = figure.querySelector(':scope > svg');
   const natural = Number.parseFloat(svg?.style.maxWidth);
   if (natural) svg.style.minWidth = `${natural * SMALLEST_DIAGRAM}px`;
   figure.classList.add('drawn');
 }
 
+// A change of look draws every diagram on the page again, in its colours and size.
+if (typeof document !== 'undefined') {
+  document.addEventListener('carrel:look', () => {
+    for (const figure of document.querySelectorAll('.diagram.drawn')) {
+      const source = figure.querySelector(':scope > pre')?.textContent;
+      if (!source) continue;
+      figure.querySelector(':scope > svg')?.remove();
+      figure.classList.remove('drawn');
+      void drawDiagram(figure, source);
+    }
+  });
+}
+
 function draw(source) {
   const drawn = drawing.then(async () => {
     const loaded = await loadMermaid();
+    loaded.initialize(mermaidSettings());
     return (await loaded.render(`carrel-diagram-${++drawings}`, source)).svg;
   });
   drawing = drawn.catch(() => {});
@@ -196,10 +215,7 @@ function loadMermaid() {
   mermaid ??= new Promise((resolve, reject) => {
     const script = document.createElement('script');
     script.src = '/static/vendor/mermaid/mermaid.min.js';
-    script.addEventListener('load', () => {
-      window.mermaid.initialize(mermaidSettings());
-      resolve(window.mermaid);
-    });
+    script.addEventListener('load', () => resolve(window.mermaid));
     script.addEventListener('error', () => {
       mermaid = null; // tried again with the next diagram
       reject(new Error('Mermaid did not load'));
@@ -214,6 +230,7 @@ function mermaidSettings() {
   const style = getComputedStyle(document.documentElement);
   const token = (name) => style.getPropertyValue(name).trim();
   const fontFamily = token('--ui');
+  const text = DIAGRAM_TEXT * (window.carrelLook?.scale('chat') ?? 1);
   return {
     // Left on, Mermaid would draw every `.mermaid` on the page by itself.
     startOnLoad: false,
@@ -224,7 +241,7 @@ function mermaidSettings() {
     flowchart: { htmlLabels: false, nodeSpacing: 30, rankSpacing: 36, padding: 8 },
     theme: 'base',
     themeVariables: {
-      darkMode: matchMedia('(prefers-color-scheme: dark)').matches,
+      darkMode: window.carrelLook?.dark() ?? matchMedia('(prefers-color-scheme: dark)').matches,
       background: token('--surface'),
       primaryColor: token('--question'),
       primaryTextColor: token('--text'),
@@ -233,10 +250,10 @@ function mermaidSettings() {
       textColor: token('--text'),
       edgeLabelBackground: token('--surface'),
       fontFamily,
-      fontSize: DIAGRAM_TEXT,
+      fontSize: `${text}px`,
     },
     fontFamily,
-    fontSize: Number.parseFloat(DIAGRAM_TEXT),
+    fontSize: text,
     // Mermaid lets a line show through half of a label on it.
     themeCSS: '.edgeLabel rect, .labelBkg { opacity: 1; }',
   };

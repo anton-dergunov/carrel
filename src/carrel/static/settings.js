@@ -1,13 +1,40 @@
-// The chat's settings, a dialog opened from the model's name on the chat's status line: the
-// model this device's chats start on, kept on the device, and a note about the reader that every
-// chat carries in its system prompt, kept on the server. Both reach a chat when its Claude Code
-// process starts; a running chat keeps what it started with, so its prompt cache stays valid.
+// The settings, one dialog, opened from the gear in the tab strip, or at the chat's part from the
+// model's name on the chat's status line. The look, kept on this device by boot.js: the colours,
+// whether a dark theme darkens the paper, and the text sizes of the library, the chat and the
+// rest. The chat's: the model this device's chats start on, kept on the device, and a note about
+// the reader that every chat carries in its system prompt, kept on the server. Both reach a chat
+// when its Claude Code process starts; a running chat keeps what it started with, so its prompt
+// cache stays valid.
 
 const MODEL_KEY = 'carrel.model';
 // A word under each model's name, for the choice.
 const HINTS = { opus: 'Deepest', sonnet: 'Balanced', haiku: 'Fastest, cheapest' };
 // How long typing in the note pauses before it is saved.
 const SAVE_AFTER_MS = 800;
+const FAMILIES = [
+  ['carrel', 'Carrel'],
+  ['plain', 'Black & white'],
+  ['eink', 'E-ink'],
+];
+const MODES = [
+  ['light', 'Light'],
+  ['dark', 'Dark'],
+  ['system', 'Follow system'],
+];
+const INKS = [
+  ['mono', 'Black only'],
+  ['colour', 'With colour'],
+];
+const PARTS = [
+  ['library', 'Library'],
+  ['chat', 'Chat'],
+  ['ui', 'Everything else'],
+];
+
+/** The part of the dialog `show` opens at: the top, or the chat's ('chat'). */
+export function sectionFor(asked) {
+  return asked === 'chat' ? 'chat' : 'top';
+}
 
 /** What the sheet says when this chat runs on another model than the one chosen, else ''. */
 export function modelLine(live, chosen, name) {
@@ -18,12 +45,14 @@ export function modelLine(live, chosen, name) {
 /**
  * `liveModel()` is the model this chat's process runs on, or null; `name(model)` how the status
  * line names one; `onOpen()` follows the sheet opening, `onModel()` a model being chosen. Returns
- * `model()`, the model this device's chats start on (null until it is known), `show(open)` and
- * `shown()`.
+ * `model()`, the model this device's chats start on (null until it is known), `show(open,
+ * section)` and `shown()`.
  */
 export function startSettings({ liveModel, name, onOpen = () => {}, onModel = () => {} }) {
   const sheet = document.getElementById('settings-dialog');
   const button = document.getElementById('model');
+  const gear = document.getElementById('settings-button');
+  const look = window.carrelLook;
   let models = [];
   let defaultModel = null;
   let chosen = rememberedModel();
@@ -41,7 +70,7 @@ export function startSettings({ liveModel, name, onOpen = () => {}, onModel = ()
 
   // The sheet's title, and Done.
   const title = el('div', 'settings-title');
-  title.append(el('h2', '', 'Chat settings'));
+  title.append(el('h2', '', 'Settings'));
   const done = title.appendChild(el('button', 'plain', 'Done'));
   done.type = 'button';
   done.addEventListener('click', () => void show(false));
@@ -70,7 +99,83 @@ export function startSettings({ liveModel, name, onOpen = () => {}, onModel = ()
   const noteLabel = groupTitle('label', 'About me', 'every device');
   noteLabel.htmlFor = 'reader-note';
   noteGroup.append(noteLabel, note, noteFoot);
+  const chatPart = el('div', 'chat-part');
   const loading = header('Loading…');
+
+  // The look: kept on this device by boot.js, and applied as it is chosen.
+  const choiceRow = (label, pref, values) => {
+    const control = el('div', 'segmented');
+    control.setAttribute('role', 'radiogroup');
+    control.setAttribute('aria-label', label);
+    for (const [value, text] of values) {
+      const choice = control.appendChild(el('button', '', text));
+      choice.type = 'button';
+      choice.setAttribute('role', 'radio');
+      choice.dataset.pref = pref;
+      choice.dataset.value = value;
+      choice.addEventListener('click', () => {
+        look.set(pref, value);
+        drawLook();
+      });
+    }
+    return control;
+  };
+  const families = choiceRow('Colours', 'family', FAMILIES);
+  const modes = choiceRow('Light or dark', 'mode', MODES);
+  const inks = choiceRow('The screen', 'ink', INKS);
+  const darkPages = el('button', 'switch-row');
+  darkPages.type = 'button';
+  darkPages.setAttribute('role', 'switch');
+  darkPages.append(el('span', 'words', 'Dark pages'), el('span', 'switch'));
+  darkPages.addEventListener('click', () => {
+    look.set('darkPages', !look.prefs.darkPages);
+    drawLook();
+  });
+  const darkHint = el('p', 'hint', 'In a dark theme, the paper is drawn light on dark too.');
+  const colourGroup = el('section', 'group look-group');
+  colourGroup.append(groupTitle('div', 'Colours', 'this device'), families, modes, inks, darkPages, darkHint);
+
+  const sizes = el('div', 'sizes');
+  const steppers = PARTS.map(([part, label]) => {
+    const row = sizes.appendChild(el('div', 'size-row'));
+    row.append(el('span', 'size-name', label));
+    const stepper = row.appendChild(el('div', 'stepper'));
+    const step = (by, text, words) => {
+      const made = el('button', '', text);
+      made.type = 'button';
+      made.setAttribute('aria-label', `${words} ${label.toLowerCase()} text`);
+      made.addEventListener('click', () => {
+        look.set(part, look.prefs[part] + by);
+        drawLook();
+      });
+      return made;
+    };
+    const less = step(-1, '−', 'Smaller');
+    const value = el('output', 'size-value');
+    const more = step(1, '+', 'Larger');
+    stepper.append(less, value, more);
+    return { part, less, value, more };
+  });
+  const sizeGroup = el('section', 'group look-group');
+  sizeGroup.append(groupTitle('div', 'Text size', 'this device'), sizes);
+
+  function drawLook() {
+    const { prefs, sizes: range } = look;
+    for (const choice of colourGroup.querySelectorAll('[data-pref]')) {
+      choice.setAttribute('aria-checked', String(String(prefs[choice.dataset.pref]) === choice.dataset.value));
+    }
+    const eink = prefs.family === 'eink';
+    modes.hidden = eink;
+    inks.hidden = !eink;
+    darkPages.hidden = eink;
+    darkHint.hidden = eink;
+    darkPages.setAttribute('aria-checked', String(prefs.darkPages));
+    for (const { part, less, value, more } of steppers) {
+      value.textContent = `${prefs[part]} px`;
+      less.disabled = prefs[part] <= range[part][0];
+      more.disabled = prefs[part] >= range[part][1];
+    }
+  }
 
   function groupTitle(tag, text, scope) {
     const made = el(tag, 'group-title', text);
@@ -157,32 +262,41 @@ export function startSettings({ liveModel, name, onOpen = () => {}, onModel = ()
   });
   note.addEventListener('blur', () => void saveNote());
 
-  async function show(open) {
+  async function show(open, asked = 'top') {
     if (!open) {
       if (sheet.open) sheet.close();
       return;
     }
-    if (sheet.open) return;
+    const section = sectionFor(asked);
+    // The dialog scrolls; the chat's part is below the look's.
+    const reveal = () => (sheet.scrollTop = section === 'chat' ? chatPart.offsetTop - 12 : 0);
+    (section === 'chat' ? button : gear).setAttribute('aria-expanded', 'true');
+    if (sheet.open) return reveal();
     onOpen();
+    drawLook();
+    chatPart.replaceChildren(loading);
+    sheet.replaceChildren(title, colourGroup, sizeGroup, chatPart);
     sheet.showModal();
-    button.setAttribute('aria-expanded', 'true');
     noteSays('');
-    sheet.replaceChildren(loading);
+    reveal();
     try {
       await load();
     } catch (error) {
-      sheet.replaceChildren(header(`Could not read the settings: ${error.message ?? error}`));
+      chatPart.replaceChildren(header(`Could not read the chat's settings: ${error.message ?? error}`));
       return;
     }
     draw();
-    sheet.replaceChildren(title, modelGroup, noteGroup);
+    chatPart.replaceChildren(modelGroup, noteGroup);
+    reveal();
   }
 
-  button.addEventListener('click', () => void show(!sheet.open));
+  button.addEventListener('click', () => void show(!sheet.open, 'chat'));
+  gear.addEventListener('click', () => void show(!sheet.open));
   // Done, Escape, or a tap outside it: the note is saved as the dialog closes.
   sheet.addEventListener('close', () => {
     void saveNote();
     button.setAttribute('aria-expanded', 'false');
+    gear.setAttribute('aria-expanded', 'false');
   });
   sheet.addEventListener('click', (event) => {
     if (event.target === sheet) void show(false);

@@ -62,12 +62,9 @@ test('⌘= ⌘− ⌘0 zoom, and + − 0 alone only when asked', () => {
   assert.equal(zoomKey(key({ altKey: true }), true, true), null);
 });
 
-test('previews are drawn nearest the page in view first, ahead before behind', async () => {
-  const { nearestMissing } = await import('../src/carrel/static/previews.js');
-  assert.equal(nearestMissing(new Map(), 5, 10), 5);
-  assert.equal(nearestMissing(new Map([[5, 'u']]), 5, 10), 6); // ahead, at the same distance
-  const have = new Map([[5, 'u'], [6, 'u']]);
-  assert.equal(nearestMissing(have, 5, 10), 4); // nearer than 7
-  assert.equal(nearestMissing(have, 5, 10, new Set([4])), 7);
-  assert.equal(nearestMissing(new Map([[1, 'u'], [2, 'u']]), 1, 2), 0);
+test("a page's picture is asked of the laptop by the PDF's version", async () => {
+  const { previewUrl } = await import('../src/carrel/static/previews.js');
+  assert.equal(previewUrl('nlp/A b.pdf', '"123-456"', 3), '/api/preview/nlp/A%20b.pdf?page=3&v=123-456');
+  assert.equal(previewUrl('x.pdf', 'W/"7-8"', 1), '/api/preview/x.pdf?page=1&v=7-8');
+  assert.equal(previewUrl('x.pdf', null, 2), '/api/preview/x.pdf?page=2&v=');
 });

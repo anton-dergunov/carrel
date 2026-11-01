@@ -42,6 +42,9 @@ final class MainWindow: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDe
     private var origin = URL(string: "http://127.0.0.1:\(ServerSetup.defaultPort)")!
     private var titleWatch: NSKeyValueObservation?
     private var showingStatus = false
+    /// What the page was last told of the window's monitor (`MonitorDensity`).
+    private var density: Double?
+    private var screensWatch: NSObjectProtocol?
 
     override init() {
         let configuration = WKWebViewConfiguration()
@@ -75,7 +78,30 @@ final class MainWindow: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDe
                 self?.window.title = title.isEmpty ? "Carrel" : title
             }
         }
+        density = MonitorDensity.of(window.screen ?? NSScreen.main)
+        tellScreen(force: true)
+        screensWatch = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.tellScreen() }
+        }
     }
+
+    /// Tells the page the density of the monitor the window is on, if it changed: before its
+    /// scripts run on each load, and at once to the page showing. The page draws a paper's pages
+    /// for it, and works the same without it.
+    private func tellScreen(force: Bool = false) {
+        let now = MonitorDensity.of(window.screen ?? NSScreen.main)
+        guard force || now != density else { return }
+        density = now
+        let script = MonitorDensity.script(now)
+        let content = webView.configuration.userContentController
+        content.removeAllUserScripts()
+        content.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        if !force { webView.evaluateJavaScript(script) }
+    }
+
+    func windowDidChangeScreen(_ notification: Notification) { tellScreen() }
 
     /// Shows carrel's page, unless it is already showing.
     func load(_ url: URL) {

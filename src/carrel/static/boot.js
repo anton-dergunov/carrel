@@ -26,7 +26,13 @@
     sharpen: 0, // an unsharp mask's amount, about one device pixel wide (page-adjust.js)
     contrast: 1,
     scans: false, // the pages that are scans, in black and white
+    // Pages drawn at the monitor's own pixels where the Mac app says it has fewer than the screen
+    // (a HiDPI screen scaled down onto it, as Crisp makes): see drawRatioOf.
+    monitor: true,
   };
+  // A page is drawn this much finer than the monitor's pixels, so that the two resamplings on its
+  // way there (up to the screen's 2×, down to the monitor) leave it as sharp.
+  const MONITOR_MARGIN = 1.2;
   const EMBOLDENS = [0, 0.05, 0.1, 0.18];
   const TONES = [1, 1.25, 1.5, 1.8];
   const SHARPENS = [0, 0.4, 0.7, 1];
@@ -84,6 +90,17 @@
     return prefs;
   }
 
+  /**
+   * How many pixels a page's canvas has per CSS pixel: the screen's (`ratio`, devicePixelRatio),
+   * or, with `prefs.monitor` and a monitor of `density` real pixels per CSS pixel below it, that
+   * density and a margin. On a 5120-pixel monitor shown as a 4096-point screen at 2×, 1.5 rather
+   * than 2: 56% of the pixels to draw, keep and move while scrolling, none of them seen.
+   */
+  function drawRatioOf(prefs, ratio, density) {
+    if (!prefs.monitor || !(density > 0)) return ratio;
+    return Math.min(ratio, Math.max(1, Math.round(density * MONITOR_MARGIN * 100) / 100));
+  }
+
   /** The theme the page is drawn in: e-ink is always dark on light, with or without colour. */
   function themeOf(prefs, systemDark) {
     if (prefs.family === 'eink') return prefs.ink === 'colour' ? 'eink-colour' : 'eink';
@@ -111,7 +128,7 @@
 
   // The page, when there is one; a test runs the functions above without it.
   if (typeof document === 'undefined' || typeof localStorage === 'undefined') {
-    globalThis.carrelLook = { readPrefs, themeOf, deviceDefaults, scaleOf, pageFilters, DEFAULTS, SIZES, EMBOLDENS, TONES, SHARPENS, CONTRASTS, EINK_PAGES };
+    globalThis.carrelLook = { readPrefs, themeOf, deviceDefaults, scaleOf, pageFilters, drawRatioOf, DEFAULTS, SIZES, EMBOLDENS, TONES, SHARPENS, CONTRASTS, EINK_PAGES };
     return;
   }
 
@@ -149,6 +166,9 @@
   // The bar's colour meta comes after this script in <head>.
   document.addEventListener('DOMContentLoaded', apply, { once: true });
   dark.addEventListener('change', changed);
+  // The Mac app's word on the monitor the window is on (`window.carrelScreen`), when it changes.
+  document.addEventListener('carrel:screen', changed);
+  const density = () => globalThis.carrelScreen?.density;
 
   globalThis.carrelLook = Object.freeze({
     prefs,
@@ -180,6 +200,10 @@
     embolden: () => (prefs.pages ? prefs.embolden : 0),
     /** How much read.js sharpens each page once drawn: 0 for not. */
     sharpen: () => (prefs.pages ? prefs.sharpen : 0),
+    /** How many pixels a page's canvas has per CSS pixel (drawRatioOf). */
+    drawRatio: () => drawRatioOf(prefs, globalThis.devicePixelRatio || 1, density()),
+    /** Whether the monitor has fewer pixels than the screen, so that `monitor` means something. */
+    monitorBelowScreen: () => drawRatioOf({ monitor: true }, globalThis.devicePixelRatio || 1, density()) < (globalThis.devicePixelRatio || 1),
     /** A part's text scale: 'ui', 'library' or 'chat'. */
     scale: (part) => scaleOf(prefs[part]),
   });

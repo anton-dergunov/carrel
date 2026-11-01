@@ -14,7 +14,7 @@ Scrolling and switching papers in carrel feel slower than vscode-pdf-viewer on t
 
 - **carrel's own code costs nothing measurable.** A bare PDF.js viewer, made from the same vendored files, draws a page after a jump in the same time as carrel's page, in WebKit and in Chromium, and carrel's page does no work while idle.
 - **The engine differs.** vscode-pdf-viewer runs in VS Code's Chromium; carrel runs in WebKit (Safari, the iPad, the Mac app's WKWebView). In headless runs Chromium drew a page after a jump in 62 ms against WebKit's 72–78 ms. The gap the eye sees on the real screen is larger than that.
-- **Done so far:** the pages' canvases on the GPU (`enableHWA`): in WebKit at 2x, 74 → 46–63 ms after a jump, and the slowest scroll frames 25–33 → 18–19 ms. A preview behind each page until it is drawn, so a fast scroll or a tab no longer shows white sheets. Nothing drawn while the paper flies past (`scroll-gate.js`), a tab put back from a copy of its pages (`snapshots.js`), and the last three papers kept loaded: what each does is in [architecture.md](architecture.md#layout-and-tabs).
+- **Done so far:** the pages' canvases on the GPU (`enableHWA`): in WebKit at 2x, 74 → 46–63 ms after a jump, and the slowest scroll frames 25–33 → 18–19 ms. A preview behind each page until it is drawn, made by the laptop, so a fast scroll, a tab or a paper's first frame no longer shows white sheets. Nothing drawn while the paper flies past (`scroll-gate.js`), a tab put back from a copy of its pages (`snapshots.js`), the last three papers kept loaded, and the pages drawn for the monitor's own pixels on the Mac: what each does is in [architecture.md](architecture.md#layout-and-tabs).
 - **The Mac was swapping** (9–12 GB of swap, 16 GB of RAM) while this was measured, which slows every app, WebKit's drawing included. Lowering it is a task of its own, outside carrel.
 
 ## What the Mac app showed (2026-11-01)
@@ -33,13 +33,13 @@ Measured with `scripts/mac-bench/bench.py`: wheel events as a free-spinning whee
 
 `scripts/mac-bench/bench.py` is the eye's view as numbers (above); the Mac app's page can also be inspected, Safari → Develop → (this Mac) → Carrel, whose Timelines show where a frame goes. Measure each option below before and after, in alternating runs.
 
-### 1. Smaller canvases on the Mac
+### 1. Fewer canvas pixels
 
-The one measured lever left on a flick's grey (above). PDF.js's cap with its detail canvas draws the part in view sharp, but at a reading scroll the rest of a page shows at the lower resolution until the detail canvas follows, which is why the reader postponed it (Not now). A cap nearer the page's own size (say 6 MP, a page at 85% of the screen's pixels) may keep most of the gain at less blur: try it and judge on the screen. Fewer pages kept drawn (PDF.js keeps ten) is the other way to fewer canvases.
+Done in part: on the Mac the pages are drawn for the monitor rather than the screen (architecture.md, Drawn for the monitor), 1.5 rather than 2 pixels per point on the Crisp monitor. In alternating runs that day it did not change a flick's grey, while the 4 MP cap had halved it: the whole page at 860 px wide seems to be what it takes, which is the blur the reader postponed. Fewer pages kept drawn (PDF.js keeps ten) is the other way to fewer canvases, untried.
 
 ### 2. Previews made by the server
 
-The previews are drawn in the browser today, the first time a paper is opened. The laptop could make them once instead, with PyMuPDF (the engine's dependency already), keep them on disk by the PDF's version, and serve them as images. Then a paper opened for the first time has its previews at once, the browser draws nothing for them, and the iPad saves the work and the battery. The offline step (plan step 10) could carry them too.
+Done (architecture.md, A preview behind each page): a paper's first frame shows its pictures, after a launch too, where it was white. Pictures twice as wide made the grey worse, so they stay at 540 px; a sharper picture during a flick, if wanted, needs a cheaper way for WebKit to paint them.
 
 ### 3. Draw further ahead
 

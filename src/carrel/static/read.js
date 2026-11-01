@@ -41,6 +41,9 @@ const canvasPixels = () => (window.carrelLook.eink() ? EINK_CANVAS_PIXELS : unde
 const KEPT_PAPERS = 3;
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${ASSETS}pdf.worker.min.mjs`;
+// How many pixels a canvas has per CSS pixel: the screen's, or the monitor's where the Mac app says
+// it has fewer (boot.js's drawRatio). PDF.js reads it here for every page and its detail canvas.
+Object.defineProperty(pdfjsLib.OutputScale, 'pixelRatio', { configurable: true, get: () => window.carrelLook.drawRatio() });
 
 /**
  * The viewer in `#viewerContainer`. `onPage(number, count)` follows the page in view,
@@ -69,11 +72,11 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   // The mark a citation's rectangles draw.
   const citeMark = createCiteMark({ viewer, eventBus, container });
   // A picture of each page behind it until it is drawn.
-  const previews = createPreviews({ viewer, eventBus });
+  const previews = createPreviews({ eventBus });
   // Nothing drawn while the paper scrolls fast, but on e-ink, where a page turn is a jump.
   holdWhileFast({ viewer, container, when: () => !window.carrelLook.eink() });
   // The pages a tab showed, over the pane when it comes back until they are drawn again.
-  // A copy is the canvases in view, some 70 MB on the Mac: fewer papers' on a tablet, whose browser
+  // A copy is the canvases in view, 30–70 MB on the Mac: fewer papers' on a tablet, whose browser
   // drops a page that takes much memory, and one on e-ink, whose pages are drawn whole at full size.
   const snapshots = createSnapshots({ viewer, eventBus, container, papers: snapshotPapers() });
   // Links inside the PDF go through this too.
@@ -98,6 +101,8 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   // sharpened (Settings → Pages): drawn on each canvas once PDF.js has drawn it (page-adjust.js).
   let embolden = window.carrelLook.embolden();
   let sharpening = window.carrelLook.sharpen();
+  // The pixels per CSS pixel the pages showing were drawn at.
+  let drawRatio = window.carrelLook.drawRatio();
 
   eventBus.on('pagesinit', () => {
     viewer.currentScaleValue = 'page-width';
@@ -136,11 +141,17 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
       file = null;
       embolden = window.carrelLook.embolden();
       sharpening = window.carrelLook.sharpen();
+      drawRatio = window.carrelLook.drawRatio();
       void open(pdf, url, { place: lastPlace }).catch((error) => console.warn(`The paper was not loaded again: ${error}`));
-    } else if (window.carrelLook.embolden() !== embolden || window.carrelLook.sharpen() !== sharpening) {
-      // Both are drawn on the pages: they are drawn again.
+    } else if (
+      window.carrelLook.embolden() !== embolden ||
+      window.carrelLook.sharpen() !== sharpening ||
+      window.carrelLook.drawRatio() !== drawRatio
+    ) {
+      // All three are how the pages are drawn: they are drawn again.
       embolden = window.carrelLook.embolden();
       sharpening = window.carrelLook.sharpen();
+      drawRatio = window.carrelLook.drawRatio();
       if (pdfDocument) viewer.refresh();
     }
   });
@@ -298,6 +309,12 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     void markScans(pdf, ticket);
     const next = reusable(pdf) ?? (await load(pdf, url, ticket));
     if (!next) return; // another paper was asked for meanwhile
+    // Not covered by copies, the paper waits a moment for the pictures of the pages it opens at,
+    // so that its first frame shows them rather than white pages.
+    if (!covered && ticket === loading) {
+      const at = place?.page ?? target?.page ?? 1;
+      await previews.ready(pdf, next.version, [at, at + 1, at - 1]);
+    }
     if (ticket !== loading) {
       retire(next);
       return;
@@ -307,7 +324,7 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     pdfDocument = next.document;
     outlines = next.outlines;
     uiManager = null;
-    previews.show(pdf, next.document);
+    previews.show(pdf, next.version, next.document.numPages, place?.page ?? target?.page ?? 1);
     viewer.setDocument(next.document);
     linkService.setDocument(next.document, null);
     if (previous && previous !== next) retire(previous);
@@ -677,7 +694,7 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
 /** How many papers' pages `snapshots.js` keeps copies of on this device. */
 function snapshotPapers() {
   if (window.carrelLook.eink()) return 1;
-  return navigator.maxTouchPoints > 1 ? 2 : 3;
+  return navigator.maxTouchPoints > 1 ? 2 : 6;
 }
 
 /** Resolves once the next frame has been drawn. */

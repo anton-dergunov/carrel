@@ -173,8 +173,14 @@ def clicks(args, rect, points):
                 continue
             between = [np.abs(load(frames[i]) - last).mean() for i in range(first, settled)]
             off = sum(d > 0.5 for d in between)
+            kinds = classify(frames[first : settled + 1], args.grey)[:-1]
+            unlike = [kind for kind, d in zip(kinds, between) if d > 0.5]
+            seen = ", ".join(
+                f"{unlike.count(k)} {k}" for k in ("grey", "blank", "blurred", "ok") if k in unlike
+            )
             print(
                 f"click {run + 1}: on screen {times[first] - at:.0f} ms after, {off} frames after that unlike where it settled"
+                + (f" ({seen})" if seen else "")
             )
 
 

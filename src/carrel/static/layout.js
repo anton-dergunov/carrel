@@ -65,16 +65,15 @@ export function shareAt(place, x, y, width, height) {
 }
 
 /**
- * Applies the remembered layout to the page and runs its controls: the split, the Chat button
- * and the view sheet. `onChange(layout)` follows every change, `onResize(layout)` the size
- * while the split is dragged, and `onDragEnd()` the drag's end.
+ * Applies the remembered layout to the page and runs its controls: the split and the Chat
+ * button; where the chat sits is chosen in the Settings dialog, through the `set` this returns.
+ * `onChange(layout)` follows every change, `onResize(layout)` the size while the split is
+ * dragged, and `onDragEnd()` the drag's end.
  */
 export function startLayout({ onChange, onResize, onDragEnd }) {
   const body = document.body;
   const divider = document.getElementById('divider');
   const toggle = document.getElementById('chat-toggle');
-  const button = document.getElementById('view-button');
-  const sheet = document.getElementById('view-sheet');
   let layout = load();
 
   function apply() {
@@ -87,9 +86,6 @@ export function startLayout({ onChange, onResize, onDragEnd }) {
     toggle.setAttribute('aria-pressed', String(!layout.hidden));
     if (layout.place !== 'tab') {
       toggle.querySelector('use').setAttribute('href', `#i-${layout.hidden ? `${HIDDEN_ICONS[layout.place]}-dashed` : ICONS[layout.place]}`);
-    }
-    for (const choice of sheet.querySelectorAll('[data-place]')) {
-      choice.setAttribute('aria-checked', String(choice.dataset.place === layout.place));
     }
     onChange(layout);
   }
@@ -133,32 +129,13 @@ export function startLayout({ onChange, onResize, onDragEnd }) {
   divider.addEventListener('pointerup', release);
   divider.addEventListener('pointercancel', release);
   // A double tap on the split puts it back where it started.
-  divider.addEventListener('dblclick', () => set({ shares: { ...layout.shares, [layout.place]: DEFAULT_SHARE } }));
+  const resetShare = () => set({ shares: { ...layout.shares, [layout.place]: DEFAULT_SHARE } });
+  divider.addEventListener('dblclick', resetShare);
 
   toggle.addEventListener('click', () => set({ hidden: !layout.hidden }));
 
-  // The sheet: where the chat sits, and later how the paper is shown.
-  const openSheet = (open) => {
-    sheet.hidden = !open;
-    button.setAttribute('aria-expanded', String(open));
-  };
-  button.addEventListener('click', () => openSheet(sheet.hidden));
-  for (const choice of sheet.querySelectorAll('[data-place]')) {
-    choice.addEventListener('click', () => {
-      set({ place: choice.dataset.place, hidden: false });
-      openSheet(false);
-    });
-  }
-  document.getElementById('reset-size').addEventListener('click', () => {
-    set({ shares: { ...layout.shares, [layout.place]: DEFAULT_SHARE } });
-    openSheet(false);
-  });
-  document.addEventListener('pointerdown', (event) => {
-    if (!sheet.hidden && !sheet.contains(event.target) && !button.contains(event.target)) openSheet(false);
-  });
-
   apply();
-  return { get: () => layout, set };
+  return { get: () => layout, set, resetShare };
 }
 
 function load() {

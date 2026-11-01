@@ -4,7 +4,8 @@
 // through `window.carrelLook` and hears of a change by the `carrel:look` event on `document`.
 (() => {
   const KEY = 'carrel.look';
-  // The text sizes are the px of each part's body text; its other sizes scale with it.
+  // The text sizes are the px of each part's body text; its other sizes scale with it, and the CSS
+  // is written for BASE.
   const BASE = 17;
   const DEFAULTS = {
     family: 'carrel',
@@ -12,9 +13,10 @@
     // The two below apply only in their own themes: e-ink's colour, the dark ones' pages.
     ink: 'mono',
     darkPages: false,
-    ui: BASE,
-    library: BASE,
-    chat: BASE,
+    // What the reader settled on for the Mac, the iPad, the phone and the e-ink tablet alike.
+    ui: 15,
+    library: 17,
+    chat: 15,
   };
   const SIZES = { ui: [14, 22], library: [14, 24], chat: [14, 26] };
   const FAMILIES = ['carrel', 'plain', 'eink'];

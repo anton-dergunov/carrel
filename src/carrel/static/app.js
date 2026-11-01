@@ -112,7 +112,8 @@ const highlights = startHighlights({
 });
 
 const refitScreen = fitToVisibleArea(() => shareOf(layout));
-startLayout({
+// Where the chat sits is chosen in the Settings dialog, which the chat runs.
+const layoutControl = startLayout({
   onChange(next) {
     const moved = next.place !== layout.place || next.hidden !== layout.hidden;
     layout = next;
@@ -163,6 +164,7 @@ const reviews = startReviews({
 });
 
 const chat = startChat({
+  layout: layoutControl,
   currentPaper: () => paperInView(state)?.pdf ?? null,
   currentReview: () => itemInView(state)?.review ?? null,
   openReview: (scope, title) => showReview(scope, title),

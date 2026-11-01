@@ -42,7 +42,8 @@ export function wholeParagraphs(text) {
  * review's scope when one is in view; `openTarget` follows a citation, `openReview(scope)`
  * opens a review, and `reviewNamed(file)` says which review a file is ({scope, title}, or null);
  * `papers()` lists the library's papers ({title, pdf}), so a plain "p. 7" in an answer can be
- * linked to the paper it is about (page-links.js); `reveal()` brings the chat into view; `onActivity()` says an answer ended or a question for
+ * linked to the paper it is about (page-links.js); `layout` is layout.js's control, for the
+ * settings' choice of where the chat sits; `reveal()` brings the chat into view; `onActivity()` says an answer ended or a question for
  * the reader came, so a chat out of sight can say so. Returns `quote(passage)`, which sets the passage the next question
  * carries ({pdf, page, text}, or null for none), `quoted()`, the one it would carry, `focus()`,
  * `about(pdf)`, the paper the next question is about, and `showOverview()`.
@@ -57,6 +58,7 @@ export function startChat({
   papers = () => [],
   reveal,
   onActivity = () => {},
+  layout = null,
 }) {
   const log = document.getElementById('log');
   const form = document.getElementById('ask');
@@ -73,6 +75,7 @@ export function startChat({
     name: modelName,
     onOpen: () => showSheet(false),
     onModel: () => renderStatus(),
+    layout,
   });
   const overview = startOverview({
     // In this chat when it is only about this paper, so the paper the skill reads stays in a
@@ -81,6 +84,7 @@ export function startChat({
       if (!onlyAbout(pdf)) switchChat(null);
       void ask(text);
     },
+    inThisChat: (pdf) => onlyAbout(pdf),
     async openPaper(pdf) {
       await openTarget({ file: pdf });
       reveal();

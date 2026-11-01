@@ -158,17 +158,34 @@ export function foldSection(id, iconName, title, body, { note = '', foldedNote =
  * late, after the reader moved on; `close()` closes the sheet.
  */
 export function startPaperSheet({ info, similar, actions, isCurrent, close, showOverview, openPaper, onRemoved }) {
+  // The answers the sheet is drawn from, so asking again changes nothing on the screen when they
+  // are the same: on e-ink every change is a repaint.
+  let shown = null;
+
+  /** Asks the laptop for the paper and its similar papers, and draws them in one step. */
   async function draw(file) {
-    const paper = await getJson(`/api/paper/${pathUrl(file)}`);
+    const [paper, found] = await Promise.all([getJson(`/api/paper/${pathUrl(file)}`), getJson(`/api/similar/${pathUrl(file)}`)]);
     if (!isCurrent(file)) return;
-    for (const box of [info, similar, actions]) {
-      box.replaceChildren();
-      box.hidden = true;
+    const key = JSON.stringify([file, paper, found]);
+    if (key === shown) return;
+    shown = key;
+    const parts = paper?.info ? sections(file, paper, found) : { info: [], similar: [], actions: [] };
+    for (const [box, children] of [
+      [info, parts.info],
+      [similar, parts.similar],
+      [actions, parts.actions],
+    ]) {
+      box.replaceChildren(...children);
+      box.hidden = !children.length;
     }
-    if (!paper?.info) return;
+  }
+
+  /** The sheet's sections for `paper`, from /api/paper, with `found`, from /api/similar. */
+  function sections(file, paper, found) {
     const fields = Object.fromEntries(paper.info.fields);
     const note = paper.info.note;
     const title = fields.title ?? paper.title;
+    const parts = { info: [], similar: [], actions: [] };
 
     const head = element('header', 'paper-head');
     const titleRow = head.appendChild(element('div', 'title-row'));
@@ -180,17 +197,17 @@ export function startPaperSheet({ info, similar, actions, isCurrent, close, show
     if (where) byline.append(where);
     if (!byline.childElementCount) byline.remove();
     head.append(tagLine(file, paper.tags));
-    info.append(head);
+    parts.info.push(head);
 
     const type = fields.type ?? note?.type;
     const about = aboutBody(fields, type, paper.info.topic);
-    if (about) info.append(foldSection('about', 'info', 'About', about, { note: aboutNote(type, paper.info.topic), foldedNote: true }).box);
+    if (about) parts.info.push(foldSection('about', 'info', 'About', about, { note: aboutNote(type, paper.info.topic), foldedNote: true }).box);
     const reading = note && readingBody(note);
-    if (reading) info.append(foldSection('reading', 'book-open-check', "The agent's reading", reading, { note: note.family ?? '', foldedNote: true }).box);
+    if (reading) parts.info.push(foldSection('reading', 'book-open-check', "The agent's reading", reading, { note: note.family ?? '', foldedNote: true }).box);
     if (note?.digest) {
       const body = element('div', 'answer digest');
       const points = digestPoints(note.digest);
-      info.append(
+      parts.info.push(
         foldSection('digest', 'scroll-text', 'Digest', body, {
           note: points ? `${points} points` : '',
           // Drawn when first opened: a digest is twenty lines of markdown.
@@ -198,39 +215,35 @@ export function startPaperSheet({ info, similar, actions, isCurrent, close, show
         }).box,
       );
     }
-    info.hidden = false;
+
+    // The papers nearest this one by meaning.
+    if (found?.papers?.length) {
+      const list = similarList(found.papers, (each) => {
+        close();
+        openPaper({ pdf: each.pdf, title: each.title });
+      });
+      parts.similar.push(foldSection('similar', 'orbit', 'Similar papers', list, { note: String(found.papers.length) }).box);
+    }
 
     if (paper.info.overview) {
-      const button = actions.appendChild(element('button', 'plain sheet-action'));
+      const button = element('button', 'plain sheet-action');
       button.type = 'button';
       button.append(icon('notebook-text'), 'Overview');
       button.addEventListener('click', () => {
         close();
         showOverview();
       });
+      parts.actions.push(button);
     }
-    const remove = actions.appendChild(element('button', 'plain sheet-action remove-paper'));
+    const remove = element('button', 'plain sheet-action remove-paper');
     remove.type = 'button';
     remove.append(icon('trash'), 'Remove from the library…');
     remove.addEventListener('click', () => {
       const box = confirmRemove(file, title, () => box.replaceWith(remove));
       remove.replaceWith(box);
     });
-    actions.hidden = false;
-
-    void drawSimilar(file);
-  }
-
-  /** The papers nearest this one by meaning, once the laptop answers. */
-  async function drawSimilar(file) {
-    const found = await getJson(`/api/similar/${pathUrl(file)}`);
-    if (!found?.papers?.length || !isCurrent(file)) return;
-    const list = similarList(found.papers, (paper) => {
-      close();
-      openPaper({ pdf: paper.pdf, title: paper.title });
-    });
-    similar.replaceChildren(foldSection('similar', 'orbit', 'Similar papers', list, { note: String(found.papers.length) }).box);
-    similar.hidden = false;
+    parts.actions.push(remove);
+    return parts;
   }
 
   /** Removing, once the reader confirms it, with an optional reason to keep it out. */

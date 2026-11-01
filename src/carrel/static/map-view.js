@@ -109,6 +109,9 @@ export function startMapView(container, { openPaper }) {
   peek.setAttribute('aria-label', 'A paper on the map');
   peek.hidden = true;
   container.replaceChildren(canvas, status, tools, legend, peek);
+  // Docked above or below the paper, the peek's height is what the map keeps clear: its similar
+  // papers folding open or shut change it.
+  new ResizeObserver(() => placePeek()).observe(peek);
 
   let map = null; // the canvas's handle, made the first time the view shows
   let doc = null;
@@ -393,8 +396,12 @@ export function startMapView(container, { openPaper }) {
 
   // The peek at a paper.
 
-  function showPeek(index) {
+  /** The peek for paper `index`, tapped on the map; or, with `centre`, picked from the peek's
+   * similar papers: then the peek stays where it is and the paper moves to the middle of what it
+   * leaves uncovered, rather than only out from under it. */
+  function showPeek(index, { centre = false } = {}) {
     const point = data.points[index];
+    const wasOpen = !peek.hidden;
     const paper = point.paper;
     peeked = index;
     const kicker = element('p', 'peek-kicker');
@@ -417,19 +424,22 @@ export function startMapView(container, { openPaper }) {
       const near = point.near.map((j) => ({ ...data.points[j].paper, index: j }));
       const list = similarList(near, (each) => {
         map.select(each.index);
-        showPeek(each.index);
+        showPeek(each.index, { centre: true });
       });
       parts.push(foldSection('map-similar', 'orbit', 'Similar papers', list, { note: `${near.length}, joined by the lines` }).box);
     }
     peek.replaceChildren(...parts);
     peek.hidden = false;
     toggleLegend(false);
-    const box = canvas.getBoundingClientRect();
-    const spot = map.screenOf(index);
-    if (box.width >= SIDE_BY_SIDE) peekSide = spot.x > box.width / 2 ? 'left' : 'right';
-    else peekSide = spot.y > box.height / 2 ? 'top' : 'bottom';
+    if (!(centre && wasOpen)) {
+      const box = canvas.getBoundingClientRect();
+      const spot = map.screenOf(index);
+      if (box.width >= SIDE_BY_SIDE) peekSide = spot.x > box.width / 2 ? 'left' : 'right';
+      else peekSide = spot.y > box.height / 2 ? 'top' : 'bottom';
+    }
     placePeek();
-    map.reveal(index);
+    if (centre) map.centreOn(index);
+    else map.reveal(index);
   }
 
   /** Docked to the side of the map away from the paper (on a wide map, left or right; else top

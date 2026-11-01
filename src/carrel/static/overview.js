@@ -1,7 +1,7 @@
 // The paper's overview: the reader's pre-read note, which the library's /overview skill writes
 // into their notes folder. The button on the chat's status line shows the note when the paper
-// has one, with no model call, and otherwise asks /overview: in the chat being read in when it is
-// only about this paper, else in a new one. The skill reads the paper into that chat, so the
+// has one, with no model call, and otherwise asks /overview, once the reader confirms it: in the
+// chat being read in when it is only about this paper, else in a new one. The skill reads the paper into that chat, so the
 // questions after it find the paper in its cache.
 //
 // The note opens in a sheet over the chat, beside the paper. Delete moves it to the Trash, for a
@@ -14,13 +14,14 @@ import { drawCallouts, drawMarkdown } from './markdown.js';
 const COMMAND = '/overview';
 
 /**
- * `ask(text, pdf)` asks a question about the paper, in the chat or a new one; `openPaper(pdf)`
+ * `ask(text, pdf)` asks a question about the paper, in the chat or a new one, and
+ * `inThisChat(pdf)` says which; `openPaper(pdf)`
  * opens another paper with the chat in view; `onOpen()` closes what else covers the chat.
  * Returns `about(pdf)`, the paper the chat asks about now (or null), `show()`, `hide()`,
  * `turnEnded(question)`, for a turn the page watched end, and `opensLink(url)`, which follows a
  * link to an overview note and says whether it was one.
  */
-export function startOverview({ ask, openPaper, onOpen = () => {} }) {
+export function startOverview({ ask, inThisChat = () => true, openPaper, onOpen = () => {} }) {
   const button = document.getElementById('overview');
   const sheet = document.getElementById('overview-sheet');
 
@@ -83,9 +84,39 @@ export function startOverview({ ask, openPaper, onOpen = () => {} }) {
     body.className = 'answer note';
     drawMarkdown(body, fromObsidian(note.text));
     drawCallouts(body);
+    sheet.classList.remove('confirm');
     sheet.replaceChildren(header, body);
     sheet.hidden = false;
     sheet.scrollTop = 0;
+    button.setAttribute('aria-expanded', 'true');
+  }
+
+  /** Before writing one: it costs a reading of the whole paper. */
+  function confirmWrite() {
+    onOpen();
+    const header = document.createElement('div');
+    header.className = 'sheet-header';
+    const name = header.appendChild(document.createElement('span'));
+    name.className = 'name';
+    name.textContent = 'Write an overview of this paper?';
+    const buttons = header.appendChild(document.createElement('span'));
+    buttons.className = 'buttons';
+    const about = pdf;
+    buttons.append(
+      plainButton('Write', () => {
+        hide();
+        ask(COMMAND, about);
+      }),
+      plainButton('Cancel', hide),
+    );
+    const why = document.createElement('p');
+    why.className = 'why';
+    why.textContent = inThisChat(pdf)
+      ? 'The agent reads the whole paper in this chat and writes the note into your notes folder.'
+      : 'The agent reads the whole paper in a new chat and writes the note into your notes folder; this chat waits in the list.';
+    sheet.classList.add('confirm');
+    sheet.replaceChildren(header, why);
+    sheet.hidden = false;
     button.setAttribute('aria-expanded', 'true');
   }
 
@@ -113,6 +144,7 @@ export function startOverview({ ask, openPaper, onOpen = () => {} }) {
 
   function hide() {
     sheet.hidden = true;
+    sheet.classList.remove('confirm');
     sheet.replaceChildren();
     button.setAttribute('aria-expanded', 'false');
   }
@@ -153,7 +185,7 @@ export function startOverview({ ask, openPaper, onOpen = () => {} }) {
   button.addEventListener('click', () => {
     if (!sheet.hidden) hide();
     else if (note) show();
-    else ask(COMMAND, pdf);
+    else confirmWrite();
   });
 
   look();

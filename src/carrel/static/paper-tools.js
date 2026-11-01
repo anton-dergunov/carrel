@@ -50,6 +50,7 @@ export function startPaperTools({ reader, showOverview, openPaper = () => {}, on
 
   let large = false; // opened out, over the pane (or the page, on a phone)
   let outlineOf = null; // the paper whose outline is drawn
+  let sheetOf = null; // the paper whose sheet was last asked for
   const outlineList = document.createElement('div');
   const contents = foldSection('contents', 'list-tree', 'Contents', outlineList);
   outlineNav.append(contents.box);
@@ -64,8 +65,10 @@ export function startPaperTools({ reader, showOverview, openPaper = () => {}, on
     pageNumber.max = String(count);
     pageNumber.value = String(reader.currentPage() ?? '');
     pageCount.textContent = `of ${count}`;
-    // Asked each time: the overview note comes and goes.
-    void paperSheet.draw(reader.file());
+    // Asked each time: the overview note comes and goes. It was drawn when the paper opened, so
+    // this redraws only what changed since.
+    sheetOf = reader.file();
+    void paperSheet.draw(sheetOf);
     if (outlineOf !== reader.file()) {
       outlineOf = reader.file();
       void drawOutline(outlineOf);
@@ -244,6 +247,11 @@ export function startPaperTools({ reader, showOverview, openPaper = () => {}, on
       badge.hidden = !count;
       badge.textContent = `${page} / ${count}`;
       if (!sheet.hidden) pageNumber.value = String(page);
+      // A paper just opened: its sheet is drawn ahead, so it opens whole, in one repaint on e-ink.
+      if (count && reader.file() !== sheetOf) {
+        sheetOf = reader.file();
+        void paperSheet.draw(sheetOf);
+      }
     },
     showFound({ current, total, pending }) {
       if (!findInput.value) findCount.textContent = '';

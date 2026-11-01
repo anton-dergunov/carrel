@@ -18,7 +18,11 @@ test('saved prefs are checked: what is missing or does not fit is the default', 
   assert.equal(prefs.darkPages, false);
   assert.equal(prefs.ui, 22);
   assert.equal(prefs.library, 16);
-  assert.equal(prefs.chat, 17);
+  assert.equal(prefs.chat, 15);
+});
+
+test('the library starts at 17 px, the chat and the rest at 15', () => {
+  assert.deepEqual([DEFAULTS.library, DEFAULTS.chat, DEFAULTS.ui], [17, 15, 15]);
 });
 
 test('the theme is the family in its mode, and e-ink by its ink', () => {

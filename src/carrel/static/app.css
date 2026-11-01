@@ -223,23 +223,6 @@ body.finding #strip > :not(#find) { display: none; }
 .sheet[hidden] { display: none; }
 .sheet-header { font-size: calc(13px * var(--scale)); color: var(--muted); margin-bottom: 6px; }
 
-/* Where the chat sits, under the Layout button */
-#view-sheet { top: calc(44px + env(safe-area-inset-top)); right: 8px; width: 336px; }
-#view-sheet .choices { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
-#view-sheet .choices button {
-  display: grid;
-  justify-items: center;
-  gap: 2px;
-  padding: 6px 0 4px;
-  font-size: calc(12px * var(--scale));
-  background: none;
-  color: var(--muted);
-  border: 1px solid transparent;
-  border-radius: 8px;
-}
-#view-sheet .choices button[aria-checked="true"] { color: var(--text); border-color: var(--line); background: var(--bg); }
-#reset-size { margin-top: 8px; padding: 2px 0; font-size: calc(13px * var(--scale)); }
-
 /* The page badge, faint in the PDF's corner, and the contents it opens */
 #page-badge {
   position: absolute;
@@ -1072,6 +1055,11 @@ button.plain {
 #overview-sheet .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #overview-sheet .buttons { display: flex; align-items: center; gap: 8px; }
 #overview-sheet .why { color: var(--muted); }
+/* Asking before an overview is written: a strip at the chat's foot, the log still above it. */
+#overview-sheet.confirm { inset: auto 0 0; overflow: visible; border-top: 1px solid var(--line); }
+#overview-sheet.confirm .sheet-header { position: static; border-bottom: 0; margin: 0; padding-top: 10px; }
+#overview-sheet.confirm .name { white-space: normal; font-weight: 600; }
+#overview-sheet.confirm p.why { margin: 0; font-size: calc(14px * var(--scale)); line-height: 1.4; }
 /* The overview button: a filled notebook when the paper has its note, a pen when it is to be written */
 #overview[hidden] { display: none; }
 #overview.has-note { color: var(--accent); }
@@ -1099,7 +1087,8 @@ button.plain {
   box-shadow: 0 20px 56px rgb(var(--shade) / 0.2), 0 1px 4px rgb(var(--shade) / 0.08);
 }
 #settings-dialog[open] { display: flex; flex-direction: column; gap: 24px; animation: settings-in 0.15s ease-out; }
-/* Opening it focuses the dialog itself, which needs no ring; its controls have their own. */
+/* Opening it focuses the dialog itself (its autofocus; WebKit would focus Done), which needs no
+   ring; its controls have their own. */
 #settings-dialog:focus, #settings-dialog:focus-visible { outline: none; }
 #settings-dialog::backdrop { background: var(--backdrop); }
 @keyframes settings-in { from { opacity: 0; transform: translateY(6px); } }
@@ -1113,7 +1102,8 @@ button.plain {
   border-bottom: 1px solid var(--line);
 }
 .settings-title h2 { margin: 0; font: 600 calc(17px * var(--scale)) var(--ui); color: var(--text); }
-.settings-title .plain { font-size: calc(16px * var(--scale)); font-weight: 600; padding: 4px 0 4px 16px; }
+/* Its box is even around the word, and stands out past the edge so the word lines up with it. */
+.settings-title .plain { margin-right: -12px; padding: 6px 12px; border-radius: 8px; font-size: calc(16px * var(--scale)); font-weight: 600; }
 #settings-dialog .group { display: flex; flex-direction: column; }
 #settings-dialog .group-title { display: block; margin: 0 2px 10px; font: 600 calc(14px * var(--scale)) var(--ui); color: var(--text); }
 #settings-dialog .scope { margin-left: 4px; font-weight: 400; color: var(--muted); }
@@ -1134,18 +1124,19 @@ button.plain {
   border-radius: 0;
 }
 .model-choices button + button { border-top: 1px solid var(--line); }
-.model-choices .dot {
+.model-choices .radio {
+  position: relative;
   flex: none;
-  width: 18px;
-  height: 18px;
-  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
   border: 1.5px solid var(--muted);
   border-radius: 50%;
 }
+.model-choices button[aria-checked="true"] .radio { border: 2px solid var(--accent); }
+.model-choices button[aria-checked="true"] .radio::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--accent); }
 .model-choices .words { flex: 1; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .model-choices .sub { font-size: calc(14px * var(--scale)); color: var(--muted); }
 .model-choices button[aria-checked="true"] { background: var(--surface); }
-.model-choices button[aria-checked="true"] .dot { border: 5.5px solid var(--accent); }
 .model-choices button[aria-checked="true"] .name { font-weight: 600; }
 
 /* The note */
@@ -1179,16 +1170,42 @@ button.plain {
 #settings-dialog .segmented { display: flex; }
 #settings-dialog .segmented[hidden] { display: none; }
 #settings-dialog .segmented button { flex: 1; min-height: 36px; padding: 4px 6px; }
+/* Where the chat sits: six choices, three a row. */
+.place-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.place-choices button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 4px 8px;
+  font-size: calc(15px * var(--scale));
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.place-choices .icon { flex: none; width: 18px; height: 18px; color: var(--muted); }
+.place-choices button[aria-checked="true"] { border-color: var(--accent); background: var(--surface); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
+.place-choices button[aria-checked="true"] .icon { color: var(--accent); }
+#settings-dialog .place-foot { display: flex; align-items: baseline; gap: 10px; }
+#settings-dialog .place-foot[hidden] { display: none; }
+#settings-dialog .place-foot .hint { flex: 1; margin: 0 2px; }
+#settings-dialog .place-foot .plain { padding: 2px 0; font-size: calc(13px * var(--scale)); }
+/* A switch in a row of its own, drawn as the text sizes' rows are. */
 .switch-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 44px;
-  padding: 0 2px;
-  font: calc(16px * var(--scale)) var(--ui);
+  gap: 12px;
+  min-height: 50px;
+  padding: 0 16px;
+  font: calc(16px * var(--scale))/1.3 var(--ui);
+  text-align: left;
   color: var(--text);
-  background: none;
-  border-radius: 0;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
 }
 .switch-row[hidden] { display: none; }
 .switch-row .switch { position: relative; flex: none; width: 46px; height: 28px; border-radius: 14px; background: var(--chip); transition: background 0.15s; }
@@ -1677,20 +1694,23 @@ button.plain.danger-text { color: var(--error); margin-left: auto; }
   box-shadow: none !important;
   text-shadow: none !important;
 }
-[data-theme^="eink"] body { font-weight: 500; }
 [data-theme^="eink"] .bar { border-bottom-color: var(--edge); }
 [data-theme^="eink"] .sheet, [data-theme^="eink"] #settings-dialog { border-width: 2px; }
 [data-theme^="eink"] body.chat-sheet #chat-pane { border-top: 2px solid var(--line); }
 [data-theme^="eink"] .segmented { background: none; border: 1px solid var(--line); }
 [data-theme^="eink"] .segmented button[aria-checked="true"],
+[data-theme^="eink"] .place-choices button[aria-checked="true"],
 [data-theme^="eink"] .chip[aria-pressed="true"],
 [data-theme^="eink"] #pen[aria-pressed="true"],
 [data-theme^="eink"] .icon-button[aria-expanded="true"] { background: var(--text); color: var(--bg); }
+[data-theme^="eink"] .place-choices button[aria-checked="true"] .icon { color: var(--bg); }
 [data-theme^="eink"] .chip,
 [data-theme^="eink"] .question,
 [data-theme^="eink"] .stepper button { border: 1px solid var(--line); }
 /* With no grey to dim a button that does nothing here, its label is left out. */
 [data-theme^="eink"] .stepper button:disabled { opacity: 1; color: transparent; }
+[data-theme^="eink"] .model-choices .radio { border: 2px solid var(--line); }
+[data-theme^="eink"] .model-choices button[aria-checked="true"] .radio::after { inset: 3px; }
 [data-theme^="eink"] .switch-row .switch { border: 2px solid var(--line); background: var(--bg); }
 [data-theme^="eink"] .switch-row .switch::after { top: 2px; left: 2px; border: 2px solid var(--line); }
 [data-theme^="eink"] .switch-row[aria-checked="true"] .switch { background: var(--text); }

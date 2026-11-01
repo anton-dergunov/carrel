@@ -228,6 +228,14 @@ def settings_pass(page, note: str | None, out: Path) -> None:
         page.eval_on_selector_all(".size-value", "els => els.map(e => e.textContent)"),
     )
     page.screenshot(path=out / "settings-0-look.png")
+    page.locator(".place-choices").scroll_into_view_if_needed()
+    print(
+        "settings: layout",
+        page.eval_on_selector_all(
+            '.place-choices [aria-checked="true"]', "els => els.map(e => e.textContent)"
+        ),
+    )
+    page.screenshot(path=out / "settings-0-layout.png")
     page.click("#settings-dialog .settings-title button")  # Done
     page.wait_for_timeout(300)
     page.click("#model")
@@ -308,6 +316,7 @@ def overview_pass(page, out: Path) -> None:
     )
     page.screenshot(path=out / "overview-1-button.png")
     if "has-note" not in (button.get_attribute("class") or ""):
+        ask_overview(page, out)
         return
     button.click()
     page.wait_for_selector("#overview-sheet:not([hidden])")
@@ -333,6 +342,17 @@ def overview_pass(page, out: Path) -> None:
         "| button:",
         button.get_attribute("title"),
     )
+    ask_overview(page, out)
+
+
+def ask_overview(page, out: Path) -> None:
+    """The pen asks before writing an overview; Cancel, so nothing is asked."""
+    page.locator("#overview").click()
+    page.wait_for_selector("#overview-sheet.confirm:not([hidden])")
+    print("overview asks:", page.inner_text("#overview-sheet").replace("\n", " | "))
+    page.screenshot(path=out / "overview-4-ask.png")
+    page.locator("#overview-sheet").get_by_role("button", name="Cancel").click()
+    print("cancelled, sheet hidden:", page.locator("#overview-sheet").is_hidden())
 
 
 def type_pass(page, text: str, out: Path) -> None:
@@ -451,6 +471,20 @@ def map_pass(page, args, out: Path) -> None:
         target["id"].rsplit("/", 1)[-1][:60],
     )
     page.screenshot(path=out / "map-4-peek.png")
+    # A similar paper, picked in the peek: it moves to the middle of what the peek leaves.
+    if peek.is_visible() and peek.locator(".fold").count():
+        if peek.locator(".fold-body").is_hidden():
+            peek.locator(".fold-head").click()
+        before = peek.bounding_box()
+        peek.locator(".fold-body li button").first.click()
+        page.wait_for_timeout(900)
+        print(
+            "similar picked:",
+            peek.locator(".peek-title").inner_text(),
+            "| peek stayed put:",
+            before["x"] == peek.bounding_box()["x"],
+        )
+        page.screenshot(path=out / "map-5-similar.png")
     page.keyboard.press("Escape")
 
     page.click("#map-view .map-areas")

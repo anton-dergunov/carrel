@@ -913,6 +913,10 @@ export function createMeaningMap(canvas, { onSelect = () => {}, onRegion = () =>
         flyTo(c.cx - dx / cam.k, c.cy - dy / cam.k, cam.k, 360);
       });
     },
+    /** Puts a paper in the middle of the part of the canvas nothing covers, at the same zoom. */
+    centreOn(i) {
+      whenSized(() => flyTo(X[i], Y[i], cam.k, 360));
+    },
     getCamera,
     setCamera,
     redraw: request,

@@ -1,10 +1,11 @@
 // The settings, one dialog, opened from the gear in the tab strip, or at the chat's part from the
 // model's name on the chat's status line. The look, kept on this device by boot.js: the colours,
 // whether a dark theme darkens the paper, and the text sizes of the library, the chat and the
-// rest. The chat's: the model this device's chats start on, kept on the device, and a note about
-// the reader that every chat carries in its system prompt, kept on the server. Both reach a chat
-// when its Claude Code process starts; a running chat keeps what it started with, so its prompt
-// cache stays valid.
+// rest; and where the chat sits, kept by layout.js. The chat's: the model this device's chats
+// start on, kept on the device, and a note about the reader that every chat carries in its system
+// prompt, kept on the server. Both reach a chat when its Claude Code process starts; a running
+// chat keeps what it started with, so its prompt cache stays valid.
+import { icon } from './rows.js';
 
 const MODEL_KEY = 'carrel.model';
 // A word under each model's name, for the choice.
@@ -30,6 +31,15 @@ const PARTS = [
   ['chat', 'Chat'],
   ['ui', 'Everything else'],
 ];
+// Where the chat sits (layout.js's places), with the icon the Chat button shows for each.
+const PLACES = [
+  ['bottom', 'Below', 'panel-bottom'],
+  ['top', 'Above', 'panel-top'],
+  ['left', 'Left', 'panel-left'],
+  ['right', 'Right', 'panel-right'],
+  ['sheet', 'Over', 'panel-bottom-open'],
+  ['tab', 'A tab', 'chat'],
+];
 
 /** The part of the dialog `show` opens at: the top, or the chat's ('chat'). */
 export function sectionFor(asked) {
@@ -44,11 +54,12 @@ export function modelLine(live, chosen, name) {
 
 /**
  * `liveModel()` is the model this chat's process runs on, or null; `name(model)` how the status
- * line names one; `onOpen()` follows the sheet opening, `onModel()` a model being chosen. Returns
+ * line names one; `onOpen()` follows the sheet opening, `onModel()` a model being chosen;
+ * `layout` is layout.js's control, for where the chat sits. Returns
  * `model()`, the model this device's chats start on (null until it is known), `show(open,
  * section)` and `shown()`.
  */
-export function startSettings({ liveModel, name, onOpen = () => {}, onModel = () => {} }) {
+export function startSettings({ liveModel, name, onOpen = () => {}, onModel = () => {}, layout = null }) {
   const sheet = document.getElementById('settings-dialog');
   const button = document.getElementById('model');
   const gear = document.getElementById('settings-button');
@@ -159,6 +170,29 @@ export function startSettings({ liveModel, name, onOpen = () => {}, onModel = ()
   const sizeGroup = el('section', 'group look-group');
   sizeGroup.append(groupTitle('div', 'Text size', 'this device'), sizes);
 
+  // Where the chat sits: applied at once, behind the dialog.
+  const places = el('div', 'place-choices');
+  places.setAttribute('role', 'radiogroup');
+  places.setAttribute('aria-label', 'Where the chat sits');
+  for (const [place, text, iconName] of PLACES) {
+    const choice = places.appendChild(el('button'));
+    choice.type = 'button';
+    choice.setAttribute('role', 'radio');
+    choice.dataset.place = place;
+    choice.append(icon(iconName), el('span', '', text));
+    choice.addEventListener('click', () => {
+      layout.set({ place, hidden: false });
+      drawLook();
+    });
+  }
+  const resetSize = el('button', 'plain', 'Default size');
+  resetSize.type = 'button';
+  resetSize.addEventListener('click', () => layout.resetShare());
+  const placeFoot = el('div', 'place-foot');
+  placeFoot.append(el('span', 'hint', 'Drag the split between them to resize the chat.'), resetSize);
+  const layoutGroup = el('section', 'group look-group');
+  layoutGroup.append(groupTitle('div', 'Layout', 'this device'), places, placeFoot);
+
   function drawLook() {
     const { prefs, sizes: range } = look;
     for (const choice of colourGroup.querySelectorAll('[data-pref]')) {
@@ -175,6 +209,11 @@ export function startSettings({ liveModel, name, onOpen = () => {}, onModel = ()
       less.disabled = prefs[part] <= range[part][0];
       more.disabled = prefs[part] >= range[part][1];
     }
+    if (!layout) return;
+    const { place } = layout.get();
+    for (const choice of places.children) choice.setAttribute('aria-checked', String(choice.dataset.place === place));
+    // On a tab of its own, the chat has no split to size.
+    placeFoot.hidden = place === 'tab';
   }
 
   function groupTitle(tag, text, scope) {
@@ -220,7 +259,7 @@ export function startSettings({ liveModel, name, onOpen = () => {}, onModel = ()
         const words = el('span', 'words');
         words.append(el('span', 'name', m.name));
         if (HINTS[m.id]) words.append(el('span', 'sub', HINTS[m.id]));
-        choice.append(el('span', 'dot'), words);
+        choice.append(el('span', 'radio'), words);
         choice.addEventListener('click', () => {
           chosen = m.id;
           rememberModel(chosen);
@@ -275,7 +314,7 @@ export function startSettings({ liveModel, name, onOpen = () => {}, onModel = ()
     onOpen();
     drawLook();
     chatPart.replaceChildren(loading);
-    sheet.replaceChildren(title, colourGroup, sizeGroup, chatPart);
+    sheet.replaceChildren(title, colourGroup, sizeGroup, ...(layout ? [layoutGroup] : []), chatPart);
     sheet.showModal();
     noteSays('');
     reveal();

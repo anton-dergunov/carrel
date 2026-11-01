@@ -64,6 +64,10 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   let pending = null;
   let lastPlace = null;
   let uiManager = null;
+  // Whether the paper showing was loaded with PDF.js drawing the letters' outlines (Settings →
+  // Pages), and which of its pages are scans, for the black-and-white option.
+  let outlines = window.carrelLook.outlines();
+  let scans = new Set();
 
   eventBus.on('pagesinit', () => {
     viewer.currentScaleValue = 'page-width';
@@ -74,6 +78,17 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     else if (target) void goTo(target).then(() => findTarget(target));
   });
   eventBus.on('pagechanging', ({ pageNumber }) => onPage(pageNumber, viewer.pagesCount));
+  // A page that is a scan is marked before it is drawn, for the CSS's black and white.
+  eventBus.on('pagerender', ({ source, pageNumber }) => source.div?.toggleAttribute('data-scan', scans.has(pageNumber)));
+
+  // The letters' outlines are a way of loading the paper: a change loads it again, in place.
+  document.addEventListener('carrel:look', () => {
+    if (window.carrelLook.outlines() !== outlines && file && paper) {
+      const { file: pdf, url } = paper;
+      file = null;
+      void open(pdf, url, { place: lastPlace }).catch((error) => console.warn(`The paper was not loaded again: ${error}`));
+    }
+  });
   eventBus.on('updateviewarea', ({ location }) => {
     if (file && location) {
       lastPlace = { page: location.pageNumber, scale: location.scale, left: Math.round(location.left), top: Math.round(location.top) };
@@ -219,6 +234,8 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     await saving;
     if (ticket !== loading) return;
     pdfDocument = null;
+    scans = new Set();
+    void markScans(pdf, ticket);
     let loaded, version, data, base;
     let task = null;
     try {
@@ -240,6 +257,10 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
         // which Safari keeps off the GPU: in WebKit at 2x a page took 74 ms to appear after a jump
         // and a scroll had frames of 25–33 ms; with it, 46–63 ms and 18–19 ms.
         enableHWA: true,
+        // Settings → Pages: PDF.js fills each letter's outline itself, and a font the PDF does not
+        // embed comes from its own standard fonts. On the Boox the letters were crisper so, at no
+        // cost in drawing (crisp-pages).
+        disableFontFace: (outlines = window.carrelLook.outlines()),
       });
       loaded = await task.promise;
     } catch (error) {
@@ -260,6 +281,18 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     viewer.setDocument(loaded);
     linkService.setDocument(loaded, null);
     void previous?.destroy();
+  }
+
+  /** Asks the laptop which of the paper's pages are scans, and marks those already laid out. */
+  async function markScans(pdf, ticket) {
+    const response = await fetch(`/api/scans/${pdf.split('/').map(encodeURIComponent).join('/')}`).catch(() => null);
+    if (!response?.ok || ticket !== loading) return;
+    const { pages } = await response.json();
+    if (ticket !== loading) return;
+    scans = new Set(pages);
+    for (let index = 0; index < viewer.pagesCount; index++) {
+      viewer.getPageView(index)?.div?.toggleAttribute('data-scan', scans.has(index + 1));
+    }
   }
 
   // Saving: one save at a time, and an edit made during one is saved after it.

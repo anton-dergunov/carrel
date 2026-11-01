@@ -1,7 +1,7 @@
 // The settings, one dialog, opened from the gear in the tab strip, or at the chat's part from the
 // model's name on the chat's status line. The look, kept on this device by boot.js: the colours,
-// whether a dark theme darkens the paper, and the text sizes of the library, the chat and the
-// rest; and where the chat sits, kept by layout.js. The chat's: the model this device's chats
+// whether a dark theme darkens the paper, the text sizes of the library, the chat and the rest,
+// and how a paper's pages are drawn; and where the chat sits, kept by layout.js. The chat's: the model this device's chats
 // start on, kept on the device, and a note about the reader that every chat carries in its system
 // prompt, kept on the server. Both reach a chat when its Claude Code process starts; a running
 // chat keeps what it started with, so its prompt cache stays valid.
@@ -26,6 +26,8 @@ const INKS = [
   ['mono', 'Black only'],
   ['colour', 'With colour'],
 ];
+// Settings → Pages: the strengths the reader judged in crisp-pages, as words.
+const STRENGTHS = ['Off', 'Light', 'More', 'Most'];
 const PARTS = [
   ['library', 'Library'],
   ['chat', 'Chat'],
@@ -123,13 +125,25 @@ export function startSettings({ liveModel, name, onOpen = () => {}, onModel = ()
       choice.type = 'button';
       choice.setAttribute('role', 'radio');
       choice.dataset.pref = pref;
-      choice.dataset.value = value;
+      choice.dataset.value = String(value);
       choice.addEventListener('click', () => {
         look.set(pref, value);
         drawLook();
       });
     }
     return control;
+  };
+  const switchRow = (words, pref) => {
+    const row = el('button', 'switch-row');
+    row.type = 'button';
+    row.setAttribute('role', 'switch');
+    row.dataset.switch = pref;
+    row.append(el('span', 'words', words), el('span', 'switch'));
+    row.addEventListener('click', () => {
+      look.set(pref, !look.prefs[pref]);
+      drawLook();
+    });
+    return row;
   };
   const families = choiceRow('Colours', 'family', FAMILIES);
   const modes = choiceRow('Light or dark', 'mode', MODES);
@@ -170,6 +184,26 @@ export function startSettings({ liveModel, name, onOpen = () => {}, onModel = ()
   const sizeGroup = el('section', 'group look-group');
   sizeGroup.append(groupTitle('div', 'Text size', 'this device'), sizes);
 
+  // How a paper's pages are drawn (crisp-pages): one switch over the adjustments, which keeps
+  // them when off, so a paper can be seen as it is and back in a tap.
+  const pagesSwitch = switchRow('Adjust pages', 'pages');
+  const pagesHint = el('p', 'hint', 'Off, every paper is drawn as it is.');
+  const outlines = switchRow('Letters as outlines', 'outlines');
+  const outlinesHint = el('p', 'hint', 'Crisper on e-ink; softer on a monitor.');
+  const labelled = (label, control) => {
+    const row = el('div', 'pages-row');
+    row.append(el('span', 'pages-name', label), control);
+    return row;
+  };
+  const tone = labelled('Darker greys', choiceRow('Darker greys', 'tone', look.tones.map((v, i) => [v, STRENGTHS[i]])));
+  const contrast = labelled('Contrast', choiceRow('Contrast', 'contrast', look.contrasts.map((v, i) => [v, STRENGTHS[i]])));
+  const scans = switchRow('Scans in black and white', 'scans');
+  const scansHint = el('p', 'hint', 'Only on the pages of a paper that are scans.');
+  const adjustments = el('div', 'pages-adjustments');
+  adjustments.append(outlines, outlinesHint, tone, contrast, scans, scansHint);
+  const pagesGroup = el('section', 'group look-group');
+  pagesGroup.append(groupTitle('div', 'Pages', 'this device'), pagesSwitch, pagesHint, adjustments);
+
   // Where the chat sits: applied at once, behind the dialog.
   const places = el('div', 'place-choices');
   places.setAttribute('role', 'radiogroup');
@@ -206,13 +240,18 @@ export function startSettings({ liveModel, name, onOpen = () => {}, onModel = ()
   const columns = el('div', 'settings-columns');
   const lookColumn = columns.appendChild(el('div', 'settings-column'));
   const restColumn = columns.appendChild(el('div', 'settings-column'));
-  lookColumn.append(colourGroup, sizeGroup);
+  lookColumn.append(colourGroup, sizeGroup, pagesGroup);
 
   function drawLook() {
     const { prefs, sizes: range } = look;
-    for (const choice of colourGroup.querySelectorAll('[data-pref]')) {
+    for (const choice of [...colourGroup.querySelectorAll('[data-pref]'), ...pagesGroup.querySelectorAll('[data-pref]')]) {
       choice.setAttribute('aria-checked', String(String(prefs[choice.dataset.pref]) === choice.dataset.value));
     }
+    for (const row of pagesGroup.querySelectorAll('[data-switch]')) {
+      row.setAttribute('aria-checked', String(prefs[row.dataset.switch]));
+    }
+    adjustments.hidden = !prefs.pages;
+    pagesHint.hidden = prefs.pages;
     const eink = prefs.family === 'eink';
     modes.hidden = eink;
     inks.hidden = !eink;

@@ -103,7 +103,7 @@ function showFacts() {
 
 // ---- The recipes and the knobs ----
 
-const RECIPE = { res: 1, fonts: 'face', embolden: 0, contrast: 1, tone: 1, sharpen: 0, threshold: 0, sauvola: 0, laptop: null };
+const RECIPE = { res: 1, fonts: 'face', embolden: 0, contrast: 1, tone: 1, sharpen: 0, threshold: 0, sauvola: 0, laptop: null, strike: 0, sharpenGpu: 0 };
 const textOnly = (crop) => !SCANS.has(crop.kind);
 const scansOnly = (crop) => SCANS.has(crop.kind);
 
@@ -141,6 +141,23 @@ const KNOBS = {
   },
   sharpen: { name: 'Sharpen', levels: [0.4, 0.7, 1, 1.5, 2, 3], set: (r, v) => ({ ...r, sharpen: v }), show: (v) => `unsharp ${v}` },
   contrast: { name: 'Contrast', levels: [1.15, 1.3, 1.5, 1.75, 2, 2.5], set: (r, v) => ({ ...r, contrast: v }), show: (v) => `contrast ${v}` },
+  // Round 2: the routes carrel can ship, each beside the bench's own at the same strength. A
+  // double strike draws the page's canvas over itself moved sideways by the stroke's width, keeping
+  // the darker of the two (letters and lines alike); the GPU's sharpening is an SVG convolution
+  // on the canvas, as carrel's filters are, where the bench's own works on the pixels in a worker.
+  strike: {
+    name: 'Embolden, shippable (round 2)',
+    levels: [{ strike: 0.05 }, { embolden: 0.05 }, { strike: 0.1 }, { embolden: 0.1 }, { strike: 0.18 }, { embolden: 0.18 }],
+    set: (r, v) => ({ ...r, ...v }),
+    show: (v) => (v.strike ? `double strike ${v.strike} pt` : `stroke ${v.embolden} pt`),
+    applies: textOnly,
+  },
+  sharpenGpu: {
+    name: 'Sharpen, shippable (round 2)',
+    levels: [{ sharpenGpu: 0.4 }, { sharpen: 0.4 }, { sharpenGpu: 0.7 }, { sharpen: 0.7 }, { sharpenGpu: 1 }, { sharpen: 1 }],
+    set: (r, v) => ({ ...r, ...v }),
+    show: (v) => (v.sharpenGpu ? `GPU unsharp ${v.sharpenGpu}` : `worker unsharp ${v.sharpen}`),
+  },
   threshold: {
     name: 'Threshold (one cut)',
     levels: [0.45, 0.55, 0.65, 0.75, 0.85],
@@ -161,9 +178,12 @@ const BASES = { full: RECIPE, laptop: { ...RECIPE, laptop: { aa: 8 } } };
 function describe(recipe) {
   const parts = [];
   for (const [name, knob] of Object.entries(KNOBS)) {
+    if (name === 'strike' || name === 'sharpenGpu') continue; // their recipes' fields are named below
     const value = name === 'glyphs' ? (recipe.fonts === 'face' ? null : recipe.fonts) : recipe[name];
     if (value !== null && value !== RECIPE[name] && !(name === 'res' && value === 1)) parts.push(knob.show(value));
   }
+  if (recipe.strike) parts.push(`double strike ${recipe.strike} pt`);
+  if (recipe.sharpenGpu) parts.push(`GPU unsharp ${recipe.sharpenGpu}`);
   return parts.join(', ') || 'as carrel draws it';
 }
 
@@ -204,6 +224,23 @@ function transfer(filter, attributes) {
 }
 function cssFilter(recipe) {
   const parts = [];
+  if (recipe.sharpenGpu) {
+    // out = in + a (in - blur), the blur [1 2 1]/4 each way: one 3×3 kernel.
+    const a = recipe.sharpenGpu;
+    const blur = [1, 2, 1, 2, 4, 2, 1, 2, 1].map((k) => k / 16);
+    const kernel = blur.map((k, i) => (i === 4 ? 1 + a - a * k : -a * k));
+    parts.push(
+      svgFilter(`sharp-${a}`, (f) => {
+        const node = document.createElementNS(SVG, 'feConvolveMatrix');
+        node.setAttribute('order', '3');
+        node.setAttribute('kernelMatrix', kernel.map((k) => k.toFixed(5)).join(' '));
+        node.setAttribute('divisor', '1');
+        node.setAttribute('preserveAlpha', 'true');
+        node.setAttribute('edgeMode', 'duplicate');
+        f.append(node);
+      }),
+    );
+  }
   if (recipe.contrast !== 1) parts.push(`contrast(${recipe.contrast})`);
   if (recipe.tone !== 1) {
     // Exponent above 1: the greys of a glyph's edges darker, white and black as they were.
@@ -286,6 +323,16 @@ async function draw(crop, recipe) {
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     await page.render({ canvasContext: ctx, viewport, transform: [1, 0, 0, 1, -x0 * scale, -y0 * scale] }).promise;
+  }
+  if (recipe.strike) {
+    // The stroke widens a letter by its width; the strike moves the copy that far, in device pixels.
+    const copy = document.createElement('canvas');
+    copy.width = canvas.width;
+    copy.height = canvas.height;
+    copy.getContext('2d').drawImage(canvas, 0, 0);
+    ctx.globalCompositeOperation = 'darken';
+    ctx.drawImage(copy, recipe.strike * scale, 0);
+    ctx.globalCompositeOperation = 'source-over';
   }
   if (recipe.sharpen) await onPixels(canvas, { op: 'sharpen', amount: recipe.sharpen });
   if (recipe.sauvola) await onPixels(canvas, { op: 'sauvola', k: recipe.sauvola, window: Math.max(15, Math.round(scale * 12)) | 1 });

@@ -53,6 +53,7 @@ from .engine import Library
 from .highlights import Highlights
 from .meaning import Meaning, MeaningError
 from .meaning_map import MeaningMap
+from .scans import Scans
 from .search import SearchError, search
 from .session import Session, Sessions
 from .settings import DEFAULT_MODEL, LONGEST_NOTE, MODELS, Settings
@@ -196,6 +197,7 @@ def make_app(
     there, for the Mac app's menu."""
     sessions = sessions or Sessions(library, extra_folders, settings=settings)
     highlights = highlights or Highlights(library)
+    scans = Scans(library)
     catalog = catalog or Catalog(library, highlights=highlights)
     edits = edits or Edits(library)
     meaning = meaning or Meaning(library, catalog)
@@ -549,6 +551,15 @@ def make_app(
             return JSONResponse({"error": "No such PDF in the library."}, status_code=404)
         return JSONResponse({"pdf": rel, "items": items}, headers={"Cache-Control": "no-store"})
 
+    async def paper_scans(request: Request) -> Response:
+        """Which of a paper's pages are scans: the black-and-white option acts on them alone."""
+        rel = request.path_params["path"]
+        try:
+            pages = await asyncio.to_thread(scans.pages, rel)
+        except LookupError:
+            return JSONResponse({"error": "No such PDF in the library."}, status_code=404)
+        return JSONResponse({"pdf": rel, "pages": pages}, headers={"Cache-Control": "no-store"})
+
     async def asked_for(request: Request) -> dict:
         body = await request.body()
         if len(body) > MAX_MARKS:
@@ -725,6 +736,7 @@ def make_app(
             Route("/pdf/{path:path}", pdf, methods=["GET", "HEAD"]),
             Route("/pdf/{path:path}", save_pdf, methods=["PUT"]),
             Route("/api/highlights/{path:path}", paper_highlights),
+            Route("/api/scans/{path:path}", paper_scans),
             Route("/api/star/{path:path}", put_star, methods=["PUT"]),
             Route("/api/tags/{path:path}", put_tags, methods=["PUT"]),
             Route("/api/tag/{name}", put_tag, methods=["PUT"]),

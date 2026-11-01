@@ -75,6 +75,15 @@
   <symbol id="i-panel-bottom-open" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="M3 15h18" /> <path d="m9 10 3-3 3 3" /></symbol>
   <symbol id="i-minimize-2" viewBox="0 0 24 24"><path d="m14 10 7-7" /> <path d="M20 10h-6V4" /> <path d="m3 21 7-7" /> <path d="M4 14h6v6" /></symbol>
 </svg>
+<!-- The pages' adjustments (boot.js's pageFilters, Settings → Pages), on each page's canvases. The tone: a gamma
+     on the greys, white and black kept (crisp-pages' tone curve). A scan in black and white: grey, then
+     ink below 55% (crisp-pages' one cut). sRGB, so the curve is the one the reader judged. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="page-tone-125" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncR type="gamma" exponent="1.25" /><feFuncG type="gamma" exponent="1.25" /><feFuncB type="gamma" exponent="1.25" /></feComponentTransfer></filter>
+  <filter id="page-tone-150" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncR type="gamma" exponent="1.5" /><feFuncG type="gamma" exponent="1.5" /><feFuncB type="gamma" exponent="1.5" /></feComponentTransfer></filter>
+  <filter id="page-tone-180" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncR type="gamma" exponent="1.8" /><feFuncG type="gamma" exponent="1.8" /><feFuncB type="gamma" exponent="1.8" /></feComponentTransfer></filter>
+  <filter id="page-scan" color-interpolation-filters="sRGB"><feColorMatrix type="saturate" values="0" /><feComponentTransfer><feFuncR type="discrete" tableValues="0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1" /><feFuncG type="discrete" tableValues="0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1" /><feFuncB type="discrete" tableValues="0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1" /></feComponentTransfer></filter>
+</svg>
 <nav id="strip" class="bar">
   <div id="tabs" role="tablist">
     <button type="button" role="tab" class="tab icon-tab" id="tab-papers" aria-label="Library" title="Library"><svg class="icon"><use href="#i-library"/></svg></button>

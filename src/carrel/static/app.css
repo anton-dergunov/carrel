@@ -958,6 +958,10 @@ article.review[hidden] { display: none; }
 .pdfViewer .page { margin: 0 auto 8px; }
 /* Dark pages (themes.css): the page and everything drawn on it, darkened together. */
 [data-dark-pages] .pdfViewer .page { filter: var(--pdf-filter); }
+/* The pages' adjustments (boot.js's pageFilters): on the page's canvases alone, so the highlights
+   and a citation's mark keep their colours; Dark pages, on the page, applies after them. */
+.pdfViewer .page .canvasWrapper > canvas { filter: var(--page-filter, none); }
+.pdfViewer .page[data-scan] .canvasWrapper > canvas { filter: var(--page-filter-scan, none); }
 
 /* A citation's mark (cite-mark.js): an overlay on the page, never an annotation. One ink in both
    themes, since the page is white in both. It arrives with a ring that contracts onto it, then
@@ -1253,6 +1257,11 @@ button.plain {
 .stepper button { width: 40px; height: 34px; padding: 0; border-radius: 8px; font: 500 calc(20px * var(--scale))/1 var(--ui); color: var(--text); background: var(--chip); }
 .stepper button:disabled { opacity: 0.35; }
 .stepper output { min-width: 4.2em; text-align: center; font-size: calc(15px * var(--scale)); font-variant-numeric: tabular-nums; color: var(--muted); }
+/* Pages: the adjustments under their switch, a name over each row of strengths. */
+#settings-dialog .pages-adjustments { display: flex; flex-direction: column; gap: 8px; padding-left: 12px; border-left: 2px solid var(--line); }
+#settings-dialog .pages-adjustments[hidden] { display: none; }
+#settings-dialog .pages-row { display: flex; flex-direction: column; gap: 4px; }
+#settings-dialog .pages-name { padding: 0 2px; font-size: calc(14px * var(--scale)); color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .switch-row .switch, .switch-row .switch::after { transition: none; } }
 #chats-sheet ul { list-style: none; margin: 0; padding: 0; }
 #chats-sheet li { border-bottom: 1px solid var(--line); }

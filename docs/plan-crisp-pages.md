@@ -1,6 +1,6 @@
 # Plan: crisp pages on e-ink (research)
 
-**This is research, with the reader in the loop.** It is a session of its own, not a change to make between others. Nothing is chosen in advance: the reader looks at the candidates on the e-ink tablet itself and picks, round after round, and the settings carrel ends up with come from those picks. E-ink is the reader's main reading device, so this is worth doing thoroughly. Built so far: the bench, and round 1 on the Boox in two colour modes, the iPad begun ([experiments/crisp-pages](../experiments/crisp-pages/README.md)): glyphs as paths, a light embolden, a mild tone curve and a threshold for scans are kept, the rest dropped, and every one of them depends on the paper.
+**This is research, with the reader in the loop.** It is a session of its own, not a change to make between others. Nothing is chosen in advance: the reader looks at the candidates on the e-ink tablet itself and picks, round after round, and the settings carrel ends up with come from those picks. E-ink is the reader's main reading device, so this is worth doing thoroughly. Built so far: the bench; round 1 on the Boox (two colour modes), the iPad and the Mac's monitor ([experiments/crisp-pages](../experiments/crisp-pages/README.md)); and Settings → Pages in carrel with its winners (letters as outlines, darker greys, contrast, scans in black and white), each device's own, described in [architecture.md](architecture.md). Left: embolden and sharpening by routes carrel can ship (round 2 on the bench), then a sitting reading with them on.
 
 ## The problem
 
@@ -45,6 +45,6 @@ Picked from the library, two or three of each, the same crops every round:
 
 ## What it should end in
 
-- **Options for a paper, not one setting for all pages** (round 1: which knob helps, and how much, depends on the paper). Each paper can turn on glyphs as paths, a light embolden, a mild tone curve or, for a scan, a threshold, on each device; how a paper is given a sensible choice to start with (its fonts, its kind), where the choice is kept, and what the Settings dialog still sets for every page are round 2's questions.
+- **Settings → Pages, each device's own** (decided after round 1): one switch over the adjustments, which keeps them when off, and no choice kept per paper, which would leave the reader unsure what is on, though which adjustment helps does change from paper to paper. Each kind of screen starts with what the research found it preferred.
 - What it costs to draw a page with it, on the Boox and the iPad.
 - A line in architecture.md on what was chosen and why, with the picks that settled it.

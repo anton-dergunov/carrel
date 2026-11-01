@@ -31,7 +31,8 @@ def device_of(record: dict) -> str:
     went into Refresh, or into Notes), so picks made under different settings are counted apart."""
     tablet = record.get("tablet") or {}
     name = tablet.get("device") or record["device"]["userAgent"][:40]
-    settings = [f"{key} {tablet[key]}" for key in SETTINGS if tablet.get(key)]
+    # By value alone: the same colour mode typed into Refresh one day and Notes the next is one.
+    settings = sorted({str(tablet[key]) for key in SETTINGS if tablet.get(key)})
     return f"{name} ({'; '.join(settings)})" if settings else name
 
 
@@ -65,6 +66,25 @@ def main() -> None:
         print(
             f"| {device} | {knob} | {base} | {kind} | {len(group)} | {baseline} | {same} | {picked} |"
         )
+
+    # Each strength against chance. A screen shows the baseline beside up to three strengths, so
+    # picking at random favours "a change" three to one; instead, each cell shown on a screen
+    # with a pick expects 1/cells of a pick, and a strength's picks over its expected picks say
+    # whether it was preferred (above 1) or not (below 1). "No difference" screens count for none.
+    scores: dict[tuple, list[float]] = defaultdict(lambda: [0, 0.0, 0])
+    for pick in picks:
+        for cell in pick["cells"]:
+            what = "baseline" if cell["baseline"] else cell["what"]
+            score = scores[(device_of(pick), pick["knob"], what)]
+            score[2] += 1
+            if pick["pick"] != "same":
+                score[1] += 1 / len(pick["cells"])
+                score[0] += cell["label"] == pick["pick"]
+    print("\n| Device | Knob | Cell | Shown | Picked | By chance | Ratio |")
+    print("|---|---|---|---|---|---|---|")
+    for (device, knob, what), (picked, expected, shown) in sorted(scores.items()):
+        ratio = f"{picked / expected:.2f}" if expected else "–"
+        print(f"| {device} | {knob} | {what} | {shown} | {picked} | {expected:.1f} | {ratio} |")
 
     measured = records("measurements.jsonl")
     if measured:

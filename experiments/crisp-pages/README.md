@@ -2,7 +2,7 @@
 
 **Question.** On the Boox Tab X C (13.3", 3200×2400, Kaleido 3, Chrome) a paper's text looks thin and grey, and turning the tablet's contrast up makes carrel's chat and library far too heavy. What, done to the page alone, makes it crisp enough that the tablet's contrast can stay at its default? The plan, the candidates and why: [docs/plan-crisp-pages.md](../../docs/plan-crisp-pages.md).
 
-**Status.** Round 1 done on the Boox in two colour modes (235 picks, 16 measurements); the iPad begun. Under way: the iPad, then the Mac, then the Boox again for the changed Glyphs and Embolden knobs. Where it stands and what is next: [NEXT.md](NEXT.md).
+**Status.** Round 1 done: the Boox in two colour modes, the iPad and the Mac's monitor, 498 picks and 35 measurements. Its winners are in carrel's Settings → Pages; round 2, embolden and sharpening by routes carrel can ship, is on the bench ([NEXT.md](NEXT.md)). Where it stands and what is next: [NEXT.md](NEXT.md).
 
 ## Method
 
@@ -104,11 +104,79 @@ The tallies agree: with the tablet darkening everything, the baseline wins more 
 
 ### The iPad 11", Chrome
 
-Begun: Resolution on all 15 crops. Chrome there has `devicePixelRatio` 2 and a window 820×1048 CSS px, so a page at page width is about 3.5 MP, under PDF.js's 5.24 MP cap: the whole page is drawn at full resolution at once (Measure: 100% of the device's pixels, no detail canvas), and "before the detail canvas" is the same picture as the baseline there. The reader rarely saw a difference: 7 of 15 no difference, and every other pick was the cell in position A, which reads as a guess.
+105 picks over every knob (the bench with the third Glyphs cell and Embolden from 0.05 pt). Chrome there has `devicePixelRatio` 2 and a window 820×1048 CSS px, so a page at page width is about 3.5 MP, under PDF.js's 5.24 MP cap: the whole page is drawn at full resolution at once (Measure: 100% of the device's pixels, no detail canvas), and "before the detail canvas" is the same picture as the baseline there. The crops were drawn at the portrait page width (820 px); the reader reads larger on the iPad, up to 1.5×, and judged that this does not call for a second pass.
+
+The reader: different things matter than on e-ink. Contrast and sharpening are worth much more; the tone curve and glyphs as paths matter little, with no font difference seen; the laptop's drawing is consistently worse than the iPad's own; the thresholds are perceived quite differently from e-ink.
+
+| Knob | Screens | Baseline | No difference | A variant |
+|---|---|---|---|---|
+| Contrast | 15 | 4 | 0 | 11: 1.15 ×3, 1.3 ×6, 1.5 ×2 |
+| Sharpen | 15 | 2 | 2 | 11: 0.4 ×3, 0.7 ×2, 1 ×6 |
+| Tone curve | 15 | 1 | 0 | 14: gamma 1.25 ×4, 1.5 ×6, 1.8 ×4 |
+| Embolden | 12 | 5 | 0 | 7, all 0.05 pt |
+| Glyphs as paths | 12 | 1 | 10 | 1 (the standard fonts alone) |
+| Drawn on the laptop | 15 | 15 | 0 | 0 |
+| Resolution | 15 | 1 | 7 | 7 (1.25× ×6) |
+| Threshold, one cut (scans) | 3 | 1 | 0 | 2 |
+| Threshold, Sauvola (scans) | 3 | 0 | 0 | 3, k 0.05–0.2 |
+
+The tallies agree with the reader except for the tone curve, picked over the baseline on 14 of 15 screens though it felt unimportant: a small, consistent preference, or the close-call guessing below (the iPad's picks lean to position A, 37 of 86).
+
+### The MacBook Air, an external monitor, Chrome
+
+133 picks. Resolution first, at the window's full width (2048 CSS px), conclusive: on the desktop PDF.js has no cap, so "before the detail canvas" is the baseline again. Every other knob at the reader's reading size on that monitor (Paper width 1100 CSS px). The monitor is a 5K-class panel scaled 1.25× (`devicePixelRatio` 2), further from the eyes than a tablet.
+
+The reader: almost nothing made a difference. Glyphs as paths were consistently worse, duller and less sharp.
+
+| Knob | Screens | No difference | Preferred (picked ÷ by chance) |
+|---|---|---|---|
+| Embolden | 24 | 10 | 0.05 pt 1.71, 0.1 pt 1.71; baseline 0.29, 0.18 pt 0.29 |
+| Glyphs as paths | 24 | 0 | baseline 1.88, standard fonts alone 1.13, paths 0.00 (never picked) |
+| Sharpen | 16 | 3 | baseline 2.15; unsharp 0.7 1.23 |
+| Contrast | 17 | 9 | no strength above the baseline |
+| Tone curve | 16 | 16 | – |
+| Drawn on the laptop | 15 | 0 | baseline 2.40 |
 
 ### Across devices
 
 - **Glyphs as paths does two things.** Of the 15 crops, three use fonts the PDF does not embed: ERR and Demšar (Times-Roman, Times-Bold) and Counterfactual (Arial). In carrel these are drawn in whatever Android substitutes; as paths, PDF.js draws its own standard fonts, which is the better font the reader saw. But paths also won on papers that embed every font (GPT-3's body and table, Contrastive Multiview Coding, Collaborative Filtering for Implicit Feedback, the intuition busters), so PDF.js filling its own outlines looks better there than Chrome's font rasteriser too. After the two Boox passes the bench shows the standard fonts alone as a third cell, to tell the two apart, and Embolden starts at 0.05 pt, since 0.1 pt, then the gentlest, won most.
 - **What PDF.js draws on the Boox** (Measure, 16 runs over 15 papers): Chrome's `devicePixelRatio` is 2.8125 and its window 853×1012 CSS px; the paper at page width is 821 px. Every page's canvas is drawn at 40–42% of the device's pixels, and the detail canvas then redraws the part in view at 100%, a median 130–360 ms after a turn per paper and 0.7 s at worst. So once it settles a page is at full resolution; resolution is not why text looked thin. On the iPad there is no such soft first drawing.
-- **Close calls lean to the top row.** On the Boox, A and B (the top row) were picked about twice as often as C and D in both modes (Optimal 58 to 29, High Contrast 58 to 23), though the order is shuffled; on the iPad every pick that was not "no difference" was A. Where the difference is small (tone curve, resolution), a pick is partly a guess, and the tallies for those knobs are weak evidence. Glyphs as paths, embolden on the Boox, and "no difference" for sharpen are clear.
+- **Close calls lean to the top row.** On the Boox, A and B (the top row) were picked about twice as often as C and D in both modes (Optimal 58 to 29, High Contrast 58 to 23), though the order is shuffled; on the iPad A was picked 37 times of 86, D 9. Where the difference is small (tone curve, resolution), a pick is partly a guess, and the tallies for those knobs are weak evidence. Glyphs as paths and embolden on the Boox, "no difference" for sharpen there, and contrast and sharpening on the iPad are clear.
 - **The cost of each knob is not measured yet.** The times the bench kept for each cell include loading that cell's own copy of the paper, so they do not compare. Measure now draws a whole paper with glyphs as paths in carrel's own viewer, for that.
+
+## Conclusions
+
+A pick was made among a baseline and up to three strengths, so picking at random favours "a change" three to one. The conclusions read each strength's picks against what chance gives it (`summary.py`'s last table: above 1 preferred, below 1 not); the reader's impressions are beside them. The reader's tactic on a screen with three good cells and one bad was to pick one of the good, which spreads the picks among the good but never on the bad: a ratio near 1 means "as good as the rest", 0 means "worse".
+
+| | Boox (e-ink, the main reading device) | iPad | Mac, external monitor |
+|---|---|---|---|
+| Glyphs as paths | **Yes**: 2.19 (Optimal, both visits), 1.50 (High Contrast); baseline 0.12, 0.58 | No difference (10 of 12) | **No**: never picked, duller |
+| …its standard fonts alone | 0.27 (Optimal), 0.75 (High Contrast), with the outlines beside it: the outlines are what helps, not the fonts | – | 1.13, about the baseline |
+| Embolden | **0.1 pt**: 2.22 and 1.67; 0.18 pt even, 0.25 pt never; 0.05 pt not shown there | 0.05 pt only (2.33, baseline 1.67); 0.1 pt and up never | **0.05–0.1 pt**: 1.71 each, baseline 0.29 |
+| Tone curve | Unclear: baseline 1.22, gamma 1.8 1.39, 1.25–1.5 0.70; in High Contrast the baseline wins | **Gamma 1.5**: 1.60, baseline 0.27 | No difference (16 of 16) |
+| Sharpen | No difference (15 of 16) | **Unsharp 1**: 1.85, baseline 0.62 | No: baseline 2.15 |
+| Contrast | No difference (11 of 15) | 1.3: 1.60, baseline 1.07, a weak lean | No |
+| Threshold for scans | Yes, any of 45–65%: 1.33 each, baseline never (7 screens) | Slight | No |
+| Drawn on the laptop | No | **No**: baseline every time | No |
+| Resolution | Only the page before its detail canvas, much worse | Nothing to choose | Nothing to choose |
+
+- **Each device wants different options**, and the reader notices them most on e-ink, less on the iPad, least on the Mac's monitor (further away, fewer pixels to the degree). On the Mac's own screen the reader expects the iPad's answers.
+- **What it costs.** Glyphs as paths on the Boox (Measure, 15 papers each way): the page in view is sharp a median 174 ms after a turn, against 171 ms as carrel draws it; per paper the two are within noise. The filters (tone, contrast, threshold) run on the GPU. Embolden and sharpening are drawn here by routes carrel cannot ship as they are (a rewritten copy of the page on the laptop; a worker over every canvas's pixels), so their cost depends on the route carrel takes.
+
+## What carrel took from it
+
+Decided with the reader on 1 Nov 2026, and built ([architecture.md](../../docs/architecture.md), Settings → Pages):
+
+- **Each device's own, not each paper's.** Which adjustment helps changes from paper to paper, but a choice kept per paper would leave the reader unsure what is on and why a paper looks as it does. So one switch, Adjust pages, over the adjustments, which keeps them when off: a paper can be seen as it is and back in a tap. No presets.
+- **The controls**: letters as outlines; darker greys (gamma 1.25, 1.5, 1.8); contrast (1.15, 1.3, 1.5), which the tallies did not favour but the reader wants for pictures on the colour e-ink screen, which cannot show every colour; scans in black and white (ink below 55%), on the pages that are scans alone.
+- **Where each kind of screen starts**: e-ink with outlines and black-and-white scans; a touch screen with darker greys at 1.5; a desktop with nothing on. Embolden would join e-ink at 0.1 pt, and sharpening a touch screen, after round 2.
+- **Left out**: drawing on the laptop (worse on the iPad, slower everywhere), more resolution than the screen's, Sauvola's threshold (the one cut is as good on these scans, and runs on the GPU).
+
+## Round 2: routes carrel can ship
+
+Embolden and sharpening were drawn in round 1 in ways carrel cannot use. Emboldening rewrote a copy of the page on the laptop, but carrel saves highlights into the PDF as the page loaded it, so it cannot load a rewritten one. Sharpening worked over every pixel in a worker, too slow for every page. Two knobs on the bench put a shippable route beside the round-1 one at the same strengths:
+
+- **Embolden, shippable**: a double strike. The page's canvas is drawn over itself, moved sideways by the stroke's width in device pixels, keeping the darker of the two. It thickens a letter's vertical stems as the stroke does, and every line of a figure a little too.
+- **Sharpen, shippable**: the same unsharp mask as one 3×3 SVG convolution on the canvas, on the GPU, as the other filters are.
+
+If the shippable route is picked as often as the round-1 one, it ships at the strength the reader chose; if it is worse, the next idea is tried there.

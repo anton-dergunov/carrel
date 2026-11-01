@@ -973,6 +973,17 @@ article.review[hidden] { display: none; }
    and a citation's mark keep their colours; Dark pages, on the page, applies after them. */
 .pdfViewer .page .canvasWrapper > canvas { filter: var(--page-filter, none); }
 .pdfViewer .page[data-scan] .canvasWrapper > canvas { filter: var(--page-filter-scan, none); }
+/* A copy of the canvases a tab showed, over the pane where its pages were until PDF.js has drawn
+   them again (snapshots.js): filtered as the canvases are, so the swap does not show. */
+.pane-snapshot { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.pane-snapshot > div { position: absolute; overflow: hidden; background: #fff; }
+.pane-snapshot > div > canvas {
+  position: absolute; top: 0; left: 0; display: block; width: 100%; height: 100%; margin: 0;
+  filter: var(--page-filter, none);
+}
+.pane-snapshot > div > canvas.detailView { image-rendering: pixelated; }
+.pane-snapshot > div[data-scan] > canvas { filter: var(--page-filter-scan, none); }
+[data-dark-pages] .pane-snapshot > div { filter: var(--pdf-filter); }
 
 /* A citation's mark (cite-mark.js): an overlay on the page, never an annotation. One ink in both
    themes, since the page is white in both. It arrives with a ring that contracts onto it, then

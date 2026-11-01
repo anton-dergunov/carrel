@@ -15,6 +15,8 @@ import { HIGHLIGHT_COLORS, lineBoxes } from './highlight.js';
 import { panAlongAxis } from './pan.js';
 import { pinchToZoom, stopPageZoom } from './pinch.js';
 import { createPreviews } from './previews.js';
+import { holdWhileFast } from './scroll-gate.js';
+import { createSnapshots } from './snapshots.js';
 
 // The viewer component reads the library from `globalThis.pdfjsLib` when its module is
 // evaluated, so it is imported only after this.
@@ -34,6 +36,9 @@ const DEST_CONTEXT_PX = 72;
 // canvases at most, against 80 under its cap.
 const EINK_CANVAS_PIXELS = 2 ** 24;
 const canvasPixels = () => (window.carrelLook.eink() ? EINK_CANVAS_PIXELS : undefined);
+// The papers kept loaded (PDF.js's documents), the one showing among them: coming back to a tab
+// skips fetching and parsing its paper again. Each holds its worker's memory, tens of MB.
+const KEPT_PAPERS = 3;
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `${ASSETS}pdf.worker.min.mjs`;
 
@@ -65,13 +70,22 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   const citeMark = createCiteMark({ viewer, eventBus, container });
   // A picture of each page behind it until it is drawn.
   const previews = createPreviews({ viewer, eventBus });
+  // Nothing drawn while the paper scrolls fast, but on e-ink, where a page turn is a jump.
+  holdWhileFast({ viewer, container, when: () => !window.carrelLook.eink() });
+  // The pages a tab showed, over the pane when it comes back until they are drawn again.
+  // A copy is the canvases in view, some 70 MB on the Mac: fewer papers' on a tablet, whose browser
+  // drops a page that takes much memory, and one on e-ink, whose pages are drawn whole at full size.
+  const snapshots = createSnapshots({ viewer, eventBus, container, papers: snapshotPapers() });
   // Links inside the PDF go through this too.
   linkService.goToDestination = (dest) => scrollToDestination(dest);
 
   let file = null;
   let pdfDocument = null;
-  // The paper as loaded, for saving it: {file, url, document, version, base}.
+  // The paper as loaded, for saving it: {file, url, document, task, version, base, outlines}; the
+  // task is the loading task, which is what PDF.js tears a document down through.
   let paper = null;
+  // The other papers kept loaded, the most recent last: file → paper.
+  const kept = new Map();
   // Where to go once the document's pages are laid out: a place, or a target {page, dest, rect}.
   let pending = null;
   let lastPlace = null;
@@ -251,8 +265,6 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   }
 
   let loading = 0;
-  // The open document's loading task, which is what PDF.js tears a document down through.
-  let openTask = null;
 
   /**
    * Shows a paper: `place` puts back where the reader was, `target` ({page, dest, search, rect})
@@ -268,26 +280,53 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
       } else if (place) restore(place);
       return;
     }
+    // The paper coming back to its place: the copies of its pages (taken by `leave`) over the pane
+    // until they are drawn.
+    const covered = place && !target ? snapshots.cover(pdf) : snapshots.clear();
     file = pdf;
     citeMark.clear(false);
     pending = { place, target };
     const ticket = ++loading;
     // The paper showing is saved before it goes: its editors go with it.
     await saving;
+    // The frame with the copies goes out before the paper is laid out: laid out at once, the work
+    // held that frame back until about when the pages themselves were drawn.
+    if (covered) await nextFrame();
     if (ticket !== loading) return;
     pdfDocument = null;
     scans = new Set();
     void markScans(pdf, ticket);
-    let loaded, version, data, base;
+    const next = reusable(pdf) ?? (await load(pdf, url, ticket));
+    if (!next) return; // another paper was asked for meanwhile
+    if (ticket !== loading) {
+      retire(next);
+      return;
+    }
+    const previous = paper;
+    paper = next;
+    pdfDocument = next.document;
+    outlines = next.outlines;
+    uiManager = null;
+    previews.show(pdf, next.document);
+    viewer.setDocument(next.document);
+    linkService.setDocument(next.document, null);
+    if (previous && previous !== next) retire(previous);
+    if (next.reused) void checkVersion(next);
+  }
+
+  /** Fetches and parses a paper: {file, url, document, task, version, base, outlines}, or null
+   * when another paper was asked for meanwhile. */
+  async function load(pdf, url, ticket) {
     let task = null;
     try {
       // Fetched here rather than by PDF.js, for the version a save names.
       const response = await fetch(url, { cache: 'no-cache' });
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-      version = response.headers.get('ETag');
-      data = new Uint8Array(await response.arrayBuffer());
-      base = data.length; // PDF.js hands the bytes to its worker, which empties `data`
-      if (ticket !== loading) return;
+      const version = response.headers.get('ETag');
+      const data = new Uint8Array(await response.arrayBuffer());
+      const base = data.length; // PDF.js hands the bytes to its worker, which empties `data`
+      if (ticket !== loading) return null;
+      const withOutlines = window.carrelLook.outlines();
       task = pdfjsLib.getDocument({
         data,
         cMapUrl: `${ASSETS}cmaps/`,
@@ -302,27 +341,66 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
         // Settings → Pages: PDF.js fills each letter's outline itself, and a font the PDF does not
         // embed comes from its own standard fonts. On the Boox the letters were crisper so, at no
         // cost in drawing (crisp-pages).
-        disableFontFace: (outlines = window.carrelLook.outlines()),
+        disableFontFace: withOutlines,
       });
-      loaded = await task.promise;
+      const document = await task.promise;
+      if (ticket !== loading) {
+        void task.destroy();
+        return null;
+      }
+      return { file: pdf, url, document, task, version, base, outlines: withOutlines };
     } catch (error) {
-      if (ticket === loading) file = null; // asking again tries again
+      if (ticket === loading) {
+        file = null; // asking again tries again
+        snapshots.clear();
+      }
+      void task?.destroy();
       throw error;
     }
-    if (ticket !== loading) {
-      // Another paper was asked for meanwhile.
-      void task.destroy();
+  }
+
+  /**
+   * A paper kept loaded, taken out of the kept ones, if it can be shown as it is: loaded the way
+   * Settings → Pages now asks, and with no highlight changed in it since (a highlight edited is
+   * in the file, which is loaded again with it).
+   */
+  function reusable(pdf) {
+    const entry = kept.get(pdf);
+    if (!entry) return null;
+    kept.delete(pdf);
+    if (entry.outlines !== window.carrelLook.outlines() || entry.document.annotationStorage.size > 0) {
+      void entry.task.destroy();
+      return null;
+    }
+    entry.reused = true;
+    return entry;
+  }
+
+  /** A paper no longer showing: kept loaded if it can be shown again as it is, else let go. */
+  function retire(entry) {
+    entry.reused = false;
+    if (entry.stale || entry.outlines !== window.carrelLook.outlines() || entry.document.annotationStorage.size > 0) {
+      void entry.task.destroy();
       return;
     }
-    const previous = openTask;
-    openTask = task;
-    pdfDocument = loaded;
-    paper = { file: pdf, url, document: loaded, version, base };
-    uiManager = null;
-    previews.show(pdf, loaded);
-    viewer.setDocument(loaded);
-    linkService.setDocument(loaded, null);
-    void previous?.destroy();
+    kept.delete(entry.file);
+    kept.set(entry.file, entry);
+    while (kept.size > KEPT_PAPERS - 1) {
+      const [oldest, gone] = kept.entries().next().value;
+      kept.delete(oldest);
+      void gone.task.destroy();
+    }
+  }
+
+  /** A kept paper shown again: if the file changed meanwhile (another app's highlight), it is
+   * loaded again, in place. A save would not overwrite it either way: it names its version. */
+  async function checkVersion(entry) {
+    const response = await fetch(entry.url, { method: 'HEAD', cache: 'no-store' }).catch(() => null);
+    const now = response?.ok ? response.headers.get('ETag') : null;
+    if (!now || now === entry.version || paper !== entry) return;
+    entry.stale = true;
+    file = null;
+    void open(entry.file, entry.url, { place: lastPlace }).catch((error) => console.warn(`The paper was not loaded again: ${error}`));
   }
 
   /** Asks the laptop which of the paper's pages are scans, and marks those already laid out. */
@@ -565,6 +643,8 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
 
   return {
     open,
+    /** The paper's tab is being left: the pages in view are copied while they still are. */
+    leave: () => file && pdfDocument && snapshots.take(file),
     goTo,
     refit,
     /** Zooms the paper a step in (1) or out (-1), or back to the page's width (0); false with
@@ -592,6 +672,17 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     remove,
     textOf,
   };
+}
+
+/** How many papers' pages `snapshots.js` keeps copies of on this device. */
+function snapshotPapers() {
+  if (window.carrelLook.eink()) return 1;
+  return navigator.maxTouchPoints > 1 ? 2 : 3;
+}
+
+/** Resolves once the next frame has been drawn. */
+function nextFrame() {
+  return new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve)));
 }
 
 /** The text layer a node of a selection is in, if it is in one. */

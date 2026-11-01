@@ -228,6 +228,7 @@ function addressOf(paper, target) {
 /** Shows a tab: the library, the chat, a paper or a review, at its remembered place or at `target`. */
 function go(key, { target = null, push = true } = {}) {
   if (key !== state.active) {
+    reader.leave();
     reader.clearMark();
     tools.leave();
     highlights.leave();

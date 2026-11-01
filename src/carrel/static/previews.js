@@ -14,7 +14,7 @@
 const WIDTH = 540; // the preview's width in pixels: a blur at full size, which is all it is for
 const QUALITY = 0.72;
 const PAPERS = 6; // the papers whose previews are kept
-const IDLE_MS = 400; // no page drawn for this long, and the viewer is idle
+const IDLE_MS = 400; // no page drawn and no scroll for this long, and the viewer is idle
 const MOST_PAGES = 600;
 
 export function createPreviews({ viewer, eventBus }) {
@@ -23,13 +23,16 @@ export function createPreviews({ viewer, eventBus }) {
   const papers = new Map();
   let file = null;
   let pdf = null;
-  let lastDrawn = 0;
+  let lastBusy = 0; // when a page was last drawn, or the paper scrolled
   let filling = 0; // which fill is running, so a new paper stops the old one
   let frame = 0;
 
-  eventBus.on('pagerender', () => (lastDrawn = performance.now()));
+  eventBus.on('pagerender', () => (lastBusy = performance.now()));
+  // Not while the paper scrolls either: a fast scroll holds the drawing back (scroll-gate.js), and
+  // the frames are the scroll's.
+  viewer.container.addEventListener('scroll', () => (lastBusy = performance.now()), { passive: true });
   eventBus.on('pagerendered', ({ source, pageNumber, isDetailView, error }) => {
-    lastDrawn = performance.now();
+    lastBusy = performance.now();
     if (isDetailView || error || !source?.canvas?.width) return;
     capture(file, pageNumber, source.canvas);
   });
@@ -73,7 +76,7 @@ export function createPreviews({ viewer, eventBus }) {
     const count = Math.min(document.numPages, MOST_PAGES);
     const tried = new Set(); // a page whose preview failed is not tried again
     while (run === filling) {
-      const wait = IDLE_MS - (performance.now() - lastDrawn);
+      const wait = IDLE_MS - (performance.now() - lastBusy);
       if (wait > 0) {
         await new Promise((resolve) => setTimeout(resolve, wait));
         continue;

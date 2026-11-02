@@ -956,6 +956,8 @@ article.review[hidden] { display: none; }
    otherwise reach over the sheets laid on the paper. */
 #viewerContainer { position: absolute; inset: 0; overflow: auto; -webkit-overflow-scrolling: touch; isolation: isolate; }
 .pdfViewer .page { margin: 0 auto 8px; }
+/* The paper going, until the next one is laid out (read.js). */
+.pdfViewer[data-leaving] { visibility: hidden; }
 /* On e-ink the gap between pages is as white as they are; a faint rule runs across its middle
    (the gap is 10px: PDF.js's margin with removePageBorders). */
 [data-theme^="eink"] .pdfViewer .page + .page::before {

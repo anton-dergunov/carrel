@@ -283,6 +283,9 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     // The paper coming back to its place: the copies of its pages (taken by `leave`) over the pane
     // until they are drawn.
     const covered = place && !target ? snapshots.cover(pdf) : snapshots.clear();
+    // The paper going stays in the viewer until the next is laid out (its save needs its editors),
+    // hidden at once: it would otherwise show under the new paper's tab.
+    viewer.viewer.toggleAttribute('data-leaving', true);
     file = pdf;
     citeMark.clear(false);
     pending = { place, target };
@@ -315,6 +318,7 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     uiManager = null;
     previews.show(pdf, next.version, next.document.numPages, place?.page ?? target?.page ?? 1);
     viewer.setDocument(next.document);
+    viewer.viewer.removeAttribute('data-leaving');
     linkService.setDocument(next.document, null);
     if (previous && previous !== next) retire(previous);
     if (next.reused) void checkVersion(next);

@@ -15,7 +15,11 @@
 // to its speed, so flick after flick goes faster.
 //
 // Safari keeps the rest: a paper at page width, a long press (selecting text, the pen, a
-// selection's handles), two fingers (pinch.js), and every device but an iPad or iPhone.
+// selection's handles), two fingers (pinch.js), and every device but an iPad or iPhone. At page
+// width nothing here listens to touchmove at all: a listener that may cancel it makes Safari wait
+// for the main thread, busy drawing pages, before it scrolls. It is added when the paper grows
+// wider than its pane, ahead of the finger, since Safari learns of a listener only as it next
+// paints.
 
 // How far the finger goes before its axis is chosen.
 const SLOP = 6;
@@ -132,8 +136,9 @@ function timeOf(event) {
   return t > 0 && t <= now && now - t < 1000 ? t : now;
 }
 
-/** Pans `container` along an axis; `motion()` says whether it may coast. */
-export function panAlongAxis({ container, motion = () => window.carrelLook?.motion() ?? true }) {
+/** Pans `container` along an axis while its paper is wider than it (PDF.js's `eventBus` says when
+ * the pages change size); `motion()` says whether it may coast. */
+export function panAlongAxis({ container, eventBus, motion = () => window.carrelLook?.motion() ?? true }) {
   if (!iosTouch()) return;
   let pan = null;
   let coast = null;
@@ -157,46 +162,56 @@ export function panAlongAxis({ container, motion = () => window.carrelLook?.moti
     { passive: true },
   );
 
-  container.addEventListener(
-    'touchmove',
-    (event) => {
-      if (!pan || pan.safari) return;
-      if (event.touches.length !== 1 || container.style.overflow === 'hidden') {
-        pan = null;
+  // Listened to only while there is something sideways to drift into.
+  let listening = false;
+  function listen() {
+    const wide = container.scrollWidth > container.clientWidth + 1;
+    if (wide === listening) return;
+    listening = wide;
+    if (wide) container.addEventListener('touchmove', touchmove, { passive: false });
+    else container.removeEventListener('touchmove', touchmove);
+  }
+  const later = () => requestAnimationFrame(listen);
+  for (const name of ['scalechanging', 'pagesloaded']) eventBus?.on(name, later);
+  new ResizeObserver(later).observe(container);
+  listen();
+
+  function touchmove(event) {
+    if (!pan || pan.safari) return;
+    if (event.touches.length !== 1 || container.style.overflow === 'hidden') {
+      pan = null;
+      return;
+    }
+    const t = timeOf(event);
+    const { clientX: x, clientY: y } = event.touches[0];
+    const previous = pan.samples.at(-1);
+    if (t - previous.t > CARRY_REST_MS) pan.rested = true;
+    if (!pan.axis) {
+      if (pan.samples.length === 1 && t - pan.began > LONG_PRESS_MS) {
+        pan.safari = true;
         return;
       }
-      const t = timeOf(event);
-      const { clientX: x, clientY: y } = event.touches[0];
-      const previous = pan.samples.at(-1);
-      if (t - previous.t > CARRY_REST_MS) pan.rested = true;
-      if (!pan.axis) {
-        if (pan.samples.length === 1 && t - pan.began > LONG_PRESS_MS) {
-          pan.safari = true;
-          return;
-        }
-        event.preventDefault();
-        record(t, x, y);
-        const dx = x - pan.from.x;
-        const dy = y - pan.from.y;
-        if (Math.hypot(dx, dy) < SLOP) return;
-        // Chosen: the way the finger has come so far is scrolled at once, on that axis.
-        pan.axis = axisFor(dx, dy);
-        pan.at = pan.from;
-        // A swipe that stops a coast starts where the coast was, not where Safari last said.
-        const read = { left: container.scrollLeft, top: container.scrollTop };
-        const last = lately().at(-1);
-        pan.place = last && isEcho(read, lately()) ? { left: last.left, top: last.top } : read;
-        remember(pan.place);
-      } else {
-        event.preventDefault();
-        record(t, x, y);
-      }
-      const { dx, dy } = onAxis(pan.axis, x - pan.at.x, y - pan.at.y);
-      pan.place = scrollBy(pan.place, dx, dy);
-      pan.at = { x, y };
-    },
-    { passive: false },
-  );
+      event.preventDefault();
+      record(t, x, y);
+      const dx = x - pan.from.x;
+      const dy = y - pan.from.y;
+      if (Math.hypot(dx, dy) < SLOP) return;
+      // Chosen: the way the finger has come so far is scrolled at once, on that axis.
+      pan.axis = axisFor(dx, dy);
+      pan.at = pan.from;
+      // A swipe that stops a coast starts where the coast was, not where Safari last said.
+      const read = { left: container.scrollLeft, top: container.scrollTop };
+      const last = lately().at(-1);
+      pan.place = last && isEcho(read, lately()) ? { left: last.left, top: last.top } : read;
+      remember(pan.place);
+    } else {
+      event.preventDefault();
+      record(t, x, y);
+    }
+    const { dx, dy } = onAxis(pan.axis, x - pan.at.x, y - pan.at.y);
+    pan.place = scrollBy(pan.place, dx, dy);
+    pan.at = { x, y };
+  }
 
   /** One more of the finger's places; two at the same moment are one. */
   function record(t, x, y) {

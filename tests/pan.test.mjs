@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { axisFor, carriedSpeed, coastStep, isEcho, onAxis, releaseVelocity, withCarry } from '../src/carrel/static/pan.js';
+import { axisFor, carriedSpeed, coastStep, isEcho, onAxis, panAlongAxis, releaseVelocity, withCarry } from '../src/carrel/static/pan.js';
+import { blocking, fakePane } from './fake-pane.mjs';
 
 /** A move of `length` px at `degrees` from straight down. */
 function at(degrees, length = 100) {
@@ -131,4 +132,26 @@ test('a jump elsewhere, or sideways, is a move', () => {
   assert.equal(isEcho({ left: 177, top: 2000 }, recent), false);
   assert.equal(isEcho({ left: 0, top: 11600 }, recent), false);
   assert.equal(isEcho({ left: 177, top: 11600 }, []), false);
+});
+
+test('one finger is left to Safari, unheld, until the paper is wider than its pane', async () => {
+  globalThis.window = { ontouchstart: null, ongesturestart: null };
+  globalThis.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+  globalThis.ResizeObserver = class {
+    observe() {}
+  };
+  const handlers = {};
+  const eventBus = { on: (name, fn) => (handlers[name] = fn) };
+  const pane = fakePane();
+  panAlongAxis({ container: pane, eventBus });
+  assert.deepEqual(blocking(pane), []);
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 5));
+  pane.scrollWidth = 1600;
+  handlers.scalechanging();
+  await settle();
+  assert.deepEqual(blocking(pane), ['touchmove']);
+  pane.scrollWidth = 800;
+  handlers.scalechanging();
+  await settle();
+  assert.deepEqual(blocking(pane), []);
 });

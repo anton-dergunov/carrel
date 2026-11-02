@@ -2,7 +2,7 @@
 // comes back, until PDF.js has drawn them again.
 //
 // The papers share one viewer, so a tab's paper is laid out afresh each time it is shown: its pages
-// went white, then their blurred previews, then sharp, 150–250 ms after the click. A copy of the
+// went white, then sharp, 150–250 ms after the click. A copy of the
 // canvases in view, taken as the tab is left, looks the same as the pages PDF.js draws again; it is
 // shown over the pane at the click, where the pages were, and each page's copy goes once PDF.js has
 // drawn that page, so the swap underneath does not show.

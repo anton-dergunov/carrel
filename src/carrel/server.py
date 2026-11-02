@@ -53,7 +53,6 @@ from .engine import Library
 from .highlights import Highlights
 from .meaning import Meaning, MeaningError
 from .meaning_map import MeaningMap
-from .previews import Previews
 from .scans import Scans
 from .search import SearchError, search
 from .session import Session, Sessions
@@ -199,7 +198,6 @@ def make_app(
     sessions = sessions or Sessions(library, extra_folders, settings=settings)
     highlights = highlights or Highlights(library)
     scans = Scans(library)
-    previews = Previews(library)
     catalog = catalog or Catalog(library, highlights=highlights)
     edits = edits or Edits(library)
     meaning = meaning or Meaning(library, catalog)
@@ -562,22 +560,6 @@ def make_app(
             return JSONResponse({"error": "No such PDF in the library."}, status_code=404)
         return JSONResponse({"pdf": rel, "pages": pages}, headers={"Cache-Control": "no-store"})
 
-    async def page_preview(request: Request) -> Response:
-        """A small picture of a page of a paper (`?page=N`), shown behind it until it is drawn.
-        Asked for with the PDF's version (`&v=`), it is kept by the browser for good: a new
-        version is a new address."""
-        rel = request.path_params["path"]
-        try:
-            number = int(request.query_params.get("page", ""))
-            data, version = await asyncio.to_thread(previews.picture, rel, number)
-        except (ValueError, LookupError):
-            return PlainTextResponse("No such page.", status_code=404)
-        named = request.query_params.get("v") == version
-        cache = "public, max-age=31536000, immutable" if named else "no-cache"
-        return Response(
-            data, media_type="image/jpeg", headers={"Cache-Control": cache, "ETag": f'"{version}"'}
-        )
-
     async def asked_for(request: Request) -> dict:
         body = await request.body()
         if len(body) > MAX_MARKS:
@@ -755,7 +737,6 @@ def make_app(
             Route("/pdf/{path:path}", save_pdf, methods=["PUT"]),
             Route("/api/highlights/{path:path}", paper_highlights),
             Route("/api/scans/{path:path}", paper_scans),
-            Route("/api/preview/{path:path}", page_preview, methods=["GET", "HEAD"]),
             Route("/api/star/{path:path}", put_star, methods=["PUT"]),
             Route("/api/tags/{path:path}", put_tags, methods=["PUT"]),
             Route("/api/tag/{name}", put_tag, methods=["PUT"]),

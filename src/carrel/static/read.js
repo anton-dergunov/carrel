@@ -15,8 +15,6 @@ import { HIGHLIGHT_COLORS, lineBoxes } from './highlight.js';
 import { off } from './off.js';
 import { panAlongAxis } from './pan.js';
 import { pinchToZoom, stopPageZoom } from './pinch.js';
-import { createPreviews } from './previews.js';
-import { holdWhileFast } from './scroll-gate.js';
 import { createSnapshots } from './snapshots.js';
 
 // The viewer component reads the library from `globalThis.pdfjsLib` when its module is
@@ -70,10 +68,6 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   // The mark a citation's rectangles draw.
   // Each of these can be left out for a measurement (off.js), for a stand-in that does nothing.
   const citeMark = off('citemark') ? { show: async () => false, clear() {} } : createCiteMark({ viewer, eventBus, container });
-  // A picture of each page behind it until it is drawn.
-  const previews = off('previews') ? { ready: async () => {}, show() {} } : createPreviews({ eventBus });
-  // Nothing drawn while the paper scrolls fast, but on e-ink, where a page turn is a jump.
-  if (!off('gate')) holdWhileFast({ viewer, container, when: () => !window.carrelLook.eink() });
   // The pages a tab showed, over the pane when it comes back until they are drawn again.
   // A copy is the canvases in view, some 70 MB on the Mac: fewer papers' on a tablet, whose browser
   // drops a page that takes much memory, and one on e-ink, whose pages are drawn whole at full size.
@@ -205,7 +199,7 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     stopPageZoom();
     pinchToZoom({ container, viewer, eventBus });
   }
-  if (!off('pan')) panAlongAxis({ container });
+  if (!off('pan')) panAlongAxis({ container, eventBus });
 
   /**
    * Fits the width again, unless the reader zoomed in or out. Not while the split is dragged:
@@ -306,12 +300,6 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     void markScans(pdf, ticket);
     const next = reusable(pdf) ?? (await load(pdf, url, ticket));
     if (!next) return; // another paper was asked for meanwhile
-    // Not covered by copies, the paper waits a moment for the pictures of the pages it opens at,
-    // so that its first frame shows them rather than white pages.
-    if (!covered && ticket === loading) {
-      const at = place?.page ?? target?.page ?? 1;
-      await previews.ready(pdf, next.version, [at, at + 1, at - 1]);
-    }
     if (ticket !== loading) {
       retire(next);
       return;
@@ -321,7 +309,6 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     pdfDocument = next.document;
     outlines = next.outlines;
     uiManager = null;
-    previews.show(pdf, next.version, next.document.numPages, place?.page ?? target?.page ?? 1);
     viewer.setDocument(next.document);
     viewer.viewer.removeAttribute('data-leaving');
     linkService.setDocument(next.document, null);

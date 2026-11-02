@@ -10,6 +10,13 @@
 // A trackpad's pinch reaches the page as wheel events with ctrlKey (as ctrl and a mouse wheel do),
 // with no event for the fingers lifting: the pinch ends when no wheel event has come for a moment.
 //
+// Nothing listens to the pane but passively while no pinch is near. A listener that may cancel a
+// wheel or touch event makes the browser wait for the main thread before it scrolls, and the main
+// thread is drawing pages: the paper stood still for 0.2–0.45 s of a fast wheel spin. So the wheel
+// is cancelled only while ctrl is held, and a touch pinch listens to touchmove only while it
+// lasts, to keep Safari from scrolling with the same fingers. Neither zooms the whole page: the
+// Mac app's web view does not on ctrl and the wheel, and Safari's own zoom is its gesture events.
+//
 // Safari would also zoom the whole page on a pinch anywhere else (the chat, the bars), whatever
 // the viewport meta says; its own gesture events are cancelled for that.
 
@@ -47,23 +54,15 @@ export function pinchToZoom({ container, viewer, eventBus }) {
   container.addEventListener(
     'touchstart',
     (event) => {
-      if (event.touches.length === 2 && !pinch && viewer.pagesCount) {
-        event.preventDefault();
-        begin(middle(event.touches), distance(event.touches));
-      }
+      if (event.touches.length === 2 && !pinch && viewer.pagesCount) begin(middle(event.touches), distance(event.touches));
     },
-    { passive: false },
+    { passive: true },
   );
-  container.addEventListener(
-    'touchmove',
-    (event) => {
-      if (!pinch) return;
-      // Only a non-passive touchmove keeps Safari from scrolling with the same fingers.
-      event.preventDefault();
-      if (event.touches.length >= 2 && pinch.touch) move(middle(event.touches), distance(event.touches) / pinch.start);
-    },
-    { passive: false },
-  );
+  function touchmove(event) {
+    // Only a non-passive touchmove keeps Safari from scrolling with the same fingers.
+    event.preventDefault();
+    if (event.touches.length >= 2) move(middle(event.touches), distance(event.touches) / pinch.start);
+  }
   for (const type of ['touchend', 'touchcancel']) {
     container.addEventListener(type, (event) => {
       if (pinch?.touch && event.touches.length < 2) end();
@@ -71,19 +70,27 @@ export function pinchToZoom({ container, viewer, eventBus }) {
   }
 
   let wheelTimer = 0;
-  container.addEventListener(
-    'wheel',
-    (event) => {
-      if (!event.ctrlKey || !viewer.pagesCount || pinch?.touch) return;
-      event.preventDefault();
-      const at = { x: event.clientX, y: event.clientY };
-      if (!pinch) begin(at, null);
-      move(pinch.center.client, pinch.spread * wheelFactor(event));
-      clearTimeout(wheelTimer);
-      wheelTimer = setTimeout(end, WHEEL_END_MS);
-    },
-    { passive: false },
-  );
+  function wheel(event) {
+    if (!event.ctrlKey || !viewer.pagesCount || pinch?.touch) return;
+    if (cancelling) event.preventDefault();
+    const at = { x: event.clientX, y: event.clientY };
+    if (!pinch) begin(at, null);
+    move(pinch.center.client, pinch.spread * wheelFactor(event));
+    clearTimeout(wheelTimer);
+    wheelTimer = setTimeout(end, WHEEL_END_MS);
+  }
+  // Cancelled only while ctrl is held, so a mouse's zoom never scrolls the pane; a trackpad's pinch
+  // holds no key, and its wheel stays passive.
+  let cancelling = false;
+  function cancelWheel(on) {
+    if (on === cancelling) return;
+    cancelling = on;
+    container.removeEventListener('wheel', wheel);
+    container.addEventListener('wheel', wheel, { passive: !on });
+  }
+  container.addEventListener('wheel', wheel, { passive: true });
+  for (const type of ['keydown', 'keyup']) window.addEventListener(type, (event) => cancelWheel(event.ctrlKey), true);
+  window.addEventListener('blur', () => cancelWheel(false));
 
   /** A pinch begins around `at` (in the window), with the fingers `start` apart; none for a wheel. */
   function begin(at, start) {
@@ -105,8 +112,18 @@ export function pinchToZoom({ container, viewer, eventBus }) {
     };
     // No native scrolling, and no momentum left over from a scroll the first finger began.
     container.style.overflow = 'hidden';
+    if (pinch.touch) container.addEventListener('touchmove', touchmove, { passive: false });
+    // An uncancelled wheel's first steps still scroll the pane before it is hidden: put back.
+    else container.addEventListener('scroll', holdScroll, { passive: true });
     pages.style.transformOrigin = `${point.x}px ${point.y}px`;
     pages.style.willChange = 'transform';
+  }
+
+  /** The scroll a wheel's pinch began at, kept until it ends. */
+  function holdScroll() {
+    if (!pinch) return;
+    container.scrollLeft = pinch.point.x - pinch.center.x;
+    container.scrollTop = pinch.point.y - pinch.center.y;
   }
 
   /** The fingers now at `at` (in the window), `spread` times as far apart as they began. */
@@ -125,8 +142,10 @@ export function pinchToZoom({ container, viewer, eventBus }) {
   function end() {
     if (!pinch) return;
     clearTimeout(wheelTimer);
-    const { factor, scale, point, anchor, last, box } = pinch;
+    const { factor, scale, point, anchor, last, box, touch } = pinch;
     pinch = null;
+    if (touch) container.removeEventListener('touchmove', touchmove);
+    else container.removeEventListener('scroll', holdScroll);
     pages.style.transform = '';
     pages.style.transformOrigin = '';
     pages.style.willChange = '';

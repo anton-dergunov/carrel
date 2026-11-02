@@ -61,10 +61,3 @@ test('⌘= ⌘− ⌘0 zoom, and + − 0 alone only when asked', () => {
   assert.equal(zoomKey(key({ key: '0' }), false, true), 'zoom-reset');
   assert.equal(zoomKey(key({ altKey: true }), true, true), null);
 });
-
-test("a page's picture is asked of the laptop by the PDF's version", async () => {
-  const { previewUrl } = await import('../src/carrel/static/previews.js');
-  assert.equal(previewUrl('nlp/A b.pdf', '"123-456"', 3), '/api/preview/nlp/A%20b.pdf?page=3&v=123-456');
-  assert.equal(previewUrl('x.pdf', 'W/"7-8"', 1), '/api/preview/x.pdf?page=1&v=7-8');
-  assert.equal(previewUrl('x.pdf', null, 2), '/api/preview/x.pdf?page=2&v=');
-});

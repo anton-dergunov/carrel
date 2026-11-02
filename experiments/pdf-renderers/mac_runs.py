@@ -3,7 +3,7 @@ scripts/mac-bench/bench.py (one spin each), and closed, round after round, so th
 load falls on all of them alike. Results are appended to results.jsonl.
 
     uv run --with numpy python experiments/pdf-renderers/mac_runs.py [--papers long,figures]
-        [--rounds 3] [--only webkit-mupdf,...] [--carrel-off all,gate,previews+gate,...] [--look]
+        [--rounds 3] [--only webkit-mupdf,...] [--carrel-off all,pinch,pinch+pan,...] [--look]
 
 The web viewers run in the PDFKit app's web view (WKWebView: the engine of carrel's Mac app and
 of the iPad's Safari), in the same window as its PDFView, and in an instance of Chrome with a
@@ -11,7 +11,7 @@ profile of its own, so the reader's own windows are left be. The bench (bench.py
 (`carrel serve`, for carrel itself) must be serving, and the app built (README.md). `--look`
 screenshots each window once instead, to check the panes. It takes the mouse and the screen.
 `--carrel-off` adds carrel loaded without some of its additions to PDF.js (static/off.js), a
-renderer each: `previews+gate` is `carrel-off-previews+gate`, loaded with `?off=previews,gate`.
+renderer each: `pinch+pan` is `carrel-off-pinch+pan`, loaded with `?off=pinch,pan`.
 """
 
 import argparse

@@ -2,7 +2,7 @@
 
 **Question.** After several rounds of tuning PDF.js ([architecture.md](../../docs/architecture.md), Speed of the PDF), a fast flick still shows grey and blurred pages, and pages blink as they come in. The grey there was WebKit not painting the large canvases PDF.js draws on the main thread. Would a renderer that draws tiles on other threads do better, on the Mac and on the iPad, and by how much?
 
-**Status.** Done, 2 Nov 2026: the Mac (42 spins: 7 renderers, 2 papers, 3 rounds) and the iPad (8 recordings flicked by hand: 3 web viewers and Files, twice each), with the reader's own impressions. The renderer was not what made carrel slow; what in carrel does is the next question.
+**Status.** 2 Nov 2026. The renderers: done, on the Mac (42 spins: 7 renderers, 2 papers, 3 rounds) and the iPad (8 recordings flicked by hand), with the reader's impressions; the renderer is not what made carrel slow. What in carrel does: found on the Mac (89 spins taking carrel apart, below), the pinch's wheel listener; the iPad's touch listeners still to be judged by the reader.
 
 ## The renderers
 
@@ -30,13 +30,15 @@ The same three papers in every renderer ([papers.yaml](papers.yaml)), each opene
 | `figures` | Scalable Diffusion Models with Transformers | pages of generated images (25 pages, 44 MB) |
 | `long` | Sparks of Artificial General Intelligence | a long report with figures (155 pages, 7 MB) |
 
-Every web viewer has the same pane: the whole window, carrel's grey (223), the pages as wide as the pane and 8 px apart, the PDF fetched whole before it is opened, as carrel does.
+Every web viewer has the same pane: the whole window, a grey (223), the pages as wide as the pane and 8 px apart, the PDF fetched whole before it is opened, as carrel does.
 
-**On the Mac**, `scripts/mac-bench/bench.py spin` flicks a free-spinning wheel over the pane (to the start, to the end, to the start again, 1.5 s apart), records the window at 60 fps and sorts each frame: grey (nothing painted), blank (a page with no ink), blurred (a quarter of the pane or more drawn below its resolution), or ok; and after each stop, how long the pane went on changing (settled). [mac_runs.py](mac_runs.py) runs every renderer in turn, round after round, in the same 1230 × 1000 pt pane: the web viewers in the PDFKit app's `WKWebView` (the engine of carrel's Mac app and of the iPad's Safari), in the window its `PDFView` has; Chrome as an instance of its own. [side_by_side.py](side_by_side.py) makes one video a paper of a round's recordings, every renderer in a grid, at their real speed.
+**On the Mac**, `scripts/mac-bench/bench.py spin` flicks a free-spinning wheel over the pane (to the start, to the end, to the start again, 1.5 s apart), records the window at 60 fps and sorts each frame: unpainted (a quarter of the pane or more one flat colour that is not white: what lies under the page, where WebKit has not painted), blank (a page laid out, white, not drawn), blurred (a quarter of the pane or more drawn below its resolution), or ok. It also measures how long the paper stood still while it was being scrolled (stalled: each wait over 50 ms for the next frame that moved it), and after each stop how long the pane went on changing (settled). [mac_runs.py](mac_runs.py) runs every renderer in turn, round after round, in the same 1230 × 1000 pt pane: the web viewers in the PDFKit app's `WKWebView` (the engine of carrel's Mac app and of the iPad's Safari), in the window its `PDFView` has; Chrome as an instance of its own. [side_by_side.py](side_by_side.py) makes one video a paper of a round's recordings, every renderer in a grid, at their real speed.
 
-Blurred had to be measured anew. The bench took a frame for blurred when it held under 60% of the detail of the sharpest frame near it, and a page of photographs held less than a page of text, sharp or not. It now compares a frame's detail at its own pixels with its detail at half of them (`fineness`): about 0.93 for a sharp page, text or photograph, 0.75–0.85 while it moves (the compositor resamples it), 0.55 for a page drawn at half resolution and enlarged. Even so, a photograph the PDF holds at low resolution reads as blurred, so on the figures paper only grey, blank and settled are compared.
+Unpainted was first "grey": the pane's own colour, 223, given to the bench. But where WebKit has not painted it shows neither the pane's colour nor the page's, and what it shows depends on the page: a flat 223 under carrel's beige pane, 218 under the bench's grey one. So the same unpainted frames were "grey" in carrel and "blank" in bare PDF.js, and carrel seemed to show grey that PDF.js did not. Every run was sorted again with the flat-colour rule; the tables below are those.
 
-**On the iPad**, nothing can post a flick, so the reader flicks by hand: three hard flicks down and up, with Control Centre's screen recording on, for each viewer and for Files, in alternation. `bench.py video` sorts the recording's frames the same way. A phone's recording has a frame only when the screen changed; each counts until the next. What is compared is the share of the time the paper moved that it showed grey, blank or blurred, which does not depend on how many flicks there were.
+Blurred had to be measured anew too. The bench took a frame for blurred when it held under 60% of the detail of the sharpest frame near it, and a page of photographs held less than a page of text, sharp or not. It now compares a frame's detail at its own pixels with its detail at half of them (`fineness`): about 0.93 for a sharp page, text or photograph, 0.75–0.85 while it moves (the compositor resamples it), 0.55 for a page drawn at half resolution and enlarged. Even so, a photograph the PDF holds at low resolution reads as blurred, so on the figures paper only unpainted, blank, stalled and settled are compared.
+
+**On the iPad**, nothing can post a flick, so the reader flicks by hand: three hard flicks down and up, with Control Centre's screen recording on, for each viewer and for Files, in alternation. `bench.py video` sorts the recording's frames the same way. A phone's recording has a frame only when the screen changed; each counts until the next. What is compared is the share of the time the paper moved that it showed unpainted, blank or blurred, which does not depend on how many flicks there were.
 
 **From the inside**, each viewer's page keeps its frames that came late (over 25 ms) and, but EmbedPDF's (its pages carry no number to watch), each page's time from coming into view to its first pixels and to sharp (`viewers/frames.js`, kept in `runs.jsonl`). It cannot see a frame WebKit did not paint; the recordings do.
 
@@ -71,50 +73,79 @@ A 1230 × 1000 pt pane on the MacBook Air's 8192 × 2304 screen (Crisp's, for a 
 
 The long paper (155 pages, from page 78):
 
-| Renderer | Grey | Blank | Blurred | Settled |
-|---|---|---|---|---|
-| carrel (PDF.js, previews, WebKit) | 439 | 172 | 1074 | 0 (184) |
-| PDF.js, WebKit | 0 | 1761 | 78 | 0 (0) |
-| EmbedPDF, WebKit | 0 | 1140 | 2073 | 264 (448) |
-| MuPDF.js, WebKit | 0 | 305 | 1798 | 170 (176) |
-| PDFKit | 0 | 708 | 94 | 0 (0) |
-| PDF.js, Chrome | 0 | 262 | 228 | 0 (0) |
-| PDFium, Chrome | 0 | 234 | 1062 | 0 (17) |
+| Renderer | Unpainted | Blank | Blurred | Stalled | Settled |
+|---|---|---|---|---|---|
+| carrel (PDF.js, previews, WebKit) | 439 | 172 | 1074 | 448 | 0 (184) |
+| PDF.js, WebKit | 1599 | 167 | 78 | 0 | 0 (0) |
+| EmbedPDF, WebKit | 812 | 281 | 2123 | 125 | 264 (448) |
+| MuPDF.js, WebKit | 69 | 203 | 1814 | 0 | 170 (176) |
+| PDFKit | 0 | 334 | 138 | 0 | 0 (0) |
+| PDF.js, Chrome | 0 | 218 | 234 | 17 | 0 (0) |
+| PDFium, Chrome | 0 | 229 | 1062 | 0 | 0 (17) |
 
 The figures paper (25 pages of generated images, 44 MB):
 
-| Renderer | Grey | Blank | Settled |
-|---|---|---|---|
-| carrel | 395 | 1124 | 99 (800) |
-| PDF.js, WebKit | 0 | 3989 | 0 (0) |
-| EmbedPDF, WebKit | 0 | 1621 | 397 (984) |
-| MuPDF.js, WebKit | 0 | 34 | 217 (267) |
-| PDFKit | 0 | 0 | 0 (0) |
-| PDF.js, Chrome | 0 | 2257 | 0 (0) |
-| PDFium, Chrome | 0 | 0 | 0 (17) |
+| Renderer | Unpainted | Blank | Stalled | Settled |
+|---|---|---|---|---|
+| carrel | 395 | 1124 | 458 | 99 (800) |
+| PDF.js, WebKit | 1117 | 2872 | 51 | 0 (0) |
+| EmbedPDF, WebKit | 762 | 853 | 209 | 397 (984) |
+| MuPDF.js, WebKit | 22 | 0 | 0 | 217 (267) |
+| PDFKit | 0 | 0 | 0 | 0 (0) |
+| PDF.js, Chrome | 24 | 2199 | 73 | 0 (0) |
+| PDFium, Chrome | 0 | 0 | 39 | 0 (17) |
 
 The same wheel events carry a `PDFView` less far than a web page: in the first second of a spin the web viewers went from page 78 to page 60, PDFKit to page 73. PDFKit crossed fewer pages, so its numbers flatter it.
 
 ### The iPad
 
-The iPad Air 11" in portrait (1640 × 2360 px), Safari, the long paper from page 78, three hard flicks down and up by hand, recorded with Control Centre, twice per viewer in alternation. Files is iPadOS's own viewer, PDFKit; it showed its thumbnails beside the page, so its pages were narrower than the web viewers' (1340 px against 1640). The share of the time the paper moved, both recordings together; settled is over the stops between flicks (the first stop, before any flick, and the last, as the recording was stopped, left out).
+The iPad Air 11" in portrait (1640 × 2360 px), Safari, the long paper from page 78, three hard flicks down and up by hand, recorded with Control Centre, twice per viewer in alternation. Files is iPadOS's own viewer, PDFKit; it showed its thumbnails beside the page, so its pages were narrower than the web viewers' (1340 px against 1640). The share of the time the paper moved, both recordings together; settled is over the stops between flicks (the first stop, before any flick, and the last, as the recording was stopped, left out). The recordings take in the viewers' opening too, which for MuPDF.js is slow.
 
-| Viewer | Blank | Blurred | Sharp | Settled, median (75th percentile) |
-|---|---|---|---|---|
-| Files (PDFKit) | 22% | 7% | 70% | 117 ms (417) |
-| PDF.js | 35% | 7% | 58% | 133 ms (233) |
-| EmbedPDF | 32% | 41% | 27% | 500 ms (750) |
-| MuPDF.js | 22% | 58% | 21% | 150 ms (383) |
+| Viewer | Unpainted | Blank | Blurred | Sharp | Settled, median (75th percentile) |
+|---|---|---|---|---|---|
+| Files (PDFKit) | 3% | 21% | 6% | 70% | 117 ms (417) |
+| PDF.js | 23% | 15% | 4% | 58% | 133 ms (233) |
+| EmbedPDF | 19% | 18% | 37% | 26% | 500 ms (750) |
+| MuPDF.js | 19% | 9% | 53% | 20% | 150 ms (383) |
 
 **From the inside** ([runs.jsonl](runs.jsonl)): on the long paper bare PDF.js kept 52–58 frames a second, with a frame now and then 130–270 ms late as it drew a page on the main thread; MuPDF.js, drawing in workers, 59 frames a second with none over 53 ms; EmbedPDF 54–56, none over 108.
 
 **What the reader saw**, which is what decides: Files was the best, and bare PDF.js not far behind; next to PDF.js in carrel, bare PDF.js flies, on the iPad and still more next to carrel's Mac app. EmbedPDF and MuPDF.js were somewhat slower than bare PDF.js, but still faster than carrel. Carrel is slowest and laggiest of all in the Mac app, slower there than on the iPad. The same PDF.js, the same version, in vscode-pdf-viewer (Chromium) flies too.
 
-## Conclusions
+### Conclusions on the renderers
 
-- **The renderer is not what makes carrel slow.** Bare PDF.js 6.3.289 in WebKit, the version carrel ships, is close to Apple's own viewer on the iPad (58% of a flick sharp against 70%, settled in the same ~120 ms) and far ahead of carrel by the reader's eye; on the Mac it settled at once, with nothing grey. Whatever carrel adds around PDF.js costs more than any change of renderer would gain. On the Mac that is measured too: in the same `WKWebView`, carrel showed grey for 0.4 s a spin and bare PDF.js none.
-- **EmbedPDF and MuPDF.js are dropped.** In WebKit both trade white pages for blurred ones, and are sharp for a third or less of a flick; EmbedPDF also takes half a second to settle. Neither is worth a viewer's rewrite.
+- **The renderer is not what makes carrel slow.** Bare PDF.js 6.3.289 in WebKit, the version carrel ships, is close to Apple's own viewer on the iPad (58% of a flick sharp against 70%, settled in the same ~120 ms) and flies by the reader's eye next to carrel.
+- **EmbedPDF and MuPDF.js are dropped.** In WebKit both trade white pages for blurred ones, and are sharp for a quarter of a flick or less; EmbedPDF also takes half a second to settle. Neither is worth a viewer's rewrite.
 - **PDFKit is the best, and for the Mac app only.** Natively it is the best on both devices, but an app on the iPad needs installing from Xcode: with a free Apple ID it stops opening after 7 days and must be installed again; to last a year, the Apple Developer Program ($99 a year), App Store or not. Carrel stays a web page on the iPad. In the Mac app it is possible (signed for this Mac, it needs nothing), at the cost of every PDF feature written twice.
-- **Chromium draws PDF.js with fewer white pages** (a seventh of WebKit's on the Mac), which is why vscode-pdf-viewer looks as it does; but bare PDF.js in WebKit already flies by the reader's eye, so it is not the cause of carrel's slowness either.
+- **Chromium paints PDF.js at once**: none of WebKit's unpainted frames, so an eighth of its time without a page (218 against 1766 ms on the long paper); which is why vscode-pdf-viewer looks as it does. But bare PDF.js in WebKit already flies by the reader's eye, so WebKit is not the cause of carrel's slowness either.
 
-**Next.** Find what in carrel's reading makes PDF.js slow, by taking carrel's additions away one at a time and measuring each with this bench (the Mac's spin, in the same web view, and the reader's eye on the iPad), rather than by guessing at a cause. Before any renderer is reconsidered.
+## What in carrel makes PDF.js slow
+
+**Method.** Elimination, not guessing. Carrel's page can be loaded without any of its additions to PDF.js, or parts of the page around it, named in the address (`?off=previews,gate`; `all` is every addition to the reader), by [static/off.js](../../src/carrel/static/off.js); nothing in the page offers it. [mac_runs.py](mac_runs.py)'s `--carrel-off` runs each variant in turn with the others, in the same web view and pane. A bench page, `/view/carrel-reader`, loads carrel's reader module alone (read.js, boot.js and carrel's stylesheets, in carrel's markup for the pane, without app.js: no tabs, chat or library), and can swap carrel's stylesheet for PDF.js's (`&css=pdfjs`). The long paper throughout, three rounds a variant, alternating, then four more for the decisive ones on both papers. Settings → Pages was off, as on the reader's Mac when it was slow.
+
+**Results** (the long paper, ms a spin, the mean of 3–4 spins):
+
+| Variant | Unpainted + blank | Blurred | Stalled |
+|---|---|---|---|
+| bare PDF.js | 1400–1770 | 50–130 | 0 |
+| carrel | 610–670 | 1030–1090 | 210–450 |
+| carrel, its reader's additions all off | 1280–1450 | 10–30 | 0 |
+| carrel without the gate (no page drawn during a flick) | 1116 | 753 | 927 |
+| carrel without the previews | 2221 | 0 | 253 |
+| carrel without the pinch (its touch and wheel listeners) | 665–703 | 1000–1090 | 13–57 |
+| carrel without the snapshots, the Pages adjustments, find, or the citation mark | 520–550 | 1080–1190 | 210–250 |
+| carrel, all off, and the page's parts too (the badge's blur, the other tabs' panes, containment, the chat, the fixed body) | 1308 | 26 | 0 |
+| carrel's reader alone, all off | 1377–1386 | 100–140 | 0 |
+| carrel's reader alone, all off, PDF.js's stylesheet | 1515 | 84 | 0 |
+| bare PDF.js under carrel's content policy (no WebAssembly) | 1496 | 73 | 0 |
+
+On the figures paper, stalled: bare PDF.js 51–110, carrel 234–458, carrel without the pinch 84; unpainted + blank: bare PDF.js 3730–3990, carrel 620–1520, carrel without the pinch 951.
+
+**What they show.**
+
+- **Carrel paints no worse than bare PDF.js; it stalls.** Its pages are unpainted or white for 0.6 s a spin against bare PDF.js's 1.4–1.8 s (the previews and the gate do their work), but the paper stands still while it is being scrolled for 0.2–0.45 s a spin, where bare PDF.js never does on the long paper. Stalled is the measured part of laggy.
+- **The stalls are the pinch's wheel listener.** Without pinch.js, carrel stalls 13–57 ms a spin on the long paper, as bare PDF.js does, and keeps what the previews give. pinch.js listens to `wheel` on the scrolling pane without `passive` (to cancel a trackpad's pinch, which comes as wheel events with ctrlKey), so WebKit cannot scroll on its own: every wheel event waits for the main thread, and the main thread is drawing pages. Without the gate, which keeps the main thread free during a flick, the stalls quadruple (927 ms), which is the same cause seen from the other side. Nothing else in carrel's reader or page moved the stalls.
+- **The earlier finding that a passive wheel listener made things worse was the colour artefact.** architecture.md recorded that the pinch's wheel listener made passive let "WebKit scroll ahead of its painting, and the grey grew"; grey there was the unpainted backdrop counted only when it happened to be the pane's colour. Without the pinch, unpainted and blank together are unchanged (665–703 against 610–670 ms).
+- **On the iPad** the same holds for touch, by the code, not yet by measurement: pinch.js listens to `touchstart` and `touchmove`, and pan.js to `touchmove`, on the pane without `passive`, and bare PDF.js listens to none. Safari then cannot start or carry a scroll without asking the main thread. The reader is to compare, by eye, carrel with `?off=pinch,pan` against carrel as it is.
+
+**Next.** The reader judges `off=pinch` on the Mac (Safari) and `off=pinch,pan` on the iPad. If it flies, pinch.js and pan.js are rewritten so that no listener on the pane is non-passive while nothing is being pinched: a trackpad's pinch from passive wheel events (the Mac app's web view does not zoom the page itself) or Safari's gesture events; a touch pinch with `touchmove` listened to only while two fingers are down, and the pane's scroll held by `overflow: hidden` rather than by `preventDefault`; pan.js only while the page is wider than its pane.

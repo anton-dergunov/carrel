@@ -4,12 +4,14 @@ recorded at 60 fps, and each frame of the PDF's pane classified.
     uv run --with numpy python scripts/mac-bench/bench.py spin [--at X,Y] [--runs N]
     uv run --with numpy python scripts/mac-bench/bench.py clicks X,Y X,Y ... [--runs N]
     uv run --with numpy python scripts/mac-bench/bench.py video RECORDING.mov [--rect X,Y,W,H]
-    uv run --with numpy python scripts/mac-bench/bench.py frames DIR ... [--grey G]
+    uv run --with numpy python scripts/mac-bench/bench.py frames DIR ...
 
 `spin` flicks a free-spinning wheel violently over the paper in view: to the start, down, and to
 the start again (from the middle of a long paper, so that the pages crossed are not all drawn). It
-prints how long the pane showed nothing painted (the viewer's grey), a page blank, or a blurred
-preview. `clicks` clicks each point in turn (tabs, in screen points) and prints, per click, when
+prints how long the pane showed nothing painted, a page blank, or a blurred one; how long the
+paper stood still while it was being scrolled (stalled); how soon each flick moved it (lag, the
+input tool's own delay of 150–200 ms included); and how long the pane went on changing after each
+stop (settled). `clicks` clicks each point in turn (tabs, in screen points) and prints, per click, when
 the pane changed and whether any frame after that differed from where it settled (a flash, a
 preview, a redraw). `video` sorts the frames of a screen recording made elsewhere (the iPad's,
 flicked by hand) the same way, with ffmpeg. `frames` sorts again the frames an earlier spin kept
@@ -17,8 +19,8 @@ flicked by hand) the same way, with ffmpeg. `frames` sorts again the frames an e
 
 The app must be on screen with a paper open; the terminal needs Screen Recording and
 Accessibility. `--app` measures another app's window (com.apple.Safari), `--rect X,Y,W,H` the
-pane in the window's points (by default its left 58%, under the tabs), `--grey` the viewer's
-background as gray (223 in the light theme). Frames are kept under --out (a temporary folder).
+pane in the window's points (by default its left 58%, under the tabs). Frames are kept under
+--out (a temporary folder).
 `--json FILE` appends each run's result to FILE, named by `--label`.
 """
 
@@ -95,29 +97,32 @@ def fineness(g):
     return None if coarse < 2 else laplacian(g).mean() / coarse
 
 
-def classify(frames, grey, tolerance=1):
-    """Each frame: 'grey' (more than a quarter of the pane unpainted), 'blank' (a run of rows with
-    no ink over 40% of the pane), 'blurred' (a quarter of the pane, or more, drawn below its
-    resolution: see fineness), or 'ok'. `tolerance` is how far from `grey` a pixel may be and
-    still be unpainted (a video's compression moves it).
+def classify(frames, flat=3):
+    """Each frame: 'unpainted' (a quarter of the pane, or more, rows of one colour that is not
+    white: what lies under the page, which WebKit shows where it has not painted), 'blank' (a run
+    of white rows over 40% of the pane: a page laid out but not drawn), 'blurred' (a quarter of the
+    pane, or more, drawn below its resolution: see fineness), or 'ok'. A row is of one colour when
+    its values are within `flat` of each other (a video's compression spreads them).
 
+    'unpainted' was once 'grey': the pane's own grey, given. But what shows where WebKit has not
+    painted is not the pane's colour: 223 under carrel's beige pane, 218 under the bench's grey one;
+    so the same unpainted frames were 'grey' in one and 'blank' in the other.
     'blurred' once meant under 60% of the sharpest frame's detail within two seconds, which took a
     page of photographs beside a page of text for blurred."""
     kinds = []
     for frame in frames:
         g = load(frame).astype(np.float64)
         core = g[:, g.shape[1] * 6 // 100 : g.shape[1] * 94 // 100]
-        greyish = np.abs(core - grey) <= tolerance
-        inkless = ~(core < 200).any(axis=1) & (greyish.mean(axis=1) < 0.5)
+        even = core.max(axis=1) - core.min(axis=1) <= flat
+        white = even & (core.mean(axis=1) >= 245)
         run = best = 0
-        for row in inkless:
+        for row in white:
             run = run + 1 if row else 0
             best = max(best, run)
-        strips = np.array_split(core, 4)
-        fine = [fineness(strip) for strip in strips]
+        fine = [fineness(strip) for strip in np.array_split(core, 4)]
         kinds.append(
-            "grey"
-            if greyish.mean() > 0.25
+            "unpainted"
+            if (even & ~white).mean() > 0.25
             else "blank"
             if best / len(core) > 0.4
             else "blurred"
@@ -130,8 +135,11 @@ def classify(frames, grey, tolerance=1):
 def spin(args, rect, at):
     x, y = at
 
+    starts = []
+
     def act():
         for direction in ("up", "down", "up"):
+            starts.append(time.time() * 1000)
             subprocess.run(
                 [tool("input"), "spin", str(x), str(y), direction, "90", "14", "2", "8"], check=True
             )
@@ -139,8 +147,9 @@ def spin(args, rect, at):
 
     for run in range(args.runs):
         out = Path(args.out) / f"spin{run + 1}"
+        starts.clear()
         times, frames = record(args.app, 8.5, out, rect, act)
-        kinds = classify(frames, args.grey)
+        kinds = classify(frames)
         shown = shown_times(times, kinds)
         if args.verbose:
             previous = None
@@ -151,16 +160,25 @@ def spin(args, rect, at):
         print(
             f"spin {run + 1}: "
             + ", ".join(
-                f"{kind} {shown.get(kind, 0):.0f} ms" for kind in ("grey", "blank", "blurred", "ok")
+                f"{kind} {shown.get(kind, 0):.0f} ms"
+                for kind in ("unpainted", "blank", "blurred", "ok")
             )
         )
-        settled = settling(times, frames)
-        print(f"  settled after each stop: {settled} ms")
+        moving, changed = motion(frames)
+        settled = settling(times, moving, changed)
+        stalled, longest = stalls(times, moving)
+        lag = lags(times, moving, starts)
+        print(
+            f"  lag {lag} ms; stalled {stalled} ms (longest {longest}); settled after each stop: {settled} ms"
+        )
         keep(
             args,
             {
                 "what": "spin",
                 "run": run + 1,
+                "lag": lag,
+                "stalled": stalled,
+                "longest_stall": longest,
                 "settled": settled,
                 **{k: round(v) for k, v in shown.items()},
             },
@@ -178,22 +196,51 @@ def offset(a, b, most=200):
     return moved
 
 
-def settling(times, frames):
-    """After each time the paper stopped and stayed still for 400 ms or more, how long the pane
-    went on changing: the drawing catching up (0 when it was done as it stopped)."""
+def motion(frames):
+    """For each frame, whether the paper moved since the one before (its content shifted), and
+    whether anything changed at all."""
     pictures = [load(frame).astype(np.float64) for frame in frames]
     profiles = [g[:, g.shape[1] // 10 : g.shape[1] * 9 // 10].mean(axis=1) for g in pictures]
     moving = [False] + [offset(profiles[i], profiles[i - 1]) != 0 for i in range(1, len(pictures))]
     changed = [False] + [
         np.abs(pictures[i] - pictures[i - 1]).mean() > 0.2 for i in range(1, len(pictures))
     ]
+    return moving, changed
+
+
+def stalls(times, moving):
+    """The time the paper stood still while it was being scrolled: each wait over 50 ms for the
+    next frame that moved it, after one that had moved it under 400 ms before."""
+    waits, last = [], None
+    for i in range(1, len(times)):
+        if not moving[i]:
+            continue
+        if last is not None and times[i] - times[last] < 400 and times[i] - times[i - 1] > 50:
+            waits.append(times[i] - times[i - 1])
+        last = i
+    return round(sum(waits)), round(max(waits, default=0))
+
+
+def lags(times, moving, starts):
+    """For each flick, from its first input event to the first frame that moved the paper."""
+    out = []
+    for start in starts:
+        first = next((t for t, m in zip(times, moving) if m and t > start), None)
+        if first is not None:
+            out.append(round(first - start))
+    return out
+
+
+def settling(times, moving, changed):
+    """After each time the paper stopped and stayed still for 400 ms or more, how long the pane
+    went on changing: the drawing catching up (0 when it was done as it stopped)."""
     settled, i = [], 1
-    while i < len(pictures):
+    while i < len(times):
         if not (moving[i - 1] and not moving[i]):
             i += 1
             continue
         stop, j, last = times[i - 1], i, None
-        while j < len(pictures) and not moving[j]:
+        while j < len(times) and not moving[j]:
             last = times[j] if changed[j] else last
             j += 1
         if times[min(j, len(times) - 1)] - stop >= 400:
@@ -216,19 +263,25 @@ def again(args, folder):
         t0 = float((run / "t0").read_text())
         times = [t0 + float(line) for line in csv.read_text().split()[1:]]
         frames = sorted(run.glob("f*.pgm"))
-        shown = shown_times(times, classify(frames, args.grey))
-        settled = settling(times, frames)
+        shown = shown_times(times, classify(frames))
+        moving, changed = motion(frames)
+        settled = settling(times, moving, changed)
+        stalled, longest = stalls(times, moving)
         name = str(run.relative_to(folder))
         print(
             f"{name}: "
-            + ", ".join(f"{k} {shown.get(k, 0):.0f} ms" for k in ("grey", "blank", "blurred", "ok"))
-            + f"; settled after each stop: {settled} ms"
+            + ", ".join(
+                f"{k} {shown.get(k, 0):.0f} ms" for k in ("unpainted", "blank", "blurred", "ok")
+            )
+            + f"; stalled {stalled} ms (longest {longest}); settled after each stop: {settled} ms"
         )
         keep(
             args,
             {
                 "what": "frames",
                 "run": name,
+                "stalled": stalled,
+                "longest_stall": longest,
                 "settled": settled,
                 **{k: round(v) for k, v in shown.items()},
             },
@@ -278,7 +331,7 @@ def video(args, path):
     frames = sorted(out.glob("f*.pgm"))
     n = min(len(times), len(frames))
     times, frames = times[:n], frames[:n]
-    kinds = classify(frames, args.grey, tolerance=4)
+    kinds = classify(frames, flat=8)
     moving = [False] * n
     previous = load(frames[0])
     for i in range(1, n):
@@ -297,12 +350,12 @@ def video(args, path):
         if moving[i]:
             shown_moving[kind] = shown_moving.get(kind, 0) + lasted
     total = sum(shown_moving.values()) or 1
-    settled = settling(times, frames)
+    settled = settling(times, *motion(frames))
     print(
         f"{Path(path).name}: {n} frames over {(end[-1] - end[0]) / 1000:.1f} s, moving {total / 1000:.1f} s; while moving: "
         + ", ".join(
             f"{kind} {shown_moving.get(kind, 0):.0f} ms ({100 * shown_moving.get(kind, 0) / total:.0f}%)"
-            for kind in ("grey", "blank", "blurred", "ok")
+            for kind in ("unpainted", "blank", "blurred", "ok")
         )
         + f"; settled after each stop: {settled} ms"
     )
@@ -352,10 +405,12 @@ def clicks(args, rect, points):
                 continue
             between = [np.abs(load(frames[i]) - last).mean() for i in range(first, settled)]
             off = sum(d > 0.5 for d in between)
-            kinds = classify(frames[first : settled + 1], args.grey)[:-1]
+            kinds = classify(frames[first : settled + 1])[:-1]
             unlike = [kind for kind, d in zip(kinds, between) if d > 0.5]
             seen = ", ".join(
-                f"{unlike.count(k)} {k}" for k in ("grey", "blank", "blurred", "ok") if k in unlike
+                f"{unlike.count(k)} {k}"
+                for k in ("unpainted", "blank", "blurred", "ok")
+                if k in unlike
             )
             print(
                 f"click {run + 1}: on screen {times[first] - at:.0f} ms after, {off} frames after that unlike where it settled"
@@ -379,7 +434,6 @@ def main():
     parser.add_argument(
         "--rect", help="the pane, X,Y,W,H in the window's points (video: in the recording's pixels)"
     )
-    parser.add_argument("--grey", type=int, default=223)
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="spin: each change of kind, in time"
     )

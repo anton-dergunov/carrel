@@ -3,13 +3,15 @@ scripts/mac-bench/bench.py (one spin each), and closed, round after round, so th
 load falls on all of them alike. Results are appended to results.jsonl.
 
     uv run --with numpy python experiments/pdf-renderers/mac_runs.py [--papers long,figures]
-        [--rounds 3] [--only webkit-mupdf,...] [--look]
+        [--rounds 3] [--only webkit-mupdf,...] [--carrel-off all,gate,previews+gate,...] [--look]
 
 The web viewers run in the PDFKit app's web view (WKWebView: the engine of carrel's Mac app and
 of the iPad's Safari), in the same window as its PDFView, and in an instance of Chrome with a
 profile of its own, so the reader's own windows are left be. The bench (bench.py) and carrel
 (`carrel serve`, for carrel itself) must be serving, and the app built (README.md). `--look`
 screenshots each window once instead, to check the panes. It takes the mouse and the screen.
+`--carrel-off` adds carrel loaded without some of its additions to PDF.js (static/off.js), a
+renderer each: `previews+gate` is `carrel-off-previews+gate`, loaded with `?off=previews,gate`.
 """
 
 import argparse
@@ -80,35 +82,45 @@ def chrome_close():
     shutil.rmtree(chrome["profile"], ignore_errors=True)
 
 
-def targets(paper: dict, carrel_rect, chrome_rect, chrome_grey) -> dict:
+def targets(paper: dict, carrel_rect, chrome_rect, carrel_off=()) -> dict:
     """Each renderer: how to open it (returning the app or process the bench measures), the pane
-    in its window's points, its grey, and how to close it."""
+    in its window's points, and how to close it."""
     pdf = PDF_ROOT / paper["pdf"]
     page = paper["page"]
 
-    def view(name):
-        return f"{BENCH}/view/{name}?paper={paper['id']}"
+    def view(name, query=""):
+        return f"{BENCH}/view/{name}?paper={paper['id']}{query}"
+
+    def in_app(url, width=PANE_W, chat=CHAT_W):
+        return lambda: app_open(url, page, width, chat)
 
     pane = (0, TITLE_BAR, PANE_W, PANE_H)
     out = {}
     for name in ("pdfjs", "embedpdf", "mupdf"):
-        out[f"webkit-{name}"] = (
-            lambda name=name: app_open(view(name), page, PANE_W, CHAT_W),
+        out[f"webkit-{name}"] = (in_app(view(name)), pane, app_close)
+    out["webkit-pdfjs-carrelcsp"] = (in_app(view("pdfjs", "&csp=carrel")), pane, app_close)
+    # Carrel's reader alone (viewers/carrel-reader.js), with its additions, without, and without
+    # them in PDF.js's stylesheet or with the pane's colour on the scrolling element.
+    for name, query in (
+        ("none", ""),
+        ("all", "&off=all"),
+        ("all-css-pdfjs", "&off=all&css=pdfjs"),
+        ("all-css-scrollerbg", "&off=all&css=scrollerbg"),
+    ):
+        out[f"webkit-carrel-reader-{name}"] = (
+            in_app(view("carrel-reader", query)),
             pane,
-            223,
             app_close,
         )
-    out["webkit-carrel"] = (
-        lambda: app_open(f"{CARREL}/read/{quote(paper['pdf'])}?page={page}", page, CARREL_W, 0),
-        carrel_rect,
-        223,
-        app_close,
-    )
-    out["pdfkit"] = (lambda: app_open(str(pdf), page, PANE_W, CHAT_W), pane, 223, app_close)
+    carrel = f"{CARREL}/read/{quote(paper['pdf'])}?page={page}"
+    out["webkit-carrel"] = (in_app(carrel, CARREL_W, 0), carrel_rect, app_close)
+    for variant in carrel_off:
+        url = f"{carrel}&off={variant.replace('+', ',')}"
+        out[f"carrel-off-{variant}"] = (in_app(url, CARREL_W, 0), carrel_rect, app_close)
+    out["pdfkit"] = (in_app(str(pdf)), pane, app_close)
     out["chrome-pdfjs"] = (
         lambda: chrome_open(view("pdfjs")),
         (0, CHROME_BAR, PANE_W, PANE_H),
-        223,
         chrome_close,
     )
     out["chrome-pdfium"] = (
@@ -116,7 +128,6 @@ def targets(paper: dict, carrel_rect, chrome_rect, chrome_grey) -> dict:
             f"{BENCH}/pdf/{paper['id']}#page={page}&toolbar=0&navpanes=0&view=FitH"
         ),
         chrome_rect,
-        chrome_grey,
         chrome_close,
     )
     return out
@@ -127,12 +138,12 @@ def main():
     parser.add_argument("--papers", default="long,figures")
     parser.add_argument("--rounds", type=int, default=3)
     parser.add_argument("--only", help="the renderers to run, by name")
+    parser.add_argument("--carrel-off", default="", help="variants of carrel, by what is off")
     parser.add_argument("--look", action="store_true")
     parser.add_argument("--out", default="/tmp/carrel-renderers")
     # Settled by --look: the paper's pane in carrel's window, and Chrome's own viewer's.
     parser.add_argument("--carrel-rect", default="0,71,1230,960")
     parser.add_argument("--chrome-rect", default="0,87,1230,1000")
-    parser.add_argument("--chrome-grey", type=int, default=32)
     args = parser.parse_args()
     rect = lambda text: tuple(map(int, text.split(",")))  # noqa: E731
     papers = {p["id"]: p for p in yaml.safe_load((HERE / "papers.yaml").read_text())["papers"]}
@@ -140,9 +151,12 @@ def main():
         for paper_id in args.papers.split(","):
             paper = papers[paper_id]
             chosen = targets(
-                paper, rect(args.carrel_rect), rect(args.chrome_rect), args.chrome_grey
+                paper,
+                rect(args.carrel_rect),
+                rect(args.chrome_rect),
+                [v for v in args.carrel_off.split(",") if v],
             )
-            for name, (start, pane, grey, stop) in chosen.items():
+            for name, (start, pane, stop) in chosen.items():
                 if args.only and name not in args.only.split(","):
                     continue
                 app = start()
@@ -173,7 +187,7 @@ def main():
                         subprocess.run(
                             [sys.executable, str(ROOT / "scripts/mac-bench/bench.py"), "spin"]
                             + ["--app", app, "--rect", ",".join(map(str, pane))]
-                            + ["--grey", str(grey), "--runs", "1", "--json", str(RESULTS)]
+                            + ["--runs", "1", "--json", str(RESULTS)]
                             + ["--label", label, "--out", f"{args.out}/{round_}-{paper_id}-{name}"],
                             check=False,
                         )

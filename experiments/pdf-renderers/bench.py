@@ -11,7 +11,9 @@ login; nothing here is carrel's server, and nothing it does changes the library.
 
 What it serves:
 - `/` the list of papers and viewers; `/view/<viewer>?paper=<id>` a paper in one viewer
-  (`pdfjs`, `embedpdf`, `mupdf`), opened at the paper's middle page (`&page=N` another);
+  (`pdfjs`, `embedpdf`, `mupdf`), opened at the paper's middle page (`&page=N` another), under
+  carrel's own policy with `&csp=carrel` (no WebAssembly); `carrel-reader` is carrel's reader
+  module alone, in carrel's markup and styles, `&off=` as in carrel;
 - `/api/papers` the papers of `papers.yaml`, without their paths; `/pdf/<id>` a paper's PDF;
 - `/viewers/` the viewers' scripts, `/vendor/` the renderers `fetch.sh` fetched, `/static/`
   carrel's static files, for PDF.js;
@@ -36,14 +38,14 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[1] / "src"))
 from carrel import tailnet  # noqa: E402
 from carrel.engine import Library  # noqa: E402
-from carrel.server import STATIC, Guard  # noqa: E402
+from carrel.server import STATIC, Guard, csp  # noqa: E402
 
 VIEWERS = HERE / "viewers"
 VENDOR = HERE / "vendor"
 RUNS = HERE / "runs.jsonl"
 MAX_RECORD = 256 * 1024
 NO_STORE = {"Cache-Control": "no-store"}
-NAMES = ("pdfjs", "embedpdf", "mupdf")
+NAMES = ("pdfjs", "embedpdf", "mupdf", "carrel-reader")
 
 # Carrel's policy, with WebAssembly allowed to compile: PDFium and MuPDF are nothing else. The
 # bench's alone; carrel's pages keep theirs.
@@ -71,8 +73,9 @@ def make_app(library: Library, hosts: set[str], logins: set[str]):
         name = request.path_params["viewer"]
         if name not in NAMES:
             return PlainTextResponse("No such viewer.", status_code=404)
+        policy = csp(request) if request.query_params.get("csp") == "carrel" else CSP
         return FileResponse(
-            VIEWERS / f"{name}.html", headers={"Content-Security-Policy": CSP, **NO_STORE}
+            VIEWERS / f"{name}.html", headers={"Content-Security-Policy": policy, **NO_STORE}
         )
 
     async def paper_list(request: Request) -> Response:

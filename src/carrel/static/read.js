@@ -12,6 +12,7 @@ import * as pdfjsLib from './vendor/pdfjs/pdf.min.mjs';
 import { createCiteMark } from './cite-mark.js';
 import { redrawn, sharpen, strike } from './page-adjust.js';
 import { HIGHLIGHT_COLORS, lineBoxes } from './highlight.js';
+import { off } from './off.js';
 import { panAlongAxis } from './pan.js';
 import { pinchToZoom, stopPageZoom } from './pinch.js';
 import { createPreviews } from './previews.js';
@@ -54,7 +55,7 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   const container = document.getElementById('viewerContainer');
   const eventBus = new EventBus();
   const linkService = new PDFLinkService({ eventBus, externalLinkTarget: LinkTarget.BLANK });
-  const findController = new PDFFindController({ eventBus, linkService });
+  const findController = off('find') ? undefined : new PDFFindController({ eventBus, linkService });
   const viewer = new PDFViewer({
     container,
     eventBus,
@@ -67,15 +68,16 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   });
   linkService.setViewer(viewer);
   // The mark a citation's rectangles draw.
-  const citeMark = createCiteMark({ viewer, eventBus, container });
+  // Each of these can be left out for a measurement (off.js), for a stand-in that does nothing.
+  const citeMark = off('citemark') ? { show: async () => false, clear() {} } : createCiteMark({ viewer, eventBus, container });
   // A picture of each page behind it until it is drawn.
-  const previews = createPreviews({ eventBus });
+  const previews = off('previews') ? { ready: async () => {}, show() {} } : createPreviews({ eventBus });
   // Nothing drawn while the paper scrolls fast, but on e-ink, where a page turn is a jump.
-  holdWhileFast({ viewer, container, when: () => !window.carrelLook.eink() });
+  if (!off('gate')) holdWhileFast({ viewer, container, when: () => !window.carrelLook.eink() });
   // The pages a tab showed, over the pane when it comes back until they are drawn again.
   // A copy is the canvases in view, some 70 MB on the Mac: fewer papers' on a tablet, whose browser
   // drops a page that takes much memory, and one on e-ink, whose pages are drawn whole at full size.
-  const snapshots = createSnapshots({ viewer, eventBus, container, papers: snapshotPapers() });
+  const snapshots = off('snapshots') ? { take() {}, cover() {}, clear() {} } : createSnapshots({ viewer, eventBus, container, papers: snapshotPapers() });
   // Links inside the PDF go through this too.
   linkService.goToDestination = (dest) => scrollToDestination(dest);
 
@@ -114,8 +116,9 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   // A page, and the detail canvas over the part in view, once drawn: emboldened by the width
   // chosen (as a share of the page's width in pt, so in the canvas's own pixels), then sharpened.
   // A page only scaled while a pinch settles (cssTransform) was not drawn again, and is left be.
-  eventBus.on('pagerender', ({ source }) => source?.canvas && redrawn(source.canvas));
+  eventBus.on('pagerender', ({ source }) => source?.canvas && !off('adjust') && redrawn(source.canvas));
   eventBus.on('pagerendered', ({ source, cssTransform, error }) => {
+    if (off('adjust')) return;
     const canvas = source?.canvas;
     const view = source?.pageView ?? source;
     if (cssTransform || error || !canvas?.width || !view?.div) return;
@@ -198,9 +201,11 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
   document.addEventListener('visibilitychange', afterResume);
   window.addEventListener('pageshow', afterResume);
 
-  stopPageZoom();
-  pinchToZoom({ container, viewer, eventBus });
-  panAlongAxis({ container });
+  if (!off('pinch')) {
+    stopPageZoom();
+    pinchToZoom({ container, viewer, eventBus });
+  }
+  if (!off('pan')) panAlongAxis({ container });
 
   /**
    * Fits the width again, unless the reader zoomed in or out. Not while the split is dragged:

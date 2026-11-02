@@ -15,3 +15,11 @@ __pycache__/
 # The crisp-pages bench: pictures of papers' pages, which are not ours to commit
 /experiments/crisp-pages/stills/
 /experiments/crisp-pages/photos/
+
+# The pdf-renderers bench: the renderers fetch.sh fetches, the PDFKit app's project and build, and
+# the screen recordings and their frames
+/experiments/pdf-renderers/vendor/
+/experiments/pdf-renderers/pdfkit/build/
+/experiments/pdf-renderers/pdfkit/*.xcodeproj/
+/experiments/pdf-renderers/pdfkit/Info.plist
+/experiments/pdf-renderers/recordings/

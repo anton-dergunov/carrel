@@ -2,7 +2,7 @@
 //   input spin X Y up|down COUNT START_LINES END_LINES INTERVAL_MS
 //       COUNT wheel events, INTERVAL_MS apart, their size falling from START_LINES to END_LINES
 //   input click X Y          prints when the button came up (wall clock, ms)
-//   input window BUNDLE_ID   prints the app's largest window: x y width height
+//   input window BUNDLE_ID   prints the app's largest window: x y width height (or a process id's)
 // X and Y are screen points. Posting events needs Accessibility for the app running this.
 import AppKit
 import ApplicationServices
@@ -14,7 +14,7 @@ if args[1] == "window" {
     let windows = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? []
     let bounds = windows.compactMap { info -> CGRect? in
         guard let pid = info[kCGWindowOwnerPID as String] as? pid_t,
-              NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == args[2],
+              Int32(args[2]).map({ $0 == pid }) ?? (NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == args[2]),
               let dict = info[kCGWindowBounds as String] as? NSDictionary else { return nil }
         return CGRect(dictionaryRepresentation: dict)
     }.max { $0.width * $0.height < $1.width * $1.height }

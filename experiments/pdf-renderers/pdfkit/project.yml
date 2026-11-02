@@ -1,0 +1,35 @@
+# PDFKit beside a web view, as a native carrel would have it: a window with Apple's PDFView where
+# the paper goes and an empty WKWebView where the chat goes. For the bench alone (README.md).
+#   cd experiments/pdf-renderers/pdfkit && xcodegen generate --quiet \
+#     && xcodebuild -project PDFKitSpike.xcodeproj -scheme PDFKitSpike -derivedDataPath build -quiet
+name: PDFKitSpike
+options:
+  deploymentTarget:
+    macOS: "14.0"
+targets:
+  PDFKitSpike:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+    dependencies:
+      - sdk: PDFKit.framework
+      - sdk: WebKit.framework
+    info:
+      path: Info.plist  # generated, not in git
+      properties:
+        CFBundleDisplayName: PDFKit Spike
+        NSHighResolutionCapable: true
+        # The bench's pages are plain HTTP on 127.0.0.1.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.anton.carrel.pdfkit-spike
+        PRODUCT_NAME: PDFKitSpike
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: minimal
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: NO
+        ENABLE_APP_SANDBOX: NO

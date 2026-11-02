@@ -1,5 +1,6 @@
 // Records a window's region with ScreenCaptureKit, as gray frames, for bench.py.
 //   capture BUNDLE_ID SECONDS OUTDIR X Y W H   (the region in the window's points)
+// BUNDLE_ID may be a process id instead: one instance of an app that runs several.
 // Writes OUTDIR/t0 (the first frame's wall-clock time, ms), OUTDIR/frames.csv (each frame's time
 // after it) and OUTDIR/fNNNN.pgm (each frame at half the points).
 import AppKit
@@ -44,9 +45,14 @@ final class Sink: NSObject, SCStreamOutput, @unchecked Sendable {
     }
 }
 
+func owned(_ app: SCRunningApplication?) -> Bool {
+    if let pid = Int32(bundle) { return app?.processID == pid }
+    return app?.bundleIdentifier == bundle
+}
+
 let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
 guard let window = content.windows
-    .filter({ $0.owningApplication?.bundleIdentifier == bundle && $0.frame.width > 400 })
+    .filter({ owned($0.owningApplication) && $0.frame.width > 400 })
     .max(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }) else {
     print("no window of \(bundle) on screen"); exit(1)
 }

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>PDF.js</title>
+<link rel="stylesheet" href="/static/vendor/pdfjs/pdf_viewer.css">
+<link rel="stylesheet" href="/viewers/common.css">
+<style>
+  /* carrel's app.css: the gap between pages. */
+  .pdfViewer .page { margin: 0 auto 8px; }
+</style>
+</head>
+<body>
+<div id="pane"><div id="viewer" class="pdfViewer"></div></div>
+<div id="failed"></div>
+<script type="module" src="/viewers/pdfjs.js"></script>
+</body>
+</html>

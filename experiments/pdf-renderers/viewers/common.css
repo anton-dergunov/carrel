@@ -1,0 +1,10 @@
+/* What every viewer shares, so that only the renderer differs: the pane fills the window, its
+   grey is carrel's light theme's (223, what bench.py takes for nothing painted), the pages are as
+   wide as the pane, 8 px apart, as carrel lays them out. */
+html, body { margin: 0; height: 100%; overflow: hidden; background: rgb(223, 223, 223); }
+body { font: 14px -apple-system, system-ui, sans-serif; }
+#pane {
+  position: absolute; inset: 0; overflow: auto; -webkit-overflow-scrolling: touch;
+  isolation: isolate; background: rgb(223, 223, 223); overscroll-behavior: none;
+}
+#failed { position: fixed; left: 16px; bottom: 16px; color: #a00; white-space: pre-wrap; }

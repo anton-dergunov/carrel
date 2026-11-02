@@ -1,0 +1,42 @@
+{"at": "2026-11-02T01:43:14+0000", "app": "", "label": "1-figures-webkit-carrel", "what": "frames", "run": "spin1", "settled": [0, 800, 0], "blurred": 4562, "ok": 620, "blank": 2622, "grey": 465}
+{"at": "2026-11-02T01:43:14+0000", "app": "", "label": "1-figures-webkit-embedpdf", "what": "frames", "run": "spin1", "settled": [370, 935, 247], "ok": 424, "blank": 1618, "blurred": 5984}
+{"at": "2026-11-02T01:43:17+0000", "app": "", "label": "1-figures-chrome-pdfium", "what": "frames", "run": "spin1", "settled": [0, 0, 16], "ok": 1816, "blurred": 6670}
+{"at": "2026-11-02T01:43:17+0000", "app": "", "label": "1-figures-webkit-pdfjs", "what": "frames", "run": "spin1", "settled": [0, 0, 0, 0, 0], "ok": 368, "blank": 4114, "blurred": 3997}
+{"at": "2026-11-02T01:43:17+0000", "app": "", "label": "2-figures-webkit-embedpdf", "what": "frames", "run": "spin1", "settled": [349, 820, 369], "ok": 405, "blank": 1502, "blurred": 6188}
+{"at": "2026-11-02T01:43:17+0000", "app": "", "label": "1-figures-pdfkit", "what": "frames", "run": "spin1", "settled": [0, 0, 0], "ok": 7905, "blurred": 400}
+{"at": "2026-11-02T01:43:17+0000", "app": "", "label": "1-long-webkit-carrel", "what": "frames", "run": "spin1", "settled": [183, 0, 0], "ok": 6833, "blurred": 1030, "grey": 415, "blank": 134}
+{"at": "2026-11-02T01:43:17+0000", "app": "", "label": "1-figures-chrome-pdfjs", "what": "frames", "run": "spin1", "settled": [0, 0, 0, 0], "ok": 2535, "blank": 2667, "blurred": 3187}
+{"at": "2026-11-02T01:43:17+0000", "app": "", "label": "3-figures-webkit-carrel", "what": "frames", "run": "spin1", "settled": [0, 437, 99], "ok": 1024, "grey": 430, "blurred": 6498, "blank": 369}
+{"at": "2026-11-02T01:43:17+0000", "app": "", "label": "1-figures-webkit-mupdf", "what": "frames", "run": "spin1", "settled": [234, 234, 183], "ok": 1477, "blurred": 6299, "blank": 33}
+{"at": "2026-11-02T01:43:18+0000", "app": "", "label": "1-long-webkit-embedpdf", "what": "frames", "run": "spin1", "settled": [448, 248, 313], "ok": 4952, "blank": 1135, "blurred": 2174}
+{"at": "2026-11-02T01:43:18+0000", "app": "", "label": "2-figures-webkit-pdfjs", "what": "frames", "run": "spin1", "settled": [0, 0, 0, 0, 0], "ok": 374, "blank": 3947, "blurred": 3659}
+{"at": "2026-11-02T01:43:18+0000", "app": "", "label": "2-long-webkit-embedpdf", "what": "frames", "run": "spin1", "settled": [197, 314, 264], "ok": 4401, "blank": 1191, "blurred": 2137}
+{"at": "2026-11-02T01:43:18+0000", "app": "", "label": "2-figures-webkit-carrel", "what": "frames", "run": "spin1", "settled": [0, 406, 129], "ok": 1069, "blurred": 6006, "grey": 289, "blank": 380}
+{"at": "2026-11-02T01:43:18+0000", "app": "", "label": "1-long-chrome-pdfium", "what": "frames", "run": "spin1", "settled": [0, 16, 0], "ok": 6264, "blurred": 1228, "blank": 268}
+{"at": "2026-11-02T01:43:18+0000", "app": "", "label": "2-figures-chrome-pdfjs", "what": "frames", "run": "spin1", "settled": [0, 0, 0, 0], "ok": 2624, "blank": 2034, "blurred": 3152}
+{"at": "2026-11-02T01:43:18+0000", "app": "", "label": "1-long-chrome-pdfjs", "what": "frames", "run": "spin1", "settled": [0, 0, 0], "ok": 8282, "blurred": 235, "blank": 255}
+{"at": "2026-11-02T01:43:18+0000", "app": "", "label": "2-figures-chrome-pdfium", "what": "frames", "run": "spin1", "settled": [17, 0, 16], "ok": 4461, "blurred": 3667}
+{"at": "2026-11-02T01:43:18+0000", "app": "", "label": "1-long-pdfkit", "what": "frames", "run": "spin1", "settled": [0, 0, 0], "ok": 7773, "blurred": 101, "blank": 713}
+{"at": "2026-11-02T01:43:18+0000", "app": "", "label": "1-long-webkit-mupdf", "what": "frames", "run": "spin1", "settled": [153, 170, 176], "ok": 6096, "blank": 350, "blurred": 1828}
+{"at": "2026-11-02T01:43:18+0000", "app": "", "label": "3-figures-webkit-embedpdf", "what": "frames", "run": "spin1", "settled": [430, 984, 397], "ok": 432, "blank": 1743, "blurred": 5985}
+{"at": "2026-11-02T01:43:18+0000", "app": "", "label": "2-figures-pdfkit", "what": "frames", "run": "spin1", "settled": [0, 0, 0], "ok": 7967, "blurred": 384}
+{"at": "2026-11-02T01:43:19+0000", "app": "", "label": "2-figures-webkit-mupdf", "what": "frames", "run": "spin1", "settled": [201, 267, 183], "ok": 1438, "blank": 68, "blurred": 6334}
+{"at": "2026-11-02T01:43:19+0000", "app": "", "label": "2-long-webkit-carrel", "what": "frames", "run": "spin1", "settled": [143, 0, 0], "ok": 6446, "blurred": 1081, "grey": 451, "blank": 234}
+{"at": "2026-11-02T01:43:19+0000", "app": "", "label": "3-figures-webkit-pdfjs", "what": "frames", "run": "spin1", "settled": [0, 0, 0, 0, 0], "ok": 464, "blank": 3907, "blurred": 3916}
+{"at": "2026-11-02T01:43:19+0000", "app": "", "label": "3-long-webkit-embedpdf", "what": "frames", "run": "spin1", "settled": [394, 0, 247], "ok": 4791, "blank": 1094, "blurred": 1907}
+{"at": "2026-11-02T01:43:19+0000", "app": "", "label": "1-long-webkit-pdfjs", "what": "frames", "run": "spin1", "settled": [0, 0, 0], "ok": 6406, "blank": 1757, "blurred": 46}
+{"at": "2026-11-02T01:43:20+0000", "app": "", "label": "2-long-webkit-mupdf", "what": "frames", "run": "spin1", "settled": [172, 169, 173], "ok": 5259, "blank": 250, "blurred": 1758}
+{"at": "2026-11-02T01:43:20+0000", "app": "", "label": "3-long-webkit-carrel", "what": "frames", "run": "spin1", "settled": [184, 0, 152], "ok": 6474, "blurred": 1111, "grey": 452, "blank": 149}
+{"at": "2026-11-02T01:43:20+0000", "app": "", "label": "2-long-chrome-pdfjs", "what": "frames", "run": "spin1", "settled": [0, 0, 0], "ok": 8334, "blank": 242, "blurred": 185}
+{"at": "2026-11-02T01:43:20+0000", "app": "", "label": "3-figures-webkit-mupdf", "what": "frames", "run": "spin1", "settled": [217, 233, 182], "ok": 1452, "blurred": 6446}
+{"at": "2026-11-02T01:43:20+0000", "app": "", "label": "3-figures-chrome-pdfjs", "what": "frames", "run": "spin1", "settled": [0, 0, 0, 0], "ok": 2648, "blank": 2069, "blurred": 4224}
+{"at": "2026-11-02T01:43:20+0000", "app": "", "label": "2-long-pdfkit", "what": "frames", "run": "spin1", "settled": [0, 0, 0], "ok": 7531, "blurred": 98, "blank": 715}
+{"at": "2026-11-02T01:43:20+0000", "app": "", "label": "3-figures-pdfkit", "what": "frames", "run": "spin1", "settled": [0, 0, 0], "ok": 7748, "blurred": 382}
+{"at": "2026-11-02T01:43:20+0000", "app": "", "label": "3-figures-chrome-pdfium", "what": "frames", "run": "spin1", "settled": [0, 0, 0], "ok": 1672, "blurred": 6835}
+{"at": "2026-11-02T01:43:20+0000", "app": "", "label": "2-long-webkit-pdfjs", "what": "frames", "run": "spin1", "settled": [0, 0, 0], "ok": 6308, "blank": 1674, "blurred": 97}
+{"at": "2026-11-02T01:43:20+0000", "app": "", "label": "2-long-chrome-pdfium", "what": "frames", "run": "spin1", "settled": [0, 0, 17], "ok": 7033, "blurred": 1028, "blank": 249}
+{"at": "2026-11-02T01:43:20+0000", "app": "", "label": "3-long-pdfkit", "what": "frames", "run": "spin1", "settled": [0, 0, 0], "ok": 7186, "blank": 697, "blurred": 83}
+{"at": "2026-11-02T01:43:20+0000", "app": "", "label": "3-long-webkit-mupdf", "what": "frames", "run": "spin1", "settled": [168, 169, 175], "ok": 6104, "blank": 316, "blurred": 1808}
+{"at": "2026-11-02T01:43:20+0000", "app": "", "label": "3-long-webkit-pdfjs", "what": "frames", "run": "spin1", "settled": [0, 0, 0], "ok": 6205, "blank": 1851, "blurred": 92}
+{"at": "2026-11-02T01:43:20+0000", "app": "", "label": "3-long-chrome-pdfium", "what": "frames", "run": "spin1", "settled": [0, 0, 0], "ok": 7578, "blurred": 931, "blank": 186}
+{"at": "2026-11-02T01:43:20+0000", "app": "", "label": "3-long-chrome-pdfjs", "what": "frames", "run": "spin1", "settled": [0, 0, 0], "ok": 6750, "blank": 290, "blurred": 265}

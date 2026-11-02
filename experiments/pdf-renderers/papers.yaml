@@ -1,0 +1,19 @@
+# The papers each viewer is flicked through, the same for every renderer. `pdf` is relative to the
+# library's pdf_root; `page` is where a viewer opens, the middle, so that a flick either way crosses
+# pages not drawn yet. Papers are named here by title only: their pages are not ours to commit.
+papers:
+- id: text
+  kind: LaTeX, text with a few plots (24 pages, 0.8 MB)
+  title: "ZeRO: Memory Optimizations Toward Training Trillion Parameter Models"
+  pdf: ml-systems/distributed-training/ZeRO. Memory Optimizations Toward Training Trillion Parameter Models.pdf
+  page: 12
+- id: figures
+  kind: LaTeX, pages of generated images (25 pages, 44 MB)
+  title: Scalable Diffusion Models with Transformers
+  pdf: generative-models/diffusion/Scalable Diffusion Models with Transformers.pdf
+  page: 13
+- id: long
+  kind: LaTeX, a long report with figures (155 pages, 7 MB)
+  title: "Sparks of Artificial General Intelligence: Early experiments with GPT-4"
+  pdf: llm/foundation-models/Sparks of Artificial General Intelligence. Early experiments with GPT-4.pdf
+  page: 78

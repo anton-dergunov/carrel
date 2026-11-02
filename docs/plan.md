@@ -14,8 +14,8 @@ Carrel puts a paper's PDF and a Claude Code chat side by side on a tablet. The c
      - ripgrep and uv inside, since `paperlib` runs through `uv run`;
      - signing in to Claude from the app (or a `claude setup-token` token), kept in the Keychain;
      - a first run that chooses a library or makes a new one;
-     - a Developer ID, with every bundled binary signed and the app notarized, to hand it to others;
-     - updates, through Sparkle rather than an updater of our own;
+     - a Developer ID, with every bundled binary signed (Electron's and Python's) and the app notarized, to hand it to others;
+     - updates, through Electron's own updater rather than one of our own;
      - the app's setup choosing the bundled `carrel` when there is one, ahead of the agent's and the shell's.
 
 2.  **Offline on the tablet.** A copy of the library on the iPad or an Android phone (the PDFs are 7 GB now), so carrel works with no server: the library, the papers, their highlights and overviews. The chat is not available offline, and the page says so.

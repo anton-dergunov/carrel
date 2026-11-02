@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
+<meta name="color-scheme" content="light dark">
+<title>Carrel Settings</title>
+<style>
+  :root {
+    --bg: #ececec; --group: #ffffff; --line: #e2e2e2; --text: #1d1d1f; --muted: #6e6e73;
+    --field: #ffffff; --field-line: #c8c8cc; --accent: #0a84ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1e1e1e; --group: #2a2a2a; --line: #3a3a3a; --text: #f5f5f7; --muted: #98989d;
+      --field: #1c1c1e; --field-line: #48484a; --accent: #0a84ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 20px; background: var(--bg); color: var(--text); font: 13px/1.4 -apple-system, sans-serif; user-select: none; }
+  h2 { font-size: 13px; font-weight: 600; margin: 0 0 6px 4px; }
+  .group { background: var(--group); border-radius: 10px; padding: 2px 14px; margin-bottom: 8px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .row:last-child { border-bottom: none; }
+  .label { width: 130px; flex: none; }
+  .source { display: block; font-size: 11px; color: var(--muted); }
+  input[type=text] { flex: 1; min-width: 0; padding: 4px 7px; border: 1px solid var(--field-line); border-radius: 6px;
+                     background: var(--field); color: var(--text); font: inherit; text-overflow: ellipsis; }
+  input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  input.port { flex: none; width: 90px; }
+  button { font: inherit; padding: 3px 12px; border-radius: 6px; border: 1px solid var(--field-line); background: var(--field); color: var(--text); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: white; }
+  .status { flex: 1; color: var(--muted); }
+  .note { color: var(--muted); font-size: 12px; margin: 0 4px 18px; }
+  .toggle { justify-content: space-between; }
+  .toggle input { width: 16px; height: 16px; }
+  .toggle .hint { color: var(--muted); font-size: 11px; }
+</style>
+</head>
+<body>
+  <h2>Server</h2>
+  <div class="group">
+    <div class="row"><span class="label">Carrel command<span class="source" data-source="command"></span></span>
+      <input type="text" data-field="command" spellcheck="false"><button data-choose="command">Choose…</button></div>
+    <div class="row"><span class="label">Library<span class="source" data-source="library"></span></span>
+      <input type="text" data-field="library" spellcheck="false"><button data-choose="library" data-folders>Choose…</button></div>
+    <div class="row"><span class="label">Engine<span class="source" data-source="engine"></span></span>
+      <input type="text" data-field="engine" spellcheck="false" data-missing="carrel's default"><button data-choose="engine" data-folders>Choose…</button></div>
+    <div class="row"><span class="label">Port<span class="source" data-source="port"></span></span>
+      <input type="text" class="port" data-field="port" inputmode="numeric"></div>
+    <div class="row"><span class="status" id="status"></span>
+      <button id="log">Show Log</button><button id="apply" class="primary">Apply</button></div>
+  </div>
+  <p class="note">Carrel shows the carrel answering on the port, such as the login agent's. With none, it starts <code>carrel serve</code> with these settings and stops it on quit. Leave a field empty to use what is found.</p>
+
+  <h2>App</h2>
+  <div class="group">
+    <label class="row toggle"><span>Show in the menu bar</span><input type="checkbox" id="menu-bar"></label>
+    <label class="row toggle"><span>Open at login <span class="hint" id="login-hint"></span></span><input type="checkbox" id="login"></label>
+  </div>
+  <script src="settings-page.js"></script>
+</body>
+</html>

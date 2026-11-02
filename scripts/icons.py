@@ -1,19 +1,27 @@
-"""Draw carrel's icons, a page with a chat bubble beside it: the Home Screen's and the Mac app's.
+"""Draw carrel's icons, a page with a chat bubble beside it: the Home Screen's and the Mac app's;
+and the Mac app's menu bar icon, Lucide's `library` as app.html has it (ISC, its notice there).
 
-    uv run --with pillow python scripts/icons.py
+    uv run --with pillow --with cairosvg python scripts/icons.py
 
-Writes src/carrel/static/icons/ and macos/Resources/Assets.xcassets/AppIcon.appiconset/. Our own
-drawing, under the repository's licence.
+Writes src/carrel/static/icons/, macos/resources/icon.icns (with iconutil) and
+macos/resources/trayTemplate.png. The app icon is our own drawing, under the repository's licence.
 """
 
-import json
+import io
+import re
+import subprocess
+import tempfile
 from pathlib import Path
 
+import cairosvg
 from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "src" / "carrel" / "static" / "icons"
-MAC = ROOT / "macos" / "Resources" / "Assets.xcassets" / "AppIcon.appiconset"
+MAC = ROOT / "macos" / "resources"
+PAGE_HTML = ROOT / "src" / "carrel" / "pages" / "app.html"
+# The menu bar's icon, in points: macOS draws a template image in the bar's own colour.
+TRAY = 18
 # Apple's grid for a Mac icon: the body 824 of 1024 wide, with these rounded corners.
 MAC_BODY = 824
 MAC_RADIUS = 185
@@ -54,27 +62,36 @@ def mac(image: Image.Image) -> Image.Image:
 
 
 def write_mac(image: Image.Image) -> None:
+    """The Mac app's icon, every size of it in one .icns."""
     MAC.mkdir(parents=True, exist_ok=True)
     icon = mac(image)
-    entries = []
-    for points in (16, 32, 128, 256, 512):
-        for scale in (1, 2):
-            name = f"icon_{points}x{points}{'@2x' if scale == 2 else ''}.png"
-            icon.resize((points * scale,) * 2, Image.LANCZOS).save(MAC / name, optimize=True)
-            entries.append(
-                {
-                    "idiom": "mac",
-                    "size": f"{points}x{points}",
-                    "scale": f"{scale}x",
-                    "filename": name,
-                }
-            )
-    contents = {"images": entries, "info": {"author": "xcode", "version": 1}}
-    (MAC / "Contents.json").write_text(json.dumps(contents, indent=2) + "\n")
-    (MAC.parent / "Contents.json").write_text(
-        json.dumps({"info": contents["info"]}, indent=2) + "\n"
+    with tempfile.TemporaryDirectory() as folder:
+        iconset = Path(folder) / "icon.iconset"
+        iconset.mkdir()
+        for points in (16, 32, 128, 256, 512):
+            for scale in (1, 2):
+                name = f"icon_{points}x{points}{'@2x' if scale == 2 else ''}.png"
+                icon.resize((points * scale,) * 2, Image.LANCZOS).save(iconset / name)
+        subprocess.run(
+            ["iconutil", "-c", "icns", str(iconset), "-o", str(MAC / "icon.icns")], check=True
+        )
+    print(MAC / "icon.icns")
+
+
+def write_tray() -> None:
+    """Lucide's `library`, the library tab's icon, as the menu bar's template image."""
+    symbol = re.search(
+        r'<symbol id="i-library" viewBox="([^"]+)">(.*?)</symbol>', PAGE_HTML.read_text()
     )
-    print(MAC)
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{symbol[1]}" fill="none" stroke="black" '
+        f'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{symbol[2]}</svg>'
+    )
+    for scale, suffix in ((1, ""), (2, "@2x")):
+        size = TRAY * scale
+        png = cairosvg.svg2png(bytestring=svg.encode(), output_width=size, output_height=size)
+        Image.open(io.BytesIO(png)).save(MAC / f"trayTemplate{suffix}.png", optimize=True)
+        print(MAC / f"trayTemplate{suffix}.png")
 
 
 def main() -> None:
@@ -84,6 +101,7 @@ def main() -> None:
         image.resize((size, size), Image.LANCZOS).save(OUT / name, optimize=True)
         print(OUT / name)
     write_mac(image)
+    write_tray()
 
 
 if __name__ == "__main__":

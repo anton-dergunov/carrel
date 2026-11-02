@@ -1,0 +1,17 @@
+{
+  "name": "carrel-mac",
+  "productName": "Carrel",
+  "version": "0.1.0",
+  "description": "Carrel in a window of its own, on Chromium",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "electron": "44.9.0"
+  }
+}

@@ -2,7 +2,7 @@
 
 **Question.** After several rounds of tuning PDF.js ([architecture.md](../../docs/architecture.md), Speed of the PDF), a fast flick still shows grey and blurred pages, and pages blink as they come in. The grey there was WebKit not painting the large canvases PDF.js draws on the main thread. Would a renderer that draws tiles on other threads do better, on the Mac and on the iPad, and by how much?
 
-**Status.** The Mac measured, 2 Nov 2026 (42 spins: 7 renderers, 2 papers, 3 rounds). The iPad not yet: its recordings are by hand.
+**Status.** Done, 2 Nov 2026: the Mac (42 spins: 7 renderers, 2 papers, 3 rounds) and the iPad (8 recordings flicked by hand: 3 web viewers and Files, twice each), with the reader's own impressions. The renderer was not what made carrel slow; what in carrel does is the next question.
 
 ## The renderers
 
@@ -97,16 +97,24 @@ The same wheel events carry a `PDFView` less far than a web page: in the first s
 
 ### The iPad
 
-Not yet measured.
+The iPad Air 11" in portrait (1640 × 2360 px), Safari, the long paper from page 78, three hard flicks down and up by hand, recorded with Control Centre, twice per viewer in alternation. Files is iPadOS's own viewer, PDFKit; it showed its thumbnails beside the page, so its pages were narrower than the web viewers' (1340 px against 1640). The share of the time the paper moved, both recordings together; settled is over the stops between flicks (the first stop, before any flick, and the last, as the recording was stopped, left out).
+
+| Viewer | Blank | Blurred | Sharp | Settled, median (75th percentile) |
+|---|---|---|---|---|
+| Files (PDFKit) | 22% | 7% | 70% | 117 ms (417) |
+| PDF.js | 35% | 7% | 58% | 133 ms (233) |
+| EmbedPDF | 32% | 41% | 27% | 500 ms (750) |
+| MuPDF.js | 22% | 58% | 21% | 150 ms (383) |
+
+**From the inside** ([runs.jsonl](runs.jsonl)): on the long paper bare PDF.js kept 52–58 frames a second, with a frame now and then 130–270 ms late as it drew a page on the main thread; MuPDF.js, drawing in workers, 59 frames a second with none over 53 ms; EmbedPDF 54–56, none over 108.
+
+**What the reader saw**, which is what decides: Files was the best, and bare PDF.js not far behind; next to PDF.js in carrel, bare PDF.js flies, on the iPad and still more next to carrel's Mac app. EmbedPDF and MuPDF.js were somewhat slower than bare PDF.js, but still faster than carrel. Carrel is slowest and laggiest of all in the Mac app, slower there than on the iPad. The same PDF.js, the same version, in vscode-pdf-viewer (Chromium) flies too.
 
 ## Conclusions
 
-So far, from the Mac alone.
+- **The renderer is not what makes carrel slow.** Bare PDF.js 6.3.289 in WebKit, the version carrel ships, is close to Apple's own viewer on the iPad (58% of a flick sharp against 70%, settled in the same ~120 ms) and far ahead of carrel by the reader's eye; on the Mac it settled at once, with nothing grey. Whatever carrel adds around PDF.js costs more than any change of renderer would gain. On the Mac that is measured too: in the same `WKWebView`, carrel showed grey for 0.4 s a spin and bare PDF.js none.
+- **EmbedPDF and MuPDF.js are dropped.** In WebKit both trade white pages for blurred ones, and are sharp for a third or less of a flick; EmbedPDF also takes half a second to settle. Neither is worth a viewer's rewrite.
+- **PDFKit is the best, and for the Mac app only.** Natively it is the best on both devices, but an app on the iPad needs installing from Xcode: with a free Apple ID it stops opening after 7 days and must be installed again; to last a year, the Apple Developer Program ($99 a year), App Store or not. Carrel stays a web page on the iPad. In the Mac app it is possible (signed for this Mac, it needs nothing), at the cost of every PDF feature written twice.
+- **Chromium draws PDF.js with fewer white pages** (a seventh of WebKit's on the Mac), which is why vscode-pdf-viewer looks as it does; but bare PDF.js in WebKit already flies by the reader's eye, so it is not the cause of carrel's slowness either.
 
-- **WebKit, not PDF.js, is most of the blank.** The same PDF.js page shows a seventh of the blank pages in Chrome that it shows in WebKit on the long paper (262 against 1761 ms), with little blur, and settles as fast. On the Mac, Chromium (Electron) would do more than any renderer in WebKit; it does nothing for the iPad.
-- **EmbedPDF is no better in WebKit.** Fewer blank pages than bare PDF.js, but more blur than anything else, and the slowest to settle (a quarter to a whole second after a stop). Drawing its tiles as `<img>`s from blob URLs costs WebKit as much as PDF.js's canvases. Not worth pursuing.
-- **Drawing off the main thread in WebKit trades blank for blur.** MuPDF.js's workers keep the pages from ever showing white, as PDFium in Chrome and PDFKit do, but each page arrives first at a quarter of its resolution and is sharp only 170–220 ms after the paper stops (its 120 ms wait for the scroll to settle, then the bands). That is about what carrel's previews already give, with a sharper placeholder; not the step a change of renderer would need to be.
-- **PDFKit is the best on the Mac**: nothing blank on the figures paper, almost no blur, sharp as the paper stops; with the caveat that it was carried less far.
-- **Carrel shows grey that bare PDF.js does not** (0.4 s a spin, in the same web view), so something carrel adds around PDF.js (the scroll gate, the previews, the snapshots, or its layout) leaves the pane unpainted. That is worth finding whatever renderer is chosen.
-
-The iPad decides between PDFKit and staying with PDF.js: it is where the reader reads, and there Chromium is not an option.
+**Next.** Find what in carrel's reading makes PDF.js slow, by taking carrel's additions away one at a time and measuring each with this bench (the Mac's spin, in the same web view, and the reader's eye on the iPad), rather than by guessing at a cause. Before any renderer is reconsidered.

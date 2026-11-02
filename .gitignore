@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .ruff_cache/
+.DS_Store
+
 /shots/
 # The browser libraries: fetched at pinned versions by scripts/vendor.sh
 /src/carrel/static/vendor/

@@ -297,12 +297,14 @@ def video(args, path):
         if moving[i]:
             shown_moving[kind] = shown_moving.get(kind, 0) + lasted
     total = sum(shown_moving.values()) or 1
+    settled = settling(times, frames)
     print(
         f"{Path(path).name}: {n} frames over {(end[-1] - end[0]) / 1000:.1f} s, moving {total / 1000:.1f} s; while moving: "
         + ", ".join(
             f"{kind} {shown_moving.get(kind, 0):.0f} ms ({100 * shown_moving.get(kind, 0) / total:.0f}%)"
             for kind in ("grey", "blank", "blurred", "ok")
         )
+        + f"; settled after each stop: {settled} ms"
     )
     keep(
         args,
@@ -310,6 +312,7 @@ def video(args, path):
             "what": "video",
             "file": Path(path).name,
             "moving": round(total),
+            "settled": settled,
             **{k: round(v) for k, v in shown_moving.items()},
         },
     )

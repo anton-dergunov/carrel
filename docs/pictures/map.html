@@ -1,33 +1,29 @@
 <!doctype html>
 <!--
-The meaning map, on the Mac app with the chat hidden. Right: the map lit by a meaning search,
-"how far an LLM judge agrees with human raters", and zoomed to the 60 papers it found, which are
-named. Left: the whole map, its regions named by a model. The map is the engine's layout of
-each paper's embedding (map_layout.py); the measured fact is the engine's meaning-search
-experiment (agentic-paper-library, experiments/meaning-search).
+The meaning map, on the Mac app, the map alone. Left: the whole library a little nearer than whole,
+its regions named by a model. Right: near the LLM-judge papers, lit by a meaning search, "how far
+an LLM judge agrees with human raters", with one paper's peek open. The fact is the engine's
+meaning-search experiment (agentic-paper-library, experiments/meaning-search).
 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <title>map</title>
 <link rel="stylesheet" href="style.css">
+<style>
+.main { justify-content: center; }
+</style>
 </head>
 <body>
 <div class="frame">
   <div class="head">
     <span class="kicker">The map</span>
     <h1>Papers laid out by what they are about</h1>
-    <span class="sub">Map places every paper by its meaning, so related papers sit together whatever folder they are in, and names the regions. A search by meaning lights up the papers it finds.</span>
+    <span class="sub">Every paper placed by its meaning, its regions named. A search in your own words lights up the papers nearest it; Qwen3-Embedding-0.6B, the encoder an experiment on this library chose, embeds them.</span>
   </div>
   <div class="main">
-    <div class="col" style="width: 236px">
-      <div class="mac"><div class="bar"><i></i><i></i><i></i><span>papers</span></div><img src="captures/map-whole.png" style="width: 236px; height: 148px" alt=""></div>
-      <div class="points">
-        <div><b>Describe what you are looking for</b>, in your own words; the papers nearest it light up. Tap one for a peek and its five nearest.</div>
-      </div>
-      <div class="fact"><span class="label">How it is drawn</span>Each paper's title, summary and abstract are embedded with <b>Qwen3-Embedding-0.6B</b>, the encoder an experiment on this library chose; the map is laid out from those vectors, and a model names its regions.</div>
-    </div>
-    <div class="mac"><div class="bar"><i></i><i></i><i></i><span>papers</span></div><img src="captures/map-search.png" style="width: 630px; height: 394px" alt=""></div>
+    <div class="card"><img data-capture="map-whole" src="captures/map-whole.png" style="width: 444px; height: 393px" alt=""></div>
+    <div class="card"><img data-capture="map-search" src="captures/map-search.png" style="width: 444px; height: 393px" alt=""></div>
   </div>
 </div>
 </body>

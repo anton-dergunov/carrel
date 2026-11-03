@@ -1,11 +1,11 @@
 <!doctype html>
 <!--
-  The hero, at the top of the README and first on the blog's card. An iPad in landscape: the
-  PagedAttention paper with the chat beside it, after a tap on the answer's citation "p. 3,
-  Eq. 3" turned the paper to page 3 and marked the equation. An e-ink reader beside it: the Zep
-  paper at Table 2, which the answer below it cites. Both chats are the reader's own, asked in
-  the library before these pictures were made. No background, so it sits on GitHub's light and
-  dark pages alike.
+  The hero, at the top of the README and first on the blog's card. A small tablet held sideways:
+  the PagedAttention paper with the chat beside it, after a tap on the answer's citation "p. 3,
+  Eq. 3" turned the paper to page 3 and marked the equation (the arrow and the hand show the tap).
+  An e-ink tablet beside it: the Zep paper at Table 2, which the answer below it cites. Both chats
+  are the reader's own, asked in the library before these pictures were made. No background, so
+  it sits on GitHub's light and dark pages alike.
 -->
 <html lang="en">
 <head>
@@ -14,13 +14,18 @@
 <link rel="stylesheet" href="style.css">
 <style>
   html, body { background: transparent; }
-  body { width: 1200px; height: 750px; padding: 0; display: flex; align-items: center; justify-content: center; gap: 30px; }
-  .ipad { margin-top: -40px; }
-  .eink { margin-top: 70px; }
+  body { width: 1060px; height: 560px; padding: 0; display: flex; align-items: center; justify-content: center; gap: 26px; }
 </style>
 </head>
 <body>
-  <div class="ipad"><img src="captures/reading-ipad.png" style="width: 740px; height: 514px" alt=""></div>
-  <div class="eink"><img src="captures/reading-eink.png" style="width: 376px; height: 541px" alt=""></div>
+  <div class="tablet"><img data-capture="reading-ipad" src="captures/reading-ipad.png" style="width: 640px; height: 447px" alt=""></div>
+  <div class="eink"><img data-capture="reading-eink" src="captures/reading-eink.png" style="width: 328px; height: 470px" alt=""></div>
+<script src="captures/marks.js"></script>
+<script src="arrows.js"></script>
+<script>
+  window.addEventListener('load', () => {
+    arrow('reading-ipad:link', 'reading-ipad:mark', { from: 'left', to: 'right', bend: -0.25, start: 'tap' });
+  });
+</script>
 </body>
 </html>

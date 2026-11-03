@@ -1,9 +1,9 @@
 <!doctype html>
 <!--
-Highlights. The iPad in landscape, on LongMemEval: the reader's own highlight on page 1, and the
-question asked about it with Ask, which carries the passage (the chat's id is in chats.json);
-the paper's sheet is open over the page, its contents listing the highlight among the headings.
-The crop on the right is the panel a tap on the highlight opens, from highlights-panel.png.
+Highlights. A small tablet held sideways, on LongMemEval: the reader's own highlight on page 1,
+tapped, with its panel open (six colours, remove, Ask); beside it, the question asked about it,
+which carries the passage (the chat's id is in chats.json). The arrow joins the highlight to the
+passage the question carries.
 -->
 <html lang="en">
 <head>
@@ -16,19 +16,23 @@ The crop on the right is the panel a tap on the highlight opens, from highlights
   <div class="head">
     <span class="kicker">Highlights</span>
     <h1>Highlight a passage, then ask about it</h1>
-    <span class="sub">Highlights are written into the PDF itself, so any PDF app shows them. Tap one to change its colour, remove it, or ask about it: the passage goes with your question.</span>
+    <span class="sub">Highlights are written into the PDF itself, so any PDF app shows them. Tap one to change its colour, remove it, or ask about it.</span>
   </div>
   <div class="main">
-    <div class="ipad"><img src="captures/highlights-contents.png" style="width: 580px; height: 403px" alt=""></div>
-    <div class="col grow">
-      <div class="crop" style="width: 270px; height: 118px; --w: 2360; --x: 330; --y: 600; --s: .346"><img src="captures/highlights-panel.png" alt=""></div>
-      <div class="points">
-        <div><b>Six colours, saved at once.</b> The pen in the bar turns a selection into a highlight; there is nothing to save.</div>
-        <div><b>Ask about it.</b> The question carries the passage and its page, and the answer cites the pages it draws on.</div>
-        <div><b>Found again.</b> The paper's contents list your highlights among its headings, each a tap away.</div>
-      </div>
+    <div class="tablet"><img data-capture="highlights" src="captures/highlights.png" style="width: 640px; height: 447px" alt=""></div>
+    <div class="col grow points">
+      <div><b>Six colours, saved at once.</b> The pen in the bar turns a selection into a highlight; there is nothing to save.</div>
+      <div><b>Ask about it.</b> The passage and its page go with your question, and the answer cites the pages it draws on.</div>
+      <div><b>Found again.</b> The paper's contents list your highlights among its headings.</div>
     </div>
   </div>
 </div>
+<script src="captures/marks.js"></script>
+<script src="arrows.js"></script>
+<script>
+  window.addEventListener('load', () => {
+    arrow('highlights:highlight', 'highlights:quote', { from: 'right', to: 'left', bend: -0.2 });
+  });
+</script>
 </body>
 </html>

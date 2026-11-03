@@ -1,9 +1,9 @@
 <!doctype html>
 <!--
-A paper's sheet and its overview, on JudgeBench, on the iPad in portrait. Left: the sheet the page
-badge opens, opened out, every section unfolded: what the library knows of the paper, the
-agent's reading of it, its digest. Right: the paper's overview note, written earlier by the
-library's /overview, shown under the page without asking a model.
+A paper's sheet and its overview, on JudgeBench, on a small tablet. Left: the sheet the page badge
+opens, opened out: what the library knows of the paper, the agent's reading of it. Right: the
+paper's overview note, written earlier by the library's /overview, shown under the page without
+asking a model.
 -->
 <html lang="en">
 <head>
@@ -16,16 +16,16 @@ library's /overview, shown under the page without asking a model.
   <div class="head">
     <span class="kicker">The paper</span>
     <h1>Everything the library knows of a paper</h1>
-    <span class="sub">Tap the page number for the paper's sheet: its summary, type and topic, the agent's notes, similar papers and contents. The overview, a three-minute pre-read, opens under the page.</span>
+    <span class="sub">Tap the page number for the paper's sheet. The overview, a three-minute pre-read, opens under the page.</span>
   </div>
   <div class="main">
-    <div class="ipad"><img src="captures/paper-info.png" style="width: 281px; height: 404px" alt=""></div>
-    <div class="ipad"><img src="captures/paper-overview.png" style="width: 281px; height: 404px" alt=""></div>
+    <div class="tablet"><img data-capture="paper-info" src="captures/paper-info.png" style="width: 300px; height: 430px" alt=""></div>
+    <div class="tablet"><img data-capture="paper-overview" src="captures/paper-overview.png" style="width: 300px; height: 430px" alt=""></div>
     <div class="col grow points">
       <div><b>Star it, tag it.</b> Your stars and tags are yours alone: no agent writes them.</div>
-      <div><b>The agent's reading.</b> What the paper argues, its evidence and its limits, kept as the library's notes, so the next chat starts from them.</div>
-      <div><b>The overview first.</b> <code>/overview</code> writes a short note to read before the paper: the setting, the key idea, why it works, and questions to ask of it. Once written, it opens with no model call.</div>
-      <div><b>Similar papers</b> come from meaning search, whatever folder they are in.</div>
+      <div><b>The agent's reading.</b> What the paper argues, its evidence and its limits, kept as the library's notes.</div>
+      <div><b>The overview first</b>: the setting, the key idea, why it works, and questions to ask of the paper.</div>
+      <div><b>Similar papers</b>, by meaning, whatever folder they are in.</div>
     </div>
   </div>
 </div>

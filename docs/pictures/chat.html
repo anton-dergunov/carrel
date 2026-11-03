@@ -1,31 +1,30 @@
 <!doctype html>
 <!--
-The chat, on the iPad with the chat on a tab of its own. Left: the chats in this library, carrel's
-and those from VS Code or the terminal, the most recent first (faded out where older test chats
-follow). Right: "/" typed, listing the library's skills and Claude Code's commands.
+The chat. Left: the top of the list of chats in the library, carrel's and those from VS Code or the
+terminal, the latest first. Right, a small tablet with the chat on a tab of its own: "/" typed,
+listing the library's skills and Claude Code's commands.
 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <title>chat</title>
 <link rel="stylesheet" href="style.css">
+<style>
+  .main { justify-content: center; gap: 28px; }
+</style>
 </head>
 <body>
 <div class="frame">
   <div class="head">
     <span class="kicker">The chat</span>
     <h1>Claude Code, beside the paper</h1>
-    <span class="sub">The chat is a Claude Code session on your laptop, in the library: the same skills, tools and notes as in VS Code or the terminal. The tablet only shows it.</span>
+    <span class="sub">The chat is a Claude Code session on your laptop, in the library, so it carries on through a reload or a sleeping tablet. Go back to any chat in the library, from VS Code or the terminal too.</span>
   </div>
   <div class="main">
-    <div class="ipad fade" style="--fade: 230px"><img src="captures/chat-earlier.png" style="width: 281px; height: 404px" alt=""></div>
-    <div class="ipad"><img src="captures/chat-commands.png" style="width: 281px; height: 404px" alt=""></div>
-    <div class="col grow points">
-      <div><b>It carries on</b> through a reload or a sleeping tablet. Go back to any earlier chat in the library, including the ones from VS Code or the terminal.</div>
-      <div><b>Slash commands</b>: <code>/overview</code>, <code>/add-paper</code>, <code>/literature-review</code> and the rest of the library's skills.</div>
-      <div><b>A line under the chat</b> says how long the prompt cache has left, and your usage limits.</div>
-      <div><b>You decide.</b> Anything beyond reading is put to you as Allow or Deny.</div>
+    <div class="col" style="width: 470px">
+      <div class="card fade"><img src="captures/chat-earlier.png" style="width: 470px; height: 407px" alt=""></div>
     </div>
+    <div class="tablet"><img data-capture="chat-commands" src="captures/chat-commands.png" style="width: 300px; height: 430px" alt=""></div>
   </div>
 </div>
 </body>

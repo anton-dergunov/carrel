@@ -16,13 +16,15 @@ body { width: 960px; height: 600px; overflow: hidden; padding: 14px; font: 12.5p
   height: 572px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface);
   display: flex; flex-direction: column; padding: 16px 20px 16px;
 }
-.head { flex: none; margin-bottom: 14px; }
+.head { flex: none; margin-bottom: 12px; }
 .kicker { display: block; margin-bottom: 3px; font: 600 10px/1.2 var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 .head h1 { font: 700 25px/1.2 var(--reading); letter-spacing: -.005em; }
 .head .sub { display: block; margin-top: 4px; font-size: 13.5px; line-height: 1.42; color: var(--muted); max-width: 880px; }
 .main { flex: 1 1 auto; min-height: 0; display: flex; gap: 18px; align-items: flex-start; }
 .main.center { justify-content: center; }
 .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+/* A column given a width keeps it. */
+.col[style*="width"] { flex: none; }
 .grow { flex: 1 1 auto; }
 
 /* What a picture says beside its captures: a few points, each with a bold lead. */
@@ -34,9 +36,9 @@ body { width: 960px; height: 600px; overflow: hidden; padding: 14px; font: 12.5p
 .caption { margin-top: 6px; font-size: 11.5px; color: var(--muted); text-align: center; }
 .caption b { color: var(--text); font-weight: 600; }
 
-/* An iPad, drawn as far as its bezel. The capture's width and height are set where it is used. */
-.ipad { flex: none; background: #1d1d1f; padding: 8px; border-radius: 17px; box-shadow: inset 0 0 0 1.5px #48484a, 0 12px 26px -12px rgba(30, 26, 15, .45); }
-.ipad img { display: block; border-radius: 8px; }
+/* A tablet, drawn as far as its bezel. The capture's width and height are set where it is used. */
+.tablet { flex: none; background: #1d1d1f; padding: 8px; border-radius: 17px; box-shadow: inset 0 0 0 1.5px #48484a, 0 12px 26px -12px rgba(30, 26, 15, .45); }
+.tablet img { display: block; border-radius: 8px; }
 /* An e-ink reader: a lighter, plainer bezel. */
 .eink { flex: none; background: #3a3a38; padding: 12px; border-radius: 14px; box-shadow: inset 0 0 0 1.5px #555552, 0 12px 26px -12px rgba(30, 26, 15, .45); }
 .eink img { display: block; border-radius: 2px; }
@@ -56,3 +58,11 @@ body { width: 960px; height: 600px; overflow: hidden; padding: 14px; font: 12.5p
 /* A capture that goes on below what is shown, faded out as if scrolled. */
 .fade { position: relative; }
 .fade::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 8px; height: var(--fade, 90px); border-radius: 0 0 8px 8px; background: linear-gradient(rgba(253, 246, 227, 0), #fdf6e3 85%); }
+
+/* A part of a screen shown on its own, without a device around it. */
+.card { flex: none; position: relative; overflow: hidden; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); box-shadow: 0 8px 20px -14px rgba(30, 26, 15, .45); }
+.card img { display: block; }
+.card.fade::after { left: 0; right: 0; bottom: 0; border-radius: 0; background: linear-gradient(rgba(255, 253, 246, 0), #fffdf6 85%); }
+
+/* The arrows arrows.js draws over a picture. */
+svg.arrows { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }

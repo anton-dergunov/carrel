@@ -3,6 +3,8 @@
   The hero, at the top of the README and first on the blog's card. A small tablet held sideways:
   the PagedAttention paper with the chat beside it, after a tap on the answer's citation "p. 3,
   Eq. 3" turned the paper to page 3 and marked the equation (the arrow and the hand show the tap).
+  The answer's opening, its heading, its intuition and its first equation are hidden, so that the
+  question shows above the citation.
   An e-ink tablet beside it: the Zep paper at Table 2, which the answer below it cites. Both chats
   are the reader's own, asked in the library before these pictures were made. No background, so
   it sits on GitHub's light and dark pages alike.
@@ -24,7 +26,7 @@
 <script src="arrows.js"></script>
 <script>
   window.addEventListener('load', () => {
-    arrow('reading-ipad:link', 'reading-ipad:mark', { from: 'left', to: 'right', bend: -0.25, start: 'tap' });
+    arrow('reading-ipad:link', 'reading-ipad:mark', { from: 'top', to: 'right', bend: 0.22, start: 'tap' });
   });
 </script>
 </body>

@@ -4,6 +4,7 @@
 // of the picture; a place is "NAME:KEY".
 //
 //   arrow('reading-ipad:link', 'reading-ipad:mark', { from: 'left', to: 'right', bend: 0.3, start: 'tap' })
+//   touch('review:link', 'tap')
 //
 // `from` and `to` pick a side of the box (left, right, top, bottom; the centre by default), `bend`
 // curves the arrow (its sign picks the side), `start` draws a finger's tap or a pointer's click.
@@ -36,10 +37,9 @@ function ensureLayer() {
   if (layer) return;
   layer = svg('svg', { class: 'arrows', width: document.body.scrollWidth, height: document.body.scrollHeight }, document.body);
   const defs = svg('defs', {});
-  for (const [id, colour, size] of [['head-halo', '#ffffff', 7], ['head', INK, 5]]) {
-    const marker = svg('marker', { id, viewBox: '0 0 10 10', refX: 6, refY: 5, markerWidth: size, markerHeight: size, orient: 'auto-start-reverse', markerUnits: 'strokeWidth' }, defs);
-    svg('path', { d: 'M0,0 L10,5 L0,10 z', fill: colour }, marker);
-  }
+  // The head's tip is the end of the line, so the arrow ends where it points.
+  const marker = svg('marker', { id: 'head', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 4.2, markerHeight: 4.2, orient: 'auto', markerUnits: 'strokeWidth' }, defs);
+  svg('path', { d: 'M0,0.8 L10,5 L0,9.2 z', fill: INK }, marker);
 }
 
 /** Where a place is on the picture, in the page's px: a side of its box, or its centre. */
@@ -70,8 +70,7 @@ function arrow(fromPlace, toPlace, { from, to, bend = 0.25, start } = {}) {
   const dx = b.x - a.x, dy = b.y - a.y;
   const c = { x: (a.x + b.x) / 2 - dy * bend, y: (a.y + b.y) / 2 + dx * bend };
   const d = `M${a.x},${a.y} Q${c.x},${c.y} ${b.x},${b.y}`;
-  svg('path', { d, fill: 'none', stroke: '#ffffff', 'stroke-width': 7, 'stroke-linecap': 'round', 'marker-end': 'url(#head-halo)' });
-  svg('path', { d, fill: 'none', stroke: INK, 'stroke-width': 3.2, 'stroke-linecap': 'round', 'marker-end': 'url(#head)' });
+  svg('path', { d, fill: 'none', stroke: INK, 'stroke-width': 2.6, 'stroke-linecap': 'round', 'marker-end': 'url(#head)' });
   // The tap or the click is drawn just under the place it starts from, so the link stays readable.
   if (start === 'tap') tap(at(fromPlace, 'bottom'));
   if (start === 'click') click(at(fromPlace, 'bottom'));
@@ -94,4 +93,11 @@ function click({ x, y }) {
   svg('path', { d: POINTER, fill: '#1d1d1f', stroke: '#ffffff', 'stroke-width': 1.6, 'stroke-linejoin': 'round' }, pointer);
 }
 
+/** A tap or a click on a place, with no arrow. */
+function touch(place, kind = 'tap') {
+  ensureLayer();
+  (kind === 'click' ? click : tap)(at(place, 'bottom'));
+}
+
 window.arrow = arrow;
+window.touch = touch;

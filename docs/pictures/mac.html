@@ -1,7 +1,9 @@
 <!doctype html>
 <!--
 The Mac app: the Prediction-Powered Inference paper with its chat beside it, after a click on the
-answer's citation "p. 1, Eq. 1" marked the passage (the arrow and the pointer show the click). The
+answer's citation "p. 1, Eq. 1" marked the equation (the arrow and the pointer show the click). The
+link's own mark was on the sentence that introduces the equation; the script points it at the
+equation itself (PPI_EQUATION in scripts/pictures.py). The
 window's frame is drawn; inside it is the page the app shows, captured in Chromium, the app's own
 engine.
 -->
@@ -19,18 +21,14 @@ engine.
     <span class="sub">The Mac app shows the carrel already running, or starts one itself; it can live in the menu bar and open at login.</span>
   </div>
   <div class="main">
-    <div class="mac"><div class="bar"><i></i><i></i><i></i><span>Statistically Reliable LLM-Based Ranking Evaluation via Prediction-Powered Inference</span></div><img data-capture="mac" src="captures/mac.png" style="width: 660px; height: 411px" alt=""></div>
-    <div class="col grow points">
-      <div><b>Keys</b>: ⌘F find, ⌘= zoom, ⌘L ask, ⌘W close the tab.</div>
-      <div><b>Fast paging.</b> Chromium draws the pages, so a paper flicked through fast stays painted.</div>
-    </div>
+    <div class="mac"><div class="bar"><i></i><i></i><i></i><span>Statistically Reliable LLM-Based Ranking Evaluation via Prediction-Powered Inference</span></div><img data-capture="mac" src="captures/mac.png" style="width: 668px; height: 416px" alt=""></div>
   </div>
 </div>
 <script src="captures/marks.js"></script>
 <script src="arrows.js"></script>
 <script>
   window.addEventListener('load', () => {
-    arrow('mac:link', 'mac:mark', { from: 'left', to: 'right', bend: 0.2, start: 'click' });
+    arrow('mac:link', 'mac:mark', { from: 'top', to: 'right', bend: 0.22, start: 'click' });
   });
 </script>
 </body>

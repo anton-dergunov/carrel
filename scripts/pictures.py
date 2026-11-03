@@ -41,17 +41,19 @@ TITLES = CAPTURES / "titles.json"
 MARKS = CAPTURES / "marks.json"
 
 # The devices: a small tablet, upright and sideways, and the Mac app's window, each smaller than
-# the real thing, so that a picture shows it nearer the size it was drawn at. The hero and the
-# pictures that show a citation or a highlight followed go further still: a smaller window, and
-# the text sizes raised (the interface's, the library's and the chat's, in px). The rest keep
-# carrel's own text sizes.
+# the real thing, so that a picture shows it nearer the size it was drawn at. The pictures that
+# show a citation or a highlight followed raise the text sizes a little too (the interface's, the
+# library's and the chat's, in px); the rest keep carrel's own, 15, 17 and 15.
 TABLET = (600, 860)
 TABLET_SIDEWAYS = (860, 600)
 MAC = (1040, 650)
 MAC_NEAR = (900, 560)
-TABLET_NEAR = "22,24,26"
-SIDEWAYS_NEAR = "20,22,22"
-MAC_NEAR_SIZES = "20,22,20"
+SIDEWAYS_NEAR = "16,17,16"
+HIGHLIGHT_SIZES = "18,20,19"
+MAC_NEAR_SIZES = "20,22,15"
+# The PPI paper's Equation 1 on its first page, in PDF points (x0, y0, x1, y1): the place the Mac
+# picture's citation marks. The answer's own link marks the sentence that introduces it.
+PPI_EQUATION = "313,481,526,533"
 
 # The papers and the earlier chats the pictures show.
 PAGED = "ml-systems/inference-and-serving/Efficient Memory Management for Large Language Model Serving with PagedAttention.pdf"
@@ -119,6 +121,7 @@ class Shooter:
         chat: str | None = None,
         library: str | None = None,
         camera: dict | None = None,
+        dark_pages: bool = False,
         model: str = "opus",
     ):
         mac = device == "mac"
@@ -132,7 +135,7 @@ class Shooter:
         page = context.new_page()
         page.on("pageerror", lambda e: print(f"  page error: {e}"))
         page.add_init_script(f"localStorage.setItem('carrel.model', {json.dumps(model)});")
-        page.add_init_script(look_script(theme, False, sizes))
+        page.add_init_script(look_script(theme, dark_pages, sizes))
         if layout:
             page.add_init_script(layout_script(layout, share))
         if chat:
@@ -263,8 +266,31 @@ def scroll_paper(page, selector: str | None, left: float = 16, top: float | None
 # The scenes: each takes the captures of one picture.
 
 
+def hide(page, selectors: list[str]) -> None:
+    """Hides parts of the page, to make room in a picture: what is hidden is said in the
+    picture's comment."""
+    page.add_style_tag(content=", ".join(selectors) + " { display: none !important; }")
+    page.wait_for_timeout(300)
+
+
+def hide_text(page, scope: str, starts: list[str]) -> None:
+    """Hides the paragraphs, headings and list items in the last `scope` whose text starts with
+    one of `starts`, to make room in a picture, as `hide` does."""
+    page.locator(scope).last.evaluate(
+        """(root, starts) => {
+          for (const node of root.querySelectorAll('p, h1, h2, h3, li'))
+            if (starts.some((start) => node.textContent.trim().startsWith(start)))
+              node.style.display = 'none';
+        }""",
+        starts,
+    )
+    page.wait_for_timeout(300)
+
+
 def reading(s: Shooter) -> None:
-    """The hero: a citation followed on a tablet held sideways, and the same reading on e-ink."""
+    """The hero: a citation followed on a tablet held sideways, and the same reading on e-ink.
+    The answer's opening, its heading, its intuition and its first equation are hidden, so that
+    its question shows above the citation."""
     page = s.paper(
         "ipad",
         PAGED,
@@ -278,20 +304,23 @@ def reading(s: Shooter) -> None:
     link = '.answer a[href*="page=3&rect=90,360"]'
     page.locator(link).first.click()
     page.wait_for_timeout(2200)  # the page turns and the mark's ring settles
-    scroll_paper(page, ".cite-mark > *", left=46, top=120)
-    scroll_chat(page, link, 0.55, 0)
+    scroll_paper(page, ".cite-mark > *", left=96, top=120)
+    hide_text(
+        page,
+        ".answer:not(.aside, .digest)",
+        ["The best source", "How it works", "Intuition.", "Each token gets"],
+    )
+    scroll_chat(page, ".question", 0.0, 0)
     print("  at:", page.inner_text("#page-badge"))
     shot(page, "reading-ipad", {"link": box(page, link), "mark": box(page, ".cite-mark > *")})
     done(page)
 
-    page = s.paper(
-        "ipad", ZEP, sizes=TABLET_NEAR, theme="eink", layout="bottom", share=0.46, chat=ZEP_CHAT
-    )
+    page = s.paper("ipad", ZEP, theme="eink", layout="bottom", share=0.46, chat=ZEP_CHAT)
     zoom_paper(page, 745)
     page.locator('.answer a[href*="table.2"]').first.click()
     page.wait_for_timeout(1500)
     scroll_paper(page, None)
-    scroll_chat(page, ".answer table", 0.12, 0)
+    scroll_chat(page, ".question", 0.0, 0)
     shot(page, "reading-eink")
     done(page)
 
@@ -303,7 +332,7 @@ def highlights(s: Shooter) -> None:
         "ipad",
         LONGMEMEVAL,
         size=TABLET_SIDEWAYS,
-        sizes=SIDEWAYS_NEAR,
+        sizes=HIGHLIGHT_SIZES,
         layout="right",
         share=0.46,
         chat=chat,
@@ -341,8 +370,9 @@ def paper(s: Shooter) -> None:
         page.click("#sheet-size")
         page.wait_for_timeout(400)
     shot(page, "paper-info")
-    page.keyboard.press("Escape")
-    page.wait_for_timeout(300)
+    done(page)
+
+    page = s.paper("ipad", JUDGEBENCH, layout="bottom", share=0.64)
     page.locator("#overview").click()
     page.wait_for_selector("#overview-sheet:not([hidden])")
     page.wait_for_timeout(800)
@@ -351,12 +381,14 @@ def paper(s: Shooter) -> None:
 
 
 def library(s: Shooter) -> None:
-    """Desk on the tablet, after two papers were opened; Areas' map of the library on the Mac."""
+    """Desk on the tablet, after two papers were opened, with its tags and all but four papers to
+    continue hidden; Areas' map of the library on the Mac."""
     page = s.paper("ipad", PAGED, layout="hidden", library=library_script("desk"))
     page.goto(read_url(s.server, ZEP))
     page.wait_for_selector(".pdfViewer .page canvas", timeout=30_000)
     page.click("#tab-papers")
     page.wait_for_timeout(1200)
+    hide(page, ["#desk-view .desk-section.tags", "#desk-view .continue > :nth-child(n + 5)"])
     shot(page, "desk")
     done(page)
 
@@ -469,7 +501,7 @@ def review(s: Shooter) -> None:
     link.click()
     page.wait_for_selector("#peek:not([hidden])")
     page.wait_for_timeout(500)
-    shot(page, "review", {"link": link.bounding_box(), "peek": box(page, "#peek")})
+    shot(page, "review", {"link": link.bounding_box()})
     done(page)
 
 
@@ -499,7 +531,15 @@ def chat(s: Shooter) -> None:
 def looks(s: Shooter) -> None:
     """One paper and its chat in three looks."""
     for theme in ("carrel-light", "carrel-dark", "eink"):
-        page = s.paper("ipad", ZEP, theme=theme, layout="bottom", share=0.46, chat=ZEP_CHAT)
+        page = s.paper(
+            "ipad",
+            ZEP,
+            theme=theme,
+            dark_pages=theme == "carrel-dark",
+            layout="bottom",
+            share=0.46,
+            chat=ZEP_CHAT,
+        )
         zoom_paper(page, 745)
         page.locator('.answer a[href*="table.2"]').first.click()
         page.wait_for_timeout(1500)
@@ -510,16 +550,21 @@ def looks(s: Shooter) -> None:
 
 
 def mac(s: Shooter) -> None:
-    """The Mac app's window: a paper and its chat side by side, an equation cited and marked."""
+    """The Mac app's window: a paper and its chat side by side, an equation cited and marked. The
+    answer's link marks the sentence that introduces Equation 1; it is pointed at the equation
+    itself (PPI_EQUATION) before it is clicked."""
     page = s.paper(
         "mac", PPI, size=MAC_NEAR, sizes=MAC_NEAR_SIZES, layout="right", share=0.45, chat=PPI_CHAT
     )
     zoom_paper(page, 1000)
     link = '.answer a[href*="rect="]'
+    page.locator(link).first.evaluate(
+        "(a, rect) => { a.href = a.href.replace(/rect=[^&]*/, 'rect=' + rect); }", PPI_EQUATION
+    )
     page.locator(link).first.click()
     page.wait_for_timeout(2200)
-    scroll_paper(page, ".cite-mark > *:last-child", left=24, top=150)
-    scroll_chat(page, link, 0.3, 0)
+    scroll_paper(page, ".cite-mark > *", left=60, top=150)
+    scroll_chat(page, link, 0.62, 0)
     shot(page, "mac", {"link": box(page, link), "mark": box(page, ".cite-mark > *")})
     done(page)
 
@@ -548,6 +593,8 @@ def compose(p, names: list[str]) -> None:
             print(f"  (no {source.relative_to(ROOT)})")
             continue
         page = browser.new_page(device_scale_factor=2)
+        failures = []
+        page.on("pageerror", lambda error: failures.append(error))
         page.goto(source.as_uri())
         page.wait_for_load_state("networkidle")
         size = page.evaluate("[document.body.offsetWidth, document.body.offsetHeight]")
@@ -555,6 +602,8 @@ def compose(p, names: list[str]) -> None:
         out = PICTURES / f"{name}.png"
         page.screenshot(path=out, omit_background=True)
         page.close()
+        if failures:
+            raise SystemExit(f"{source.name}: {failures[0]}")
         subprocess.run(
             ["pngquant", "--force", "--skip-if-larger", "--output", str(out), "256", str(out)],
             check=False,

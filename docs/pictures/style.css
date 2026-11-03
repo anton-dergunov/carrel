@@ -20,7 +20,7 @@ body { width: 960px; height: 600px; overflow: hidden; padding: 14px; font: 12.5p
 .kicker { display: block; margin-bottom: 3px; font: 600 10px/1.2 var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 .head h1 { font: 700 25px/1.2 var(--reading); letter-spacing: -.005em; }
 .head .sub { display: block; margin-top: 4px; font-size: 13.5px; line-height: 1.42; color: var(--muted); max-width: 880px; }
-.main { flex: 1 1 auto; min-height: 0; display: flex; gap: 18px; align-items: flex-start; }
+.main { flex: 1 1 auto; min-height: 0; display: flex; gap: 18px; align-items: center; justify-content: center; }
 .main.center { justify-content: center; }
 .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 /* A column given a width keeps it. */
@@ -28,19 +28,21 @@ body { width: 960px; height: 600px; overflow: hidden; padding: 14px; font: 12.5p
 .grow { flex: 1 1 auto; }
 
 /* What a picture says beside its captures: a few points, each with a bold lead. */
-.points { display: flex; flex-direction: column; gap: 10px; font-size: 12.3px; line-height: 1.45; color: var(--muted); }
+.points { display: flex; flex-direction: column; gap: 12px; font-size: 14px; line-height: 1.45; color: var(--muted); }
 .points b { color: var(--text); font-weight: 600; }
-.fact { border: 1px solid #c9dbe6; background: #eaf2f7; border-radius: 9px; padding: 9px 11px; font-size: 11.8px; line-height: 1.42; color: #24506b; }
+.fact { border: 1px solid #c9dbe6; background: #eaf2f7; border-radius: 9px; padding: 10px 12px; font-size: 13.4px; line-height: 1.42; color: #24506b; }
 .fact .label { display: block; margin-bottom: 3px; font: 600 9.5px/1.2 var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
 .fact b { color: #173a50; font-weight: 600; }
 .caption { margin-top: 6px; font-size: 11.5px; color: var(--muted); text-align: center; }
 .caption b { color: var(--text); font-weight: 600; }
 
 /* A tablet, drawn as far as its bezel. The capture's width and height are set where it is used. */
-.tablet { flex: none; background: #1d1d1f; padding: 8px; border-radius: 17px; box-shadow: inset 0 0 0 1.5px #48484a, 0 12px 26px -12px rgba(30, 26, 15, .45); }
+.tablet { flex: none; background: #3a3a3c; padding: 5px; border-radius: 13px; box-shadow: 0 10px 24px -12px rgba(30, 26, 15, .4); }
 .tablet img { display: block; border-radius: 8px; }
+.main > .col { flex: none; }
+.main > .col.grow { flex: 1 1 auto; }
 /* An e-ink reader: a lighter, plainer bezel. */
-.eink { flex: none; background: #3a3a38; padding: 12px; border-radius: 14px; box-shadow: inset 0 0 0 1.5px #555552, 0 12px 26px -12px rgba(30, 26, 15, .45); }
+.eink { flex: none; background: #5b5a56; padding: 7px; border-radius: 11px; box-shadow: 0 10px 24px -12px rgba(30, 26, 15, .4); }
 .eink img { display: block; border-radius: 2px; }
 
 /* The Mac app's window: a standard macOS title bar over the capture of its page. */

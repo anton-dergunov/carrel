@@ -1,7 +1,7 @@
 <!doctype html>
 <!--
 A review, on the Mac app: the library's review of llm/evaluation, "Evaluating LLMs", in its own
-tab, with a peek at a paper it cites (MMLU), opened by a click on its name. Beside it, a chat asked
+tab, with a peek at a paper it cites (MMLU), opened by a tap on its name (the hand). Beside it, a chat asked
 about the review (its id is in chats.json), whose answer cites the reviewed papers' tables.
 -->
 <html lang="en">
@@ -30,7 +30,7 @@ about the review (its id is in chats.json), whose answer cites the reviewed pape
 <script src="arrows.js"></script>
 <script>
   window.addEventListener('load', () => {
-    arrow('review:link', 'review:peek', { from: 'right', to: 'right', bend: 0.6, start: 'click' });
+    touch('review:link', 'tap');
   });
 </script>
 </body>

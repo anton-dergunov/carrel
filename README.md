@@ -54,7 +54,7 @@ Away from the desk I wanted the same thing on an iPad: the paper, the chat besid
 - An area's literature review opens in a tab of its own. Tap a paper it cites for a peek, then open it, or open it at the cited page.
 - The chat beside a review is asked about the review.
 
-<p align="center"><img src="docs/pictures/review.png" width="760" alt="The review 'Evaluating LLMs' on the Mac; an arrow shows a click on a paper it cites, MMLU, opening its peek. Beside it, a chat asked which findings matter for building LLM-as-judge evals; the answer's points each cite a paper's table."></p>
+<p align="center"><img src="docs/pictures/review.png" width="760" alt="The review 'Evaluating LLMs' on the Mac; a tap on a paper it cites, MMLU, has opened its peek. Beside it, a chat asked which findings matter for building LLM-as-judge evals; the answer's points each cite a paper's table."></p>
 
 **A chat that carries on**
 - The chat lives on the laptop, so it carries on through a reload or a sleeping tablet. Start a new one, or go back to an earlier one, including the chats you had in VS Code or the terminal in the library; carrel's chats show up there too.
@@ -72,7 +72,7 @@ Away from the desk I wanted the same thing on an iPad: the paper, the chat besid
 - Put the chat below, above or beside the paper, over it, or on a tab of its own, and drag the split.
 - Text sizes for the interface, the library and the chat, and the model each device starts its chats on.
 
-<p align="center"><img src="docs/pictures/looks.png" width="760" alt="The Zep paper at Table 2 and its chat on three tablets: Carrel light, Carrel dark, and E-ink."></p>
+<p align="center"><img src="docs/pictures/looks.png" width="760" alt="The Zep paper at Table 2 and its chat on three tablets: Carrel light; Carrel dark, with the paper drawn light on dark; and E-ink."></p>
 
 **On the Mac too**
 - The Mac app shows the same pages in a window of its own, with menus and the keys a Mac app has. It draws them with Chromium, so a paper flicked through as fast as the wheel spins stays painted.

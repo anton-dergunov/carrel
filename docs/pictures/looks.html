@@ -1,0 +1,39 @@
+<!doctype html>
+<!--
+Looks, on the iPad in portrait: the same paper and chat in Carrel's light and dark themes and in
+E-ink, then the settings with the colours, the text sizes, the pages' adjustments, the place of
+the chat and the model.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>looks</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .main { flex: none; justify-content: center; gap: 14px; }
+  .col { gap: 0; }
+  .row { flex: none; display: flex; flex-direction: row; gap: 22px; margin-top: 22px; padding: 0 6px; }
+  .row > div { flex: 1; }
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="head">
+    <span class="kicker">Make it yours</span>
+    <h1>Light, dark, or e-ink</h1>
+    <span class="sub">Each device keeps its own look: the theme, the text sizes, where the chat sits, and the model. On an e-ink tablet nothing moves: pages turn instead of scrolling.</span>
+  </div>
+  <div class="main">
+    <div class="col"><div><div class="ipad"><img src="captures/looks-carrel-light.png" style="width: 208px; height: 300px" alt=""></div></div><div class="caption"><b>Carrel</b>, light</div></div>
+    <div class="col"><div><div class="ipad"><img src="captures/looks-carrel-dark.png" style="width: 208px; height: 300px" alt=""></div></div><div class="caption"><b>Carrel</b>, dark</div></div>
+    <div class="col"><div><div class="ipad"><img src="captures/looks-eink.png" style="width: 208px; height: 300px" alt=""></div></div><div class="caption"><b>E-ink</b>: page turns, no motion</div></div>
+    <div class="col"><div><div class="ipad"><img src="captures/looks-settings.png" style="width: 208px; height: 300px" alt=""></div></div><div class="caption"><b>Settings</b>, per device</div></div>
+  </div>
+  <div class="row points">
+    <div><b>Where the chat sits</b>: below, above, left or right of the paper, over it, or on a tab of its own. Drag the split.</div>
+    <div><b>Adjust pages</b> for a small or e-ink screen: bolder letters, sharper edges, darker greys, scans in black and white.</div>
+    <div><b>Text sizes</b> for the interface, the library and the chat, each on its own.</div>
+  </div>
+</div>
+</body>
+</html>

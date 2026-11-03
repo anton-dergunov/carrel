@@ -1,0 +1,34 @@
+<!doctype html>
+<!--
+Search, on the iPad with the chat hidden. Left: Text, ripgrep over every paper's text layer, for
+"lost in the middle": the papers with the most matches, each match with its page. Right:
+Meaning, a description of the same paper's finding in none of its words; "Lost in the Middle"
+comes first. The fact is the engine's meaning-search experiment.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>search</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="frame">
+  <div class="head">
+    <span class="kicker">Search</span>
+    <h1>Find by the words, or by what you mean</h1>
+    <span class="sub">Titles filter as you type. Text searches the full text of every paper and opens one at the page that matches. Meaning finds the papers nearest a description.</span>
+  </div>
+  <div class="main">
+    <div class="ipad"><img src="captures/search-text.png" style="width: 281px; height: 404px" alt=""></div>
+    <div class="ipad"><img src="captures/search-meaning.png" style="width: 281px; height: 404px" alt=""></div>
+    <div class="col grow">
+      <div class="points">
+        <div><b>Text</b> shows each match in its sentence, with its page; a tap opens the paper there, with the words found.</div>
+        <div><b>Meaning</b> needs none of the paper's words: here a description of what <i>Lost in the Middle</i> found brings it up first.</div>
+      </div>
+      <div class="fact"><span class="label">Chosen by experiment</span>On 32 judged queries over this library, nDCG@10: <b>0.752</b> for the encoder used, Qwen3-Embedding-0.6B; 0.628 for the best small one; 0.504 for keyword search (BM25).</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

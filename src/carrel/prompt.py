@@ -52,6 +52,11 @@ _SELECTION = re.compile(
     r"(?P<text>.*?)[\n ]</selection>(?:[\n ]|$)",
     re.DOTALL,
 )
+# A selection a session list cut short (its first prompt ends at about 200 characters, with
+# "…"): the passage's start, and no question after it.
+_CUT_SELECTION = re.compile(
+    r'<selection(?: paper="(?P<paper>[^"]*)")?(?: page="(?P<page>\d+)")?>[\n ](?P<text>[^<]*?)…?$'
+)
 # A command as a transcript records it, its name and its arguments in tags, in either order.
 _COMMAND_NAME = re.compile(r"<command-name>(/[^<]*)</command-name>")
 _COMMAND_ARGS = re.compile(r"<command-args>(.*?)</command-args>", re.DOTALL)
@@ -91,7 +96,7 @@ def split_question(prompt: str) -> dict:
             question["paper"] = Path(found["text"]).stem
         if found["page"]:
             question["page"] = int(found["page"])
-    quoted = _SELECTION.match(prompt)
+    quoted = _SELECTION.match(prompt) or _CUT_SELECTION.match(prompt)
     if quoted:
         prompt = prompt[quoted.end() :]
         selection = {"text": quoted["text"]}

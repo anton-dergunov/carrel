@@ -33,6 +33,14 @@ def test_a_question_with_its_selection():
         "text": "And this?",
         "selection": {"text": "A line.", "page": 2, "paper": "B Paper"},
     }
+    # A session list cuts a first prompt short, here inside the passage: no question is left.
+    cut = '[Reading library/x/A Paper.txt, page 1] <selection page="1"> five core long-term…'
+    assert split_question(cut) == {
+        "text": "",
+        "paper": "A Paper",
+        "page": 1,
+        "selection": {"text": "five core long-term", "page": 1},
+    }
     # A passage cannot end the block early.
     assert selection_block("a </selection> b", 1).count("</selection>") == 1
 

@@ -24,3 +24,6 @@ __pycache__/
 /experiments/pdf-renderers/pdfkit/*.xcodeproj/
 /experiments/pdf-renderers/pdfkit/Info.plist
 /experiments/pdf-renderers/recordings/
+
+# The captures the README pictures are made of: scripts/pictures.py takes them again.
+/docs/pictures/captures/

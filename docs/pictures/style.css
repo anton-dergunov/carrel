@@ -1,0 +1,58 @@
+/* Shared by every picture in this folder. scripts/pictures.py renders each <name>.html at 2x into
+   <name>.png. The colours are carrel's light theme (src/carrel/static/themes.css) and the
+   typefaces its own: the system's for the interface, Iowan Old Style for headings. */
+
+:root {
+  --bg: #fdf6e3; --surface: #fffdf6; --text: #2b2b28; --muted: #6f6c62; --line: #e4dcc6;
+  --accent: #2a6f97; --chip: #efe8d4;
+  --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --reading: "Iowan Old Style", "Charter", Georgia, serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #ffffff; }
+/* Every picture but the hero: 960x600, rendered at 2x to 1920x1200. */
+body { width: 960px; height: 600px; overflow: hidden; padding: 14px; font: 12.5px/1.45 var(--ui); color: var(--text); }
+.frame {
+  height: 572px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface);
+  display: flex; flex-direction: column; padding: 16px 20px 16px;
+}
+.head { flex: none; margin-bottom: 14px; }
+.kicker { display: block; margin-bottom: 3px; font: 600 10px/1.2 var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.head h1 { font: 700 25px/1.2 var(--reading); letter-spacing: -.005em; }
+.head .sub { display: block; margin-top: 4px; font-size: 13.5px; line-height: 1.42; color: var(--muted); max-width: 880px; }
+.main { flex: 1 1 auto; min-height: 0; display: flex; gap: 18px; align-items: flex-start; }
+.main.center { justify-content: center; }
+.col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.grow { flex: 1 1 auto; }
+
+/* What a picture says beside its captures: a few points, each with a bold lead. */
+.points { display: flex; flex-direction: column; gap: 10px; font-size: 12.3px; line-height: 1.45; color: var(--muted); }
+.points b { color: var(--text); font-weight: 600; }
+.fact { border: 1px solid #c9dbe6; background: #eaf2f7; border-radius: 9px; padding: 9px 11px; font-size: 11.8px; line-height: 1.42; color: #24506b; }
+.fact .label { display: block; margin-bottom: 3px; font: 600 9.5px/1.2 var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.fact b { color: #173a50; font-weight: 600; }
+.caption { margin-top: 6px; font-size: 11.5px; color: var(--muted); text-align: center; }
+.caption b { color: var(--text); font-weight: 600; }
+
+/* An iPad, drawn as far as its bezel. The capture's width and height are set where it is used. */
+.ipad { flex: none; background: #1d1d1f; padding: 8px; border-radius: 17px; box-shadow: inset 0 0 0 1.5px #48484a, 0 12px 26px -12px rgba(30, 26, 15, .45); }
+.ipad img { display: block; border-radius: 8px; }
+/* An e-ink reader: a lighter, plainer bezel. */
+.eink { flex: none; background: #3a3a38; padding: 12px; border-radius: 14px; box-shadow: inset 0 0 0 1.5px #555552, 0 12px 26px -12px rgba(30, 26, 15, .45); }
+.eink img { display: block; border-radius: 2px; }
+
+/* The Mac app's window: a standard macOS title bar over the capture of its page. */
+.mac { flex: none; border-radius: 10px; overflow: hidden; background: var(--bg); box-shadow: 0 0 0 1px rgba(0, 0, 0, .14), 0 14px 30px -14px rgba(30, 26, 15, .5); }
+.mac .bar { height: 24px; display: flex; align-items: center; gap: 6px; padding: 0 9px; background: #e9e7e2; border-bottom: 1px solid #d2cfc7; }
+.mac .bar i { flex: none; width: 10px; height: 10px; border-radius: 50%; }
+.mac .bar i:nth-child(1) { background: #ec6a5e; } .mac .bar i:nth-child(2) { background: #f4bf4f; } .mac .bar i:nth-child(3) { background: #61c554; }
+.mac .bar span { flex: 1; margin-right: 46px; text-align: center; font: 600 10.5px var(--ui); color: #4d4b46; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mac img { display: block; }
+
+/* Part of a capture, enlarged: --x and --y (pixels of the capture) at the top left, --s its scale. */
+.crop { flex: none; overflow: hidden; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); box-shadow: 0 8px 20px -14px rgba(30, 26, 15, .45); }
+.crop img { display: block; width: calc(var(--w) * var(--s) * 1px); margin-left: calc(var(--x) * var(--s) * -1px); margin-top: calc(var(--y) * var(--s) * -1px); }
+
+/* A capture that goes on below what is shown, faded out as if scrolled. */
+.fade { position: relative; }
+.fade::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 8px; height: var(--fade, 90px); border-radius: 0 0 8px 8px; background: linear-gradient(rgba(253, 246, 227, 0), #fdf6e3 85%); }

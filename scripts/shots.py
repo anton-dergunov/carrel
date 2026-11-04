@@ -53,7 +53,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 IPAD = {"width": 820, "height": 1180}
-LIBRARY_DRAWN = "#area-page .area-title, #all-view .rows, #all-view .list-note, #map-view canvas"
+LIBRARY_DRAWN = "#desk-view .desk-section, #area-page .area-title, #all-view .rows, #all-view .list-note, #map-view canvas"
 LAYOUTS = ["bottom", "top", "left", "right", "sheet", "tab", "hidden"]
 THEMES = ["carrel-light", "carrel-dark", "plain-light", "plain-dark", "eink", "eink-colour"]
 
@@ -739,7 +739,9 @@ def main() -> None:
     parser.add_argument("--theme", choices=THEMES, help="this device's theme")
     parser.add_argument("--dark-pages", action="store_true", help="darken the PDF in a dark theme")
     parser.add_argument("--sizes", help="the text sizes in px: UI,LIBRARY,CHAT")
-    parser.add_argument("--view", choices=["areas", "all", "map"], help="the library's view")
+    parser.add_argument(
+        "--view", choices=["desk", "areas", "all", "map"], help="the library's view"
+    )
     parser.add_argument("--area", help="the library open at this topic")
     parser.add_argument("--more", action="store_true", help="open the area map's +N more card")
     parser.add_argument("--rich", action="store_true", help="the library's rows, rich")

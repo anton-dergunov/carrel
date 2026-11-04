@@ -568,7 +568,39 @@ body.dragging #divider::before { opacity: 1; }
 #filter-clear .icon { width: 16px; height: 16px; }
 #filter-clear[hidden] { display: none; }
 #library-count { flex: 1; min-width: 0; font-size: calc(13px * var(--scale)); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#library-add, #library-options { flex: none; }
 #library-options { width: 34px; height: 34px; }
+
+/* The search's depth on a narrow pane: a menu after the box, the phone's own picker. */
+.depth-menu { position: relative; flex: none; display: inline-flex; align-items: center; color: var(--muted); }
+#depth-menu {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 36px;
+  padding: 0 28px 0 12px;
+  border: 0;
+  border-radius: 9px;
+  /* 16px at least: Safari zooms into a smaller control when it is focused. */
+  font: 500 max(16px, calc(14px * var(--scale))) var(--ui);
+  color: var(--text);
+  background: var(--chip);
+}
+.depth-menu .icon { position: absolute; right: 8px; width: 15px; height: 15px; pointer-events: none; }
+
+/* A narrow pane (a phone, or beside the chat): no heading, the depth as a menu, and the views share
+   the row with + and the options, scrolling sideways before anything is cut off. */
+#library-bar h1, #depth, #library-count { display: none; }
+#views { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+#views::-webkit-scrollbar { display: none; }
+#views button { flex: 1 1 auto; padding: 4px 6px; white-space: nowrap; }
+@container (min-width: 560px) {
+  #library-bar h1 { display: block; }
+  #depth { display: inline-flex; }
+  .depth-menu { display: none; }
+  #library-count { display: block; }
+  #views { flex: none; overflow-x: visible; }
+  #views button { flex: none; padding: 4px 12px; }
+}
 
 /* Segmented controls: iOS's pills. */
 .segmented {
@@ -1553,14 +1585,27 @@ button {
 .continue-item .title { font: 600 calc(15.5px * var(--scale))/1.3 var(--reading); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .continue-item .meta { font-size: calc(12.5px * var(--scale)); color: var(--muted); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .see-all { margin-top: 8px; padding: 4px 0; font-size: calc(14px * var(--scale)); }
-.progress-row { display: grid; grid-template-columns: minmax(0, 12em) minmax(0, 1fr) auto; align-items: center; gap: 14px; min-height: 40px; border-bottom: 1px solid var(--line); }
-.progress-row .group { font: calc(15px * var(--scale))/1.3 var(--reading); }
-.pips { display: flex; flex-wrap: wrap; gap: 4px; }
-.pip { display: inline-block; width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid color-mix(in srgb, var(--muted) 55%, transparent); vertical-align: -2px; }
+/* A group's name and tally, its pips below them on a narrow pane, in one line on a wide one. */
+.progress-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "group tally" "pips pips";
+  align-items: center;
+  gap: 6px 14px;
+  min-height: 40px;
+  padding: 8px 0 10px;
+  border-bottom: 1px solid var(--line);
+}
+@container (min-width: 560px) {
+  .progress-row { grid-template-columns: minmax(0, 12em) minmax(0, 1fr) auto; grid-template-areas: "group pips tally"; padding: 0; }
+}
+.progress-row .group { grid-area: group; font: calc(15px * var(--scale))/1.3 var(--reading); }
+.pips { grid-area: pips; display: flex; flex-wrap: wrap; gap: 4px; }
+.pip { flex: none; display: inline-block; width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid color-mix(in srgb, var(--muted) 55%, transparent); vertical-align: -2px; }
 a.pip { -webkit-tap-highlight-color: transparent; }
 .pip.read { border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: color-mix(in srgb, var(--accent) 22%, transparent); }
 .pip.reviewed { border-color: var(--accent); background: var(--accent); }
-.progress-row .tally { font-size: calc(13px * var(--scale)); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.progress-row .tally { grid-area: tally; font-size: calc(13px * var(--scale)); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .progress-key { margin: 10px 0 0; font-size: calc(12.5px * var(--scale)); color: var(--muted); }
 .progress-key .pip { width: 11px; height: 11px; margin: 0 2px 0 8px; }
 .progress-key .pip:first-child { margin-left: 0; }
@@ -1769,7 +1814,7 @@ button.plain.danger-text { color: var(--error); margin-left: auto; }
 [data-theme^="eink"] .bar { border-bottom-color: var(--edge); }
 [data-theme^="eink"] .sheet, [data-theme^="eink"] #settings-dialog { border-width: 2px; }
 [data-theme^="eink"] body.chat-sheet #chat-pane { border-top: 2px solid var(--line); }
-[data-theme^="eink"] .segmented { background: none; border: 1px solid var(--line); }
+[data-theme^="eink"] .segmented, [data-theme^="eink"] #depth-menu { background: none; border: 1px solid var(--line); }
 [data-theme^="eink"] .segmented button[aria-checked="true"],
 [data-theme^="eink"] .place-choices button[aria-checked="true"],
 [data-theme^="eink"] .chip[aria-pressed="true"],

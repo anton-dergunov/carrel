@@ -73,6 +73,7 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   const filter = document.getElementById('filter');
   const filterClear = document.getElementById('filter-clear');
   const depthControl = document.getElementById('depth');
+  const depthMenu = document.getElementById('depth-menu'); // the same choice on a narrow pane
   const viewControl = document.getElementById('views');
   const countLabel = document.getElementById('library-count');
   const optionsButton = document.getElementById('library-options');
@@ -109,6 +110,7 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
   function render() {
     viewControl.querySelectorAll('[data-view]').forEach((button) => button.setAttribute('aria-checked', String(button.dataset.view === state.view)));
     depthControl.querySelectorAll('[data-depth]').forEach((button) => button.setAttribute('aria-checked', String(button.dataset.depth === state.depth)));
+    depthMenu.value = state.depth;
     filter.placeholder = PLACEHOLDERS[state.depth];
     pane.dataset.view = state.view;
     closeMore();
@@ -616,6 +618,13 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
     save();
     render();
     filter.focus({ preventScroll: true });
+  });
+
+  // Not focusing the box: on a phone that brings the keyboard up over the picker's choice.
+  depthMenu.addEventListener('change', () => {
+    state.depth = depthMenu.value;
+    save();
+    render();
   });
 
   viewControl.addEventListener('click', (event) => {

@@ -7,6 +7,7 @@ The pictures in carrel's README and on the blog's Projects page: carrel on a rea
 - `arrows.js` draws the arrows, with a tap or a click where they start, from the boxes `scripts/pictures.py` records with each capture (`captures/marks.js`).
 - `captures/` holds the captures (not in git: `scripts/pictures.py` takes them again).
 - `chats.json` names the two chats the pictures asked, so a retake draws them again instead of asking.
+- `adjust-pages.png` is not made by the script: it is a screenshot of Settings → Pages, taken by hand on the Mac and reduced from 900 to 600 px wide; take it again by hand when that part of Settings changes.
 
 ```sh
 uv run --group shots python scripts/pictures.py                 # every capture, then every picture (needs a running carrel)

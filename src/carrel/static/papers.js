@@ -620,11 +620,11 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
     filter.focus({ preventScroll: true });
   });
 
-  // Not focusing the box: on a phone that brings the keyboard up over the picker's choice.
   depthMenu.addEventListener('change', () => {
     state.depth = depthMenu.value;
     save();
     render();
+    filter.focus({ preventScroll: true });
   });
 
   viewControl.addEventListener('click', (event) => {

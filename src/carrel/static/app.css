@@ -197,15 +197,35 @@ body:not([data-active="paper"]) :is(#find-button, #pen) { display: none; }
 /* A change to the highlights that has not reached the laptop yet. */
 #pen.unsaved::after { content: ""; position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--error); }
 
-/* Find: it takes the place of the tabs and the buttons while it is open. */
-body.finding #strip > :not(#find) { display: none; }
-#find { flex: 1; display: flex; align-items: center; gap: 4px; min-height: 40px; }
+/* Find: a bar over the top of the paper, the tabs and buttons left as they are. Across the pane
+   when it is narrow (a phone, a portrait iPad), else in its corner. It ends above 50px, where
+   PDF.js puts a match it scrolls to, so it never covers what it found. */
+body.finding #find-button { background: var(--question); color: var(--text); }
+#find {
+  position: absolute;
+  z-index: 4;
+  top: 6px;
+  right: 8px;
+  width: min(460px, calc(100% - 16px));
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 42px;
+  padding: 0 4px 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  /* Solid: the page's text showing through would read as part of the bar. */
+  background: var(--surface);
+  box-shadow: 0 6px 18px rgb(var(--shade) / 0.15);
+}
+#find[hidden] { display: none; }
 #find-input {
   flex: 1;
   min-width: 0;
   /* 16px at least: Safari zooms into a smaller box when it is focused. */
   font: max(16px, calc(16px * var(--scale))) var(--ui);
-  padding: 4px 10px;
+  padding: 3px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--bg);
@@ -1813,6 +1833,8 @@ button.plain.danger-text { color: var(--error); margin-left: auto; }
 }
 [data-theme^="eink"] .bar { border-bottom-color: var(--edge); }
 [data-theme^="eink"] .sheet, [data-theme^="eink"] #settings-dialog { border-width: 2px; }
+[data-theme^="eink"] #find { box-shadow: none; border-width: 2px; }
+[data-theme^="eink"] body.finding #find-button { background: var(--text); color: var(--bg); }
 [data-theme^="eink"] body.chat-sheet #chat-pane { border-top: 2px solid var(--line); }
 [data-theme^="eink"] .segmented, [data-theme^="eink"] #depth-menu { background: none; border: 1px solid var(--line); }
 [data-theme^="eink"] .segmented button[aria-checked="true"],

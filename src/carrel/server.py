@@ -458,6 +458,9 @@ def make_app(
             listed = []
         return JSONResponse(listed)
 
+    async def usage(request: Request) -> Response:
+        return JSONResponse(await sessions.usage_now())
+
     async def chats(request: Request) -> Response:
         listing = await asyncio.to_thread(sessions.listing)
         return JSONResponse(listing)
@@ -747,6 +750,7 @@ def make_app(
             Route("/api/overview/{path:path}", overview, methods=["GET", "HEAD"]),
             Route("/api/overview/{path:path}", delete_overview, methods=["DELETE"]),
             Route("/api/commands", commands),
+            Route("/api/usage", usage),
             Route("/api/chats", chats),
             Route("/api/ping", ping),
             Route("/api/settings", get_settings, methods=["GET", "HEAD"]),

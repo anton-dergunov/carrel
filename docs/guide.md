@@ -92,7 +92,7 @@ Tap a paper and it opens in a tab, with a chat beside it. The library has its ta
 
 **The page badge.** The page number in the corner opens the paper's sheet: go to a page, or jump through the contents (see [below](#the-papers-sheet-and-its-overview)).
 
-**Find.** The magnifier, or ⌘F, finds words in the paper, a match at a time.
+**Find.** The magnifier, or ⌘F, finds words in the paper, a match at a time, in a bar over the top of the page.
 
 **Zoom.** Pinch to zoom. On an iPad, while the page is wider than the screen, a finger's pan keeps to the direction it mostly runs along.
 
@@ -164,7 +164,7 @@ When an area has a literature review, it shows on Desk and on the area's page. A
 A chat is a Claude Code session on the laptop, in the library. The tablet only shows it, so leaving the page, a reload or a sleeping tablet never ends it.
 
 - **New chat**, and **earlier chats**, from the buttons under the chat. The list holds every chat in the library: carrel's, and the ones you had in VS Code or the terminal. Carrel's chats show up there too.
-- **The line under the chat** shows the model, how long the chat's prompt cache has left, and your usage limits.
+- **The line under the chat** shows the model, how long the chat's prompt cache has left and, on a Claude subscription, how much of your 5-hour window is left and when it resets, and how much of your week is left and how long until it resets.
 - **The model** is chosen per device, in Settings or by tapping its name. A new chat starts on it.
 - **About me**, in Settings, is a note added to each new chat's instructions: who you are, what you know, how you like answers. It is kept on the laptop and shared by every device.
 

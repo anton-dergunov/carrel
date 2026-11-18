@@ -73,7 +73,7 @@ This came from the first sitting, where the chat closed after the first question
 - The server closes a chat's Claude Code process after 60 minutes idle.
 - A question in an expired chat asks first, since a new chat may cost less.
 
-**The display.** Everything but the answer (tools, thinking, system messages) folds into one section per turn. The usage limits are shown once, on the status line, as they change.
+**The display.** Everything but the answer (tools, thinking, system messages) folds into one section per turn. The status line shows what is left of the plan's usage limits: the 5-hour window and the week. The page reads them from `/api/usage`. The server asks Claude Code with the `get_usage` control request, the data behind `/usage`, which asks the model nothing. It is experimental, and the Python SDK has no method for it. The server asks a running chat's process, or one started to ask, and keeps the reading for a minute. An answer, or a `RateLimitEvent` (a limit's state changed), drops the reading. The page then reads it again. With an API key there are no limits and the line shows none.
 
 ## Settings
 

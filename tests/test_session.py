@@ -11,6 +11,8 @@ from claude_agent_sdk import (
     AssistantMessage,
     PermissionResultAllow,
     PermissionResultDeny,
+    RateLimitEvent,
+    RateLimitInfo,
     ResultMessage,
     StreamEvent,
     SystemMessage,
@@ -320,6 +322,99 @@ async def test_the_commands_claude_code_offers(library):
     assert await chats.command_list() == [
         {"name": "overview", "description": "A pre-read note", "hint": ""}
     ]
+    await talk.close()
+
+
+USAGE_REPLY = {
+    "subscription_type": "pro",
+    "rate_limits_available": True,
+    "rate_limits": {
+        "limits": [
+            {
+                "kind": "session",
+                "group": "session",
+                "percent": 37,
+                "severity": "normal",
+                "resets_at": "2026-11-19T00:39:59.651613+00:00",
+                "is_active": True,
+            },
+            {"kind": "weekly_all", "percent": 18, "resets_at": "2026-11-21T21:59:59+00:00"},
+        ]
+    },
+}
+
+
+class UsageControl:
+    """Claude Code's control channel, as far as `get_usage` sees it."""
+
+    def __init__(self, reply):
+        self.reply = reply
+        self.asked = []
+
+    async def _send_control_request(self, request, timeout=60.0):
+        self.asked.append(request)
+        if isinstance(self.reply, Exception):
+            raise self.reply
+        return self.reply
+
+
+def test_the_usage_the_page_is_given():
+    assert session_module.usage_from(USAGE_REPLY) == {
+        "available": True,
+        "plan": "pro",
+        "limits": [
+            {
+                "kind": "session",
+                "percent": 37,
+                "severity": "normal",
+                "resets_at": 1795048799.651613,
+            },
+            {"kind": "weekly_all", "percent": 18, "severity": "normal", "resets_at": 1795298399.0},
+        ],
+    }
+    # An API key: no plan limits.
+    assert session_module.usage_from({"rate_limits_available": False}) == {"available": False}
+    assert session_module.usage_from(None) == {"available": False}
+
+
+async def test_the_usage_is_read_once_a_minute(library):
+    now = [1000.0]
+    client = FakeClient()
+    client._query = UsageControl(USAGE_REPLY)
+    chats = Sessions(library, connect=connecting(client), clock=lambda: now[0])
+    # No chat running: a process is started to ask, and closed.
+    assert (await chats.usage_now())["plan"] == "pro"
+    assert client._query.asked == [{"subtype": "get_usage", "skip_behaviors": True}]
+    assert not client.connected
+    now[0] += 30
+    await chats.usage_now()
+    assert len(client._query.asked) == 1
+    now[0] += 31
+    await chats.usage_now()
+    assert len(client._query.asked) == 2
+    # Claude Code failing to say is no usage, kept as long as a reading.
+    client._query.reply = RuntimeError("get_usage is not supported")
+    chats.usage.drop()
+    assert await chats.usage_now() == {"available": False}
+
+
+async def test_a_change_of_a_limit_makes_the_usage_stale(library):
+    client = FakeClient()
+    client._query = UsageControl(USAGE_REPLY)
+    chats = Sessions(library, connect=connecting(client))
+    talk = chats.get(None)
+    outbox = Outbox()
+    await talk.attach(outbox)
+    await talk.ask("Hi")
+    await outbox.next("ResultMessage")
+    # A running chat's process is asked, not a new one.
+    await chats.usage_now()
+    assert client.connected and len(client._query.asked) == 1
+    info = RateLimitInfo(status="allowed_warning", rate_limit_type="seven_day", utilization=0.8)
+    await client.replies.put(RateLimitEvent(rate_limit_info=info, uuid="u", session_id="s"))
+    assert (await outbox.next("Limits"))["data"] == {}
+    await chats.usage_now()
+    assert len(client._query.asked) == 2
     await talk.close()
 
 

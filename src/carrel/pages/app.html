@@ -97,13 +97,6 @@
   <button type="button" class="icon-button" id="find-button" aria-label="Find in this paper" title="Find in this paper"><svg class="icon"><use href="#i-search"/></svg></button>
   <button type="button" class="icon-button" id="chat-toggle" aria-label="Show or hide the chat" title="Show or hide the chat" aria-pressed="true"><svg class="icon"><use href="#i-panel-bottom"/></svg></button>
   <button type="button" class="icon-button" id="settings-button" aria-label="Settings" title="Settings" aria-expanded="false" aria-controls="settings-dialog"><svg class="icon"><use href="#i-settings"/></svg></button>
-  <form id="find" role="search" hidden>
-    <input id="find-input" type="search" placeholder="Find in this paper" aria-label="Find in this paper" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false">
-    <output id="find-count"></output>
-    <button type="button" class="icon-button" id="find-previous" aria-label="Previous match" title="Previous match"><svg class="icon"><use href="#i-up"/></svg></button>
-    <button type="button" class="icon-button" id="find-next" aria-label="Next match" title="Next match"><svg class="icon"><use href="#i-down"/></svg></button>
-    <button type="button" class="plain" id="find-done">Done</button>
-  </form>
 </nav>
 <section id="papers-pane" class="content" aria-label="The library">
   <header id="library-bar">
@@ -154,6 +147,13 @@
 <section id="review-pane" class="content" aria-label="Review"></section>
 <section id="pdf-pane" class="content">
   <div id="viewerContainer"><div id="viewer" class="pdfViewer"></div></div>
+  <form id="find" role="search" hidden>
+    <input id="find-input" type="search" placeholder="Find in this paper" aria-label="Find in this paper" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <output id="find-count"></output>
+    <button type="button" class="icon-button" id="find-previous" aria-label="Previous match" title="Previous match"><svg class="icon"><use href="#i-up"/></svg></button>
+    <button type="button" class="icon-button" id="find-next" aria-label="Next match" title="Next match"><svg class="icon"><use href="#i-down"/></svg></button>
+    <button type="button" class="plain" id="find-done">Done</button>
+  </form>
   <button type="button" id="page-badge" aria-label="Contents and pages" aria-expanded="false" aria-controls="contents-sheet" hidden></button>
   <div id="contents-sheet" class="sheet" role="dialog" aria-label="The paper" hidden>
     <div class="sheet-bar">

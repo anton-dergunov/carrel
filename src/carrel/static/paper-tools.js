@@ -7,7 +7,7 @@
 //   small, by the badge, and closes with a tap anywhere else; it opens out over the page below the
 //   tabs, chat and all, and then stays until it is closed. On a phone it opens over the whole page
 //   at once.
-// - find, which takes the place of the tabs in the bar while it is open.
+// - find, a bar over the top of the paper while it is open.
 
 import { HIGHLIGHT_COLORS } from './highlight.js';
 import { contentsNote, foldSection, interleave, startPaperSheet } from './paper-sheet.js';
@@ -211,7 +211,8 @@ export function startPaperTools({ reader, showOverview, openPaper = () => {}, on
     if (findInput.value) reader.find(findInput.value, { again: true, previous });
   };
 
-  findButton.addEventListener('click', openFind);
+  // The button shows find open (body.finding), and a second tap closes it.
+  findButton.addEventListener('click', () => (findForm.hidden ? openFind() : closeFind()));
   findForm.addEventListener('submit', (event) => {
     event.preventDefault();
     again(false);

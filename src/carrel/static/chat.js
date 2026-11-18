@@ -105,7 +105,9 @@ export function startChat({
   let reconnectTimer = 0;
   let busy = false;
   let cacheExpiresAt = null;
-  let limits = {};
+  let usage = null; // the plan's usage limits, from /api/usage
+  let usageAskedAt = 0;
+  let usageTimer = 0;
   let model = null; // the model this chat's process runs on; null while there is none
 
   // Answer blocks drawn from the stream that the complete message has not yet replaced.
@@ -171,10 +173,7 @@ export function startChat({
   function receive(message) {
     const { seq, kind, data } = message;
     if (kind === 'Chat') return chatState(data);
-    if (kind === 'Limits') {
-      limits = data;
-      return renderStatus();
-    }
+    if (kind === 'Limits') return askUsage();
     if (seq != null) {
       if (seq <= lastSeq) return;
       lastSeq = seq;
@@ -195,7 +194,6 @@ export function startChat({
     }
     setBusy(data.busy);
     cacheExpiresAt = data.cache_expires_at;
-    limits = data.limits ?? limits;
     model = data.model ?? null;
     renderStatus();
   }
@@ -238,7 +236,22 @@ export function startChat({
   }
 
   // The status line: the model (a button that opens the settings), the connection, the prompt
-  // cache, the usage limits.
+  // cache, and what is left of the plan's usage limits.
+
+  /** Reads the usage again, soon: the asks of a moment (a chat's replayed answers) are one. */
+  function askUsage() {
+    clearTimeout(usageTimer);
+    usageTimer = setTimeout(async () => {
+      usageAskedAt = Date.now();
+      try {
+        const response = await fetch('/api/usage');
+        if (response.ok) usage = await response.json();
+      } catch {
+        return; // offline: the line keeps what it showed
+      }
+      renderStatus();
+    }, 1000);
+  }
 
   function expired() {
     return cacheExpiresAt != null && Date.now() / 1000 > cacheExpiresAt;
@@ -254,16 +267,16 @@ export function startChat({
       const left = cacheExpiresAt - Date.now() / 1000;
       parts.push(left > 0 ? `cache ${Math.ceil(left / 60)} min` : 'cache expired');
     }
-    for (const [type, info] of Object.entries(limits ?? {})) {
-      if (info.utilization == null && info.status === 'allowed') continue;
-      let text = limitName(type);
-      if (info.utilization != null) text += ` ${Math.round(info.utilization * 100)}%`;
-      if (info.status === 'rejected') text += ' reached';
-      if (info.status !== 'allowed' && info.resets_at) text += ` · resets ${clock(info.resets_at)}`;
-      parts.push(text);
-    }
+    const now = Date.now() / 1000;
+    const left = usageText(usage, now);
+    parts.push(...left.parts);
     status.textContent = parts.join(' · ');
-    status.classList.toggle('warn', Object.values(limits ?? {}).some((info) => info.status === 'rejected'));
+    status.title = status.textContent;
+    status.classList.toggle('warn', left.warn);
+    // A window that has reset since it was read: read it again.
+    if (usage?.limits?.some((limit) => limit.resets_at && limit.resets_at <= now) && Date.now() - usageAskedAt > 60_000) {
+      askUsage();
+    }
   }
   setInterval(renderStatus, 30_000);
 
@@ -314,6 +327,7 @@ export function startChat({
       case 'RateLimitEvent':
         return undefined; // the reader's own hooks, on every turn; limits are in the status line
       case 'ResultMessage':
+        askUsage(); // an answer spent some of the plan
         return result(data);
       case 'PermissionRequest':
         return permission(data);
@@ -774,7 +788,9 @@ export function startChat({
 
   // Back from sleep or from another app: attach again now, not at the next back-off.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') reconnectNow();
+    if (document.visibilityState !== 'visible') return;
+    reconnectNow();
+    if (Date.now() - usageAskedAt > 5 * 60_000) askUsage();
   });
   window.addEventListener('pageshow', reconnectNow);
   window.addEventListener('online', reconnectNow);
@@ -785,6 +801,7 @@ export function startChat({
   });
 
   renderStatus();
+  askUsage();
   connect();
   return {
     quote,
@@ -837,10 +854,42 @@ export function modelName(id) {
   return `${name.charAt(0).toUpperCase()}${name.slice(1)}${version ? ` ${version}` : ''}`;
 }
 
-const LIMIT_NAMES = { five_hour: '5-h', seven_day: 'week', seven_day_opus: 'week (Opus)', seven_day_sonnet: 'week (Sonnet)' };
+const USAGE_NAMES = { session: '5 h', weekly_all: 'week' };
 
-function limitName(type) {
-  return LIMIT_NAMES[type] ?? type.replaceAll('_', ' ');
+/**
+ * What is left of the plan's usage limits, as the status line shows them: the 5-hour window with
+ * the time it resets ("5 h 63% left · resets 00:40", always within 5 hours), the week with how long
+ * until it resets ("week 82% left · resets in 3 d 1 h"), and any other limit (a model's week) only
+ * when it is close. `warn` when one shown is close. Nothing for an API key. `now` in seconds.
+ */
+export function usageText(usage, now = Date.now() / 1000) {
+  const parts = [];
+  let warn = false;
+  if (!usage?.available) return { parts, warn };
+  for (const limit of usage.limits ?? []) {
+    const close = Boolean(limit.severity) && limit.severity !== 'normal';
+    if (!(limit.kind in USAGE_NAMES) && !close) continue;
+    const name = USAGE_NAMES[limit.kind] ?? limit.kind.replace(/^weekly_/, 'week ').replaceAll('_', ' ');
+    const reset = limit.resets_at != null && limit.resets_at <= now;
+    const left = reset ? 100 : Math.max(0, 100 - Math.round(limit.percent ?? 0));
+    let text = `${name} ${left > 0 ? `${left}% left` : 'used up'}`;
+    if (!reset && limit.resets_at != null) {
+      text += limit.kind === 'session' ? ` · resets ${clock(limit.resets_at)}` : ` · resets in ${duration(limit.resets_at - now)}`;
+    }
+    parts.push(text);
+    warn ||= close && !reset;
+  }
+  return { parts, warn };
+}
+
+/** "3 d 1 h", "5 h 20 min", "12 min". */
+export function duration(seconds) {
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  if (days) return hours ? `${days} d ${hours} h` : `${days} d`;
+  if (hours) return minutes % 60 ? `${hours} h ${minutes % 60} min` : `${hours} h`;
+  return `${minutes} min`;
 }
 
 function clock(seconds) {

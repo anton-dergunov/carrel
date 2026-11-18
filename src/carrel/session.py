@@ -19,11 +19,14 @@ Anything else is put to the reader on the tablet as Allow / Deny.
 """
 
 import asyncio
+import contextlib
 import dataclasses
 import json
+import logging
 import time
 import uuid
 from collections.abc import Awaitable, Callable
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -67,6 +70,11 @@ ENTRYPOINT = "carrel"
 # What `paperlib add` and `paperlib info` reach: arXiv's listing, API and PDFs. Others are
 # added as the sandbox reports them.
 ALLOWED_DOMAINS = ["arxiv.org", "export.arxiv.org", "*.arxiv.org"]
+
+# How long a reading of the plan's usage is kept before Claude Code is asked again.
+USAGE_TTL = 60
+
+log = logging.getLogger("carrel")
 
 # Never read, whatever a session's folders are.
 SECRETS = ["~/.ssh", "~/.aws", "~/.gnupg", "~/.config", "~/.netrc", "~/.claude.json"]
@@ -160,7 +168,7 @@ class Session:
         session_id: str | None = None,
         connect: Callable | None = None,
         extra_folders: tuple[Path, ...] = (),
-        limits: dict | None = None,
+        usage: "Usage | None" = None,
         clock: Callable[[], float] = time.time,
         settings: Settings | None = None,
         commands: dict | None = None,
@@ -178,7 +186,8 @@ class Session:
         self.folders = list(dict.fromkeys([*library.outside_folders(), *extra_folders]))
         self._connect = connect or self._connect_client
         self._clock = clock
-        self.limits = limits if limits is not None else {}
+        # The plan's usage, shared by every chat; a change of a limit's state makes it stale.
+        self.usage = usage if usage is not None else Usage(clock)
         # The slash commands Claude Code offers, learnt when a process starts.
         self.commands = commands if commands is not None else {}
         self.seq = 0
@@ -216,7 +225,6 @@ class Session:
             "live": self.client is not None,
             "model": self.model,
             "cache_expires_at": expires,
-            "limits": self.limits,
         }
 
     def expired(self) -> bool:
@@ -404,16 +412,16 @@ class Session:
         try:
             async for message in self.client.receive_messages():
                 if isinstance(message, RateLimitEvent):
-                    # Shown once, as the latest of each limit, not as a row per event.
-                    info = message.rate_limit_info
-                    self.limits[info.rate_limit_type or "limit"] = to_wire(info)
-                    await self.emit("Limits", self.limits, keep=False)
+                    # A limit's state changed: the page reads the usage again, not a row per event.
+                    self.usage.drop()
+                    await self.emit("Limits", {}, keep=False)
                     continue
                 if isinstance(message, SystemMessage) and message.subtype == "init":
                     # The commands bound to a terminal; the server's list does not mark them.
                     self.commands["terminal"] = message.data.get("terminal_slash_commands", [])
                 await self.emit(type(message).__name__, to_wire(message))
                 if isinstance(message, ResultMessage):
+                    self.usage.drop()  # the answer spent some of the plan; the page asks next
                     self.busy = False
                     self.last_turn_end = self._clock()
                     # The complete messages are in the log; the stream that drew them is not
@@ -506,7 +514,7 @@ class Sessions:
     ):
         self.library = library
         self.chats: dict[str, Session] = {}
-        self.limits: dict = {}  # the latest usage limits, shared by every chat
+        self.usage = Usage(clock)  # the plan's usage, shared by every chat
         self.commands: dict = {}  # the slash commands, as the latest process to start offered them
         self.settings = settings or Settings()
         self._made = dict(
@@ -515,6 +523,7 @@ class Sessions:
             clock=clock,
             settings=self.settings,
             commands=self.commands,
+            usage=self.usage,
         )
         self._clock = clock
         self._learning = asyncio.Lock()
@@ -524,7 +533,7 @@ class Sessions:
         (under this id, when it is a valid one)."""
         if session_id in self.chats:
             return self.chats[session_id]
-        made = dict(self._made, limits=self.limits)
+        made = self._made
         talk = None
         if session_id and _is_uuid(session_id):
             talk = Session.from_transcript(self.library, session_id, **made)
@@ -552,18 +561,37 @@ class Sessions:
             )
         return chats
 
+    @contextlib.asynccontextmanager
+    async def _probe(self):
+        """A Claude Code process started only to be asked something, which asks the model nothing."""
+        probe = Session(self.library, **self._made)
+        client = await probe._connect()
+        try:
+            yield probe, client
+        finally:
+            await client.disconnect()
+
+    async def usage_now(self) -> dict:
+        """The plan's usage limits (`Usage.read`), asked of a running chat's process when there
+        is one, else of a probe."""
+
+        async def ask() -> dict:
+            live = next((talk.client for talk in self.chats.values() if talk.client), None)
+            if live is not None:
+                return await ask_usage(live)
+            async with self._probe() as (_, client):
+                return await ask_usage(client)
+
+        return await self.usage.get(ask)
+
     async def command_list(self) -> list[dict]:
         """The slash commands a question can start with, as Claude Code offers them in the
         library: known once a chat's process has started, else from a process started to ask
         (which asks the model nothing). Those bound to a terminal, and hidden ones, are left out."""
         async with self._learning:
             if "listed" not in self.commands:
-                probe = Session(self.library, **self._made, limits=self.limits)
-                client = await probe._connect()
-                try:
+                async with self._probe() as (probe, client):
                     await probe.learn_commands(client)
-                finally:
-                    await client.disconnect()
         terminal = set(self.commands.get("terminal", ()))
         return [
             {
@@ -606,3 +634,65 @@ def _is_uuid(value: str | None) -> bool:
         return bool(value) and str(uuid.UUID(value)) == value.lower()
     except ValueError:
         return False
+
+
+async def ask_usage(client: ClaudeSDKClient) -> dict:
+    """What Claude Code's `/usage` shows, through the control request its TypeScript SDK calls
+    `usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET`; the Python SDK has no method
+    for it. Asks the model nothing. Check it again when the SDK is bumped."""
+    return await client._query._send_control_request(
+        {"subtype": "get_usage", "skip_behaviors": True}, timeout=30
+    )
+
+
+def usage_from(reply: dict | None) -> dict:
+    """The page's reading of a `get_usage` reply: the plan, and each of its limits with the
+    percent used, its severity and when it resets (seconds since the epoch). Not available for
+    an API key, or when the reply has no limits."""
+    if not isinstance(reply, dict) or not reply.get("rate_limits_available"):
+        return {"available": False}
+    limits = []
+    for each in (reply.get("rate_limits") or {}).get("limits") or []:
+        if not isinstance(each, dict) or not each.get("kind"):
+            continue
+        resets = each.get("resets_at")
+        try:
+            resets = datetime.fromisoformat(resets).timestamp() if resets else None
+        except (TypeError, ValueError):
+            resets = None
+        limits.append(
+            {
+                "kind": each["kind"],
+                "percent": each.get("percent"),
+                "severity": each.get("severity") or "normal",
+                "resets_at": resets,
+            }
+        )
+    return {"available": bool(limits), "plan": reply.get("subscription_type"), "limits": limits}
+
+
+class Usage:
+    """The plan's usage limits, read from Claude Code at most once a minute (`USAGE_TTL`); asks
+    that come together share one reading."""
+
+    def __init__(self, clock: Callable[[], float] = time.time):
+        self._clock = clock
+        self._read: dict | None = None
+        self._at = 0.0
+        self._lock = asyncio.Lock()
+
+    def drop(self) -> None:
+        """Forget the reading: the next ask reads again."""
+        self._read = None
+
+    async def get(self, ask: Callable[[], Awaitable[dict]]) -> dict:
+        async with self._lock:
+            if self._read is None or self._clock() - self._at > USAGE_TTL:
+                try:
+                    reply = await ask()
+                except Exception as error:
+                    log.warning("could not read the plan's usage: %s", error)
+                    reply = None
+                self._read = usage_from(reply)
+                self._at = self._clock()
+            return self._read

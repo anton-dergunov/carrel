@@ -233,6 +233,7 @@ export function startChat({
     busy = value;
     send.hidden = value;
     stop.hidden = !value;
+    renderStatus();
   }
 
   // The status line: the model (a button that opens the settings), the connection, the prompt
@@ -263,7 +264,8 @@ export function startChat({
     const shown = model ?? settings.model();
     modelButton.textContent = shown ? modelName(shown) : 'Model';
     if (!attached) parts.push('reconnecting…');
-    if (cacheExpiresAt != null) {
+    // While a question runs it reads the cache again and refreshes it: no countdown till it ends.
+    if (cacheExpiresAt != null && !busy) {
       const left = cacheExpiresAt - Date.now() / 1000;
       parts.push(left > 0 ? `cache ${Math.ceil(left / 60)} min` : 'cache expired');
     }

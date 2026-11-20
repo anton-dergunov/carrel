@@ -191,6 +191,16 @@ class Library:
     def papers(self) -> list[Paper]:
         return [paper for paper, _ in self.entries()]
 
+    def entry(self, path: str | os.PathLike) -> tuple[Paper, dict] | None:
+        """The paper at a paper file with its frontmatter, as `entries` has it, or None when it
+        has no PDF."""
+        path = Path(path)
+        pdf = Path(self.lib.pdf_path_for(path))
+        if not pdf.is_file():
+            return None
+        meta, _ = self.lib.read_paper(path)
+        return self._paper(path, meta, pdf.relative_to(self.lib.PDF_ROOT).as_posix()), meta
+
     def topics(self) -> dict[str, str]:
         """The declared topic tree, {folder: scope}, in the file's order."""
         return {str(path): str(scope or "") for path, scope in self.lib.load_topics().items()}

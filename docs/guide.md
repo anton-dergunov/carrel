@@ -143,13 +143,13 @@ The library's tab has five views:
 - **Timeline**: the papers by the year they were published, or by when you added them.
 - **Map**: every paper placed by what it is about, with its regions named. Tap a paper for a peek and its nearest neighbours; a search lights up the papers it finds.
 
-**Adding and removing.** The + in the library's bar adds a paper: an arXiv id or address, a web page's address, or a PDF from the tablet. The library's own command files it and writes its summary, and its output streams in as it works. Remove a paper from its sheet.
+**Adding and removing.** The + in the library's bar adds a paper: an arXiv id or address, a web page's address, or a PDF from the tablet. A paper the library already has shows as soon as its id is typed, with Open in place of Add. Otherwise the library's own command files it and writes its summary, and a card then says how it went: the paper added (or found already there) with Open, or why it was not added, with what the command printed folded beneath. Remove a paper from its sheet.
 
 ## Search
 
 The search box at the top of the library has three depths:
 
-- **Titles** filters titles, authors and summaries as you type, on the device.
+- **Titles** filters titles, authors and summaries as you type, on the device; an arXiv id, or a pasted arXiv link, finds its paper.
 - **Text** searches the full text of every paper on the laptop. Each match is shown in its sentence with its page; tap one and the paper opens there, with the words found.
 - **Meaning** finds the papers nearest a description, in your own words. In Map it lights them up.
 

@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from conftest import DPO, WIDE
 from starlette.testclient import TestClient
 
 from carrel.edits import EditError, Edits, arxiv_id
@@ -49,7 +50,12 @@ def test_an_arxiv_paper_is_filed_by_the_engine(client):
     assert lines(response) == [
         {"line": "ran add 1706.03762"},
         {"line": "no file"},
-        {"done": True, "code": 0, "added": []},  # the stand-in adds nothing
+        {  # the stand-in adds nothing, and says nothing of why
+            "done": True,
+            "code": 0,
+            "outcome": "failed",
+            "reason": "The library's command ended without adding it.",
+        },
     ]
 
 
@@ -121,7 +127,12 @@ def test_a_failing_command_says_so(library, client, monkeypatch):
         json={"source": "https://x.org/fail", "topic": "recsys", "title": "fail"},
         headers=ORIGIN,
     )
-    assert lines(response)[-1] == {"done": True, "code": 3, "added": []}
+    assert lines(response)[-1] == {
+        "done": True,
+        "code": 3,
+        "outcome": "failed",
+        "reason": "The library's command ended without adding it.",
+    }
 
 
 def test_only_from_carrels_own_page(client):
@@ -156,11 +167,84 @@ def test_what_an_add_brought_in(library):
     )
     pdf.write_bytes(b"%PDF-1.4\n")
     try:
-        assert edits.added_since(before) == {
-            "added": [{"pdf": "recsys/New One.pdf", "title": "A New One"}]
+        assert edits.read_outcome(["add-pdf", "x.pdf", "recsys"], [], before) == {
+            "outcome": "added",
+            "papers": [
+                {
+                    "pdf": "recsys/New One.pdf",
+                    "text": "library/recsys/New One.txt",
+                    "title": "A New One",
+                    "added": "2026-10-30",
+                    "summary": "s",
+                    "topic": "recsys",
+                }
+            ],
         }
         assert edits.gone(["remove", "library/recsys/New One.txt"]) == {"removed": False}
     finally:
         paper.unlink()
         pdf.unlink()
     assert edits.gone(["remove", "library/recsys/New One.txt"]) == {"removed": True}
+
+
+def test_why_an_add_brought_nothing_in(library):
+    """Read from the library, and from the lines the engine's add commands print."""
+    edits = Edits(library, command=fake)
+    before = edits.papers_now()
+    outcome = edits.read_outcome
+    wide = library.root / "library" / f"{WIDE}.txt"
+    wide_pdf = library.pdf_root / f"{WIDE}.pdf"
+
+    # An arXiv paper the library has: looked up by its id, whatever was printed.
+    dpo = outcome(["add", "2305.18290"], ["2305.18290: Direct Preference Optimization"], before)
+    assert dpo["outcome"] == "exists"
+    [paper] = dpo["papers"]
+    assert paper["pdf"] == f"{DPO}.pdf" and paper["arxiv"] == "2305.18290"
+    assert paper["topic"] == "llm/post-training/preference-learning"
+
+    # A web page or a PDF the library has: the path the engine names, its text or its PDF.
+    for path in (wide, wide_pdf):
+        found = outcome(
+            ["add-pdf", "x.pdf", "recsys"], ["Title: x", f"skip (exists): {path}"], before
+        )
+        assert found["outcome"] == "exists"
+        assert found["papers"][0]["title"] == "Wide & Deep: A Test Paper"
+    assert outcome(["add-web", "u", "recsys"], ["skip (exists): /elsewhere/x.md"], before) == {
+        "outcome": "failed",
+        "reason": "The library's command ended without adding it.",
+    }
+
+    said = {
+        "skipped": [
+            "2401.00001: A Paper",
+            "  skipped earlier (2026-09-01): off topic",
+            "  not added; remove it from catalog/skipped.yaml to add it",
+            "add: 0 added, 1 not added",
+        ],
+        "missing": ["2401.99999: not found on arXiv", "add: 0 added, 1 not added"],
+        "no folder": [
+            "2401.00001: A Paper",
+            "  not added: no declared folder fits (it is about birds)",
+            "  use the add-paper skill, which proposes a new folder",
+        ],
+        "model": ["2401.00001: A Paper", "  not added: claude -p failed: timeout"],
+        "error": [
+            "Rendering https://x.org ...",
+            "error: the site answered with a bot check (Wait)",
+        ],
+    }
+    assert outcome(["add", "2401.00001"], said["skipped"], before) == {
+        "outcome": "skipped",
+        "reason": "You skipped it on 2026-09-01: off topic",
+    }
+    reasons = {
+        name: outcome(["add", "2401.00001"], printed, before)["reason"]
+        for name, printed in said.items()
+        if name != "skipped"
+    }
+    assert reasons == {
+        "missing": "arXiv has no paper 2401.99999.",
+        "no folder": "No area of the library fits it: it is about birds",
+        "model": "claude -p failed: timeout",
+        "error": "the site answered with a bot check (Wait)",
+    }

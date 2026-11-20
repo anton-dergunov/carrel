@@ -2,13 +2,18 @@
 // share. The laptop runs the engine's own commands (edits.py): an arXiv paper is filed by the
 // engine, a web page or a PDF goes into the area the reader picks.
 
-import { element } from './rows.js';
-
-const ARXIV = /^(?:https?:\/\/(?:www\.)?(?:export\.)?arxiv\.org\/(?:abs|pdf)\/)?\d{4}\.\d{4,5}(?:v\d+)?(?:\.pdf)?\/?$/i;
+import { arxivId, plainTitle } from './library.js';
+import { element, icon, paperRow } from './rows.js';
 
 /** Whether the engine files `source` itself: an arXiv id or address. */
 export function isArxiv(source) {
-  return ARXIV.test(source.trim());
+  return arxivId(source) !== null;
+}
+
+/** The paper in `papers` (the library's document) that `source` names by its arXiv id, if any. */
+export function paperNamed(papers, source) {
+  const id = arxivId(source);
+  return id ? (papers.find((paper) => paper.arxiv === id) ?? null) : null;
 }
 
 /**
@@ -62,10 +67,75 @@ export function commandLog() {
 }
 
 /**
- * The Add button and its sheet. `topics()` lists the areas; `onAdded()` follows a paper added,
- * and `openPaper({pdf, title})` opens one.
+ * What an add came to, as a card: a heading that says it, the paper (a row as the library draws
+ * it, which opens it) or why there is none, the next step, and what the command printed, folded.
+ * `outcome` is the server's ({outcome, papers, reason}, edits.py), or 'exists' for a paper the
+ * library already has, found before anything ran. `rowOf(paper)` gives the library's own entry
+ * for a paper the server named, when it has it; `openButton: false` leaves out Open, when the
+ * sheet's own button says it.
  */
-export function startAdding({ topics, onAdded, openPaper }) {
+export function addResult({ outcome, papers = [], reason = '' }, { printed = '', rowOf = (paper) => paper, onOpen, onAgain, openButton = true }) {
+  const box = element('div', `add-result ${outcome}`);
+  box.setAttribute('role', 'status');
+  const [first] = papers;
+  const heads = {
+    added: [papers.length > 1 ? `Added ${papers.length} papers` : `Added to ${first?.topic ?? 'the library'}`, 'check'],
+    exists: ['Already in your library', 'book-open-check'],
+    skipped: ['You skipped this paper before', 'info'],
+    failed: ['Not added', 'info'],
+  };
+  const [text, mark] = heads[outcome] ?? heads.failed;
+  const head = box.appendChild(element('p', 'result-head'));
+  head.append(icon(mark), element('span', '', text));
+
+  for (const paper of papers.slice(0, 3)) {
+    const shown = rowOf(paper);
+    const row = paperRow({ ...shown, title: plainTitle(shown.title), year: shown.year ?? String(shown.published ?? '').slice(0, 4) }, { rich: true, topic: outcome === 'exists' });
+    row.addEventListener('click', (event) => {
+      event.preventDefault();
+      onOpen(paper);
+    });
+    box.append(row);
+  }
+  if (reason) box.append(element('p', 'result-reason', reason));
+  if (outcome === 'skipped') box.append(element('p', 'result-hint', 'To add it, take it out of catalog/skipped.yaml.'));
+
+  const buttons = element('div', 'result-buttons');
+  if (first && openButton) {
+    const open = buttons.appendChild(element('button', 'primary', 'Open'));
+    open.type = 'button';
+    open.addEventListener('click', () => onOpen(first));
+  }
+  if (outcome === 'added' && onAgain) {
+    const again = buttons.appendChild(element('button', 'plain', 'Add another'));
+    again.type = 'button';
+    again.addEventListener('click', onAgain);
+  }
+  if (buttons.childElementCount) box.append(buttons);
+
+  if (printed) {
+    const output = box.appendChild(element('details', 'result-output'));
+    output.append(element('summary', '', 'What the library printed'));
+    output.append(element('pre', 'lines', printed));
+    output.open = outcome === 'failed' && !reason;
+  }
+  return box;
+}
+
+/** While a command runs: what it is doing, and the last line it printed. */
+function addProgress(text) {
+  const box = element('div', 'add-result running');
+  box.setAttribute('role', 'status');
+  box.append(element('p', 'command-state working', text));
+  const latest = box.appendChild(element('p', 'result-latest'));
+  return { box, line: (line) => (latest.textContent = line) };
+}
+
+/**
+ * The Add button and its sheet. `topics()` lists the areas and `papers()` the library's papers;
+ * `onAdded()` follows a paper added, and `openPaper({pdf, title})` opens one.
+ */
+export function startAdding({ topics, papers = () => [], onAdded, openPaper }) {
   const button = document.getElementById('library-add');
   const sheet = document.getElementById('add-sheet');
   let running = false;
@@ -85,6 +155,11 @@ export function startAdding({ topics, onAdded, openPaper }) {
     if (running) return; // the output stays in view until the command ends
     sheet.hidden = true;
     button.setAttribute('aria-expanded', 'false');
+  }
+
+  function openIt(paper) {
+    close();
+    openPaper({ pdf: paper.pdf, title: plainTitle(paper.title) });
   }
 
   function form() {
@@ -109,37 +184,57 @@ export function startAdding({ topics, onAdded, openPaper }) {
     area.append(new Option('Choose its area…', ''));
     for (const topic of topics()) {
       const depth = topic.path.split('/').length - 1;
-      area.append(new Option(`${' '.repeat(depth)}${topic.path.split('/').at(-1).replaceAll('-', ' ')}`, topic.path));
+      area.append(new Option(`${' '.repeat(depth)}${topic.path.split('/').at(-1).replaceAll('-', ' ')}`, topic.path));
     }
     const named = where.appendChild(element('input'));
     named.type = 'text';
     named.placeholder = 'Its title (if the page or PDF lacks one)';
     named.setAttribute('aria-label', 'Its title');
-    const hint = element('p', 'hint', 'An arXiv paper is filed by the library: a model picks its area and writes its summary.');
+    const hint = element('p', 'hint');
 
     const add = element('button', 'primary', 'Add');
     add.type = 'button';
-    const log = commandLog();
-    log.box.hidden = true;
+    const result = element('div', 'add-results');
+    let known = null; // the library's paper the box names, found as it is typed
+    let finished = false; // a command's card is showing, until the box changes
+
+    const rowOf = (paper) => papers().find((each) => each.pdf === paper.pdf) ?? paper;
+    const again = () => {
+      finished = false;
+      result.replaceChildren();
+      update();
+      source.focus({ preventScroll: true });
+    };
 
     const update = () => {
       const pdf = file.files?.[0];
+      known = pdf ? null : paperNamed(papers(), source.value);
       const filed = !pdf && isArxiv(source.value);
       where.hidden = filed || (!pdf && !source.value.trim());
+      hint.hidden = Boolean(known) || finished;
       hint.textContent = pdf
         ? `${pdf.name}: choose the area it goes in.`
         : filed || !source.value.trim()
           ? 'An arXiv paper is filed by the library: a model picks its area and writes its summary.'
           : 'A web page is printed to a PDF and its text kept; choose the area it goes in.';
-      add.disabled = running || (!pdf && !source.value.trim()) || (!filed && !area.value);
+      add.textContent = known ? 'Open' : 'Add';
+      add.disabled = running || (!known && ((!pdf && !source.value.trim()) || (!filed && !area.value)));
+      if (!running && !finished) {
+        result.replaceChildren(...(known ? [addResult({ outcome: 'exists', papers: [known] }, { onOpen: openIt, openButton: false })] : []));
+      }
+    };
+    const changed = () => {
+      if (running) return;
+      finished = false;
+      update();
     };
     source.addEventListener('input', () => {
       if (source.value) file.value = '';
-      update();
+      changed();
     });
     file.addEventListener('change', () => {
       if (file.files?.length) source.value = '';
-      update();
+      changed();
     });
     area.addEventListener('change', update);
     source.addEventListener('keydown', (event) => {
@@ -147,51 +242,50 @@ export function startAdding({ topics, onAdded, openPaper }) {
     });
 
     add.addEventListener('click', async () => {
+      if (known) return openIt(known);
       const pdf = file.files?.[0];
       running = true;
       update();
-      log.box.hidden = false;
-      log.say(isArxiv(source.value) && !pdf ? 'Asking arXiv, then a model for its area…' : 'Adding…', 'working');
+      const progress = addProgress(isArxiv(source.value) && !pdf ? 'Asking arXiv, then a model for its area…' : 'Adding…');
+      result.replaceChildren(progress.box);
+      const printed = [];
+      const onLine = (line) => {
+        printed.push(line);
+        if (line.trim()) progress.line(line.trim());
+      };
+      let card;
       try {
         const ended = pdf
           ? await runCommand(
               `/api/add?${new URLSearchParams({ topic: area.value, title: named.value, name: pdf.name })}`,
               { method: 'POST', headers: { 'Content-Type': 'application/pdf' }, body: pdf },
-              log.line,
+              onLine,
             )
           : await runCommand(
               '/api/add',
               { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: source.value, topic: area.value, title: named.value }) },
-              log.line,
+              onLine,
             );
-        if (ended.added?.length) {
-          const [first] = ended.added;
-          log.say(ended.added.length > 1 ? `Added ${ended.added.length} papers.` : `Added “${first.title}”.`, 'done');
-          const open = element('button', 'plain', 'Open it');
-          open.type = 'button';
-          open.addEventListener('click', () => {
-            close();
-            openPaper(first);
-          });
-          log.box.append(open);
+        card = ended;
+        if (ended.outcome === 'added') {
           source.value = '';
           file.value = '';
           onAdded();
-        } else {
-          log.say('Nothing was added: the output above says why.', 'error');
         }
       } catch (error) {
-        log.say(String(error.message || error), 'error');
+        card = { outcome: 'failed', reason: String(error.message || error) };
       } finally {
         running = false;
+        finished = true;
         update();
       }
+      result.replaceChildren(addResult(card, { printed: printed.join('\n'), rowOf, onOpen: openIt, onAgain: again }));
     });
 
     update();
     const row = element('div', 'add-row');
     row.append(source, add);
-    return [title, row, choose, file, where, hint, log.box];
+    return [title, row, choose, file, where, hint, result];
   }
 
   button.addEventListener('click', open);

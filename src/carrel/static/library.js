@@ -70,16 +70,28 @@ export function plainTitle(title) {
   });
 }
 
-/** One lower-case text per paper: title, authors, summary, topic, type, year and the reader's tags. */
+/** One lower-case text per paper: title, authors, summary, topic, type, year, the reader's tags and the arXiv id. */
 export function haystackOf(paper) {
-  return [paper.title, [paper.authors ?? []].flat().join(' '), paper.summary, paper.topic.replaceAll('/', ' '), paper.type, paper.year, (paper.tags ?? []).join(' ')]
+  return [paper.title, [paper.authors ?? []].flat().join(' '), paper.summary, paper.topic.replaceAll('/', ' '), paper.type, paper.year, (paper.tags ?? []).join(' '), paper.arxiv]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
 }
 
+const ARXIV = /^(?:https?:\/\/)?(?:(?:www\.)?(?:export\.)?arxiv\.org\/(?:abs|pdf)\/)?(\d{4}\.\d{4,5})(?:v\d+)?(?:\.pdf)?\/?$/i;
+
+/** The arXiv id in `text`, an id or an arXiv address ("2505.12540", ".../abs/2505.12540v2"), or null. */
+export function arxivId(text) {
+  return ARXIV.exec(String(text).trim())?.[1] ?? null;
+}
+
+/** A query's words, lower-case; an arXiv address is its id, so a pasted link finds its paper. */
 export function words(query) {
-  return query.toLowerCase().split(/\s+/).filter(Boolean);
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => arxivId(word) ?? word);
 }
 
 /** Whether a paper is in an area: its own folder or one under it. '' is the whole library. */
@@ -186,7 +198,7 @@ const LEAD = 40; // how much of the summary comes before its first match
 
 /**
  * What a title search found outside the title: for the words the title lacks, the fields that
- * hold them, in the order summary, authors, area, type, year, tags, as [{field, text, ranges}], the
+ * hold them, in the order summary, authors, area, type, year, tags, arXiv id, as [{field, text, ranges}], the
  * ranges marking every word. A field comes only for a word no field before it holds. The summary
  * is cut to start a little before its first match; the authors are the ones whose names match.
  * `shown` names fields the row already shows: they account for their words, and are left out.
@@ -212,6 +224,7 @@ export function foundOutsideTitle(paper, words, { shown = [] } = {}) {
   field('type', paper.type);
   field('year', paper.year);
   field('tags', (paper.tags ?? []).join(' '), (held) => paper.tags.filter((tag) => held.some((word) => tag.includes(word))).join(', '));
+  field('arxiv', paper.arxiv);
   return found;
 }
 

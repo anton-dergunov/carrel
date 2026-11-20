@@ -1684,6 +1684,25 @@ button.danger { background: var(--error); color: var(--surface); padding: 6px 14
 .command-state.done { color: var(--accent); }
 .command-state.error { color: var(--error); }
 @media (prefers-reduced-motion: reduce) { .command-state.working { animation: none; } #add-sheet { animation: none; } }
+/* What an add came to: a card with the paper (a library row), the next step, and the output folded. */
+.add-results:empty { display: none; }
+.add-result { display: grid; gap: 8px; padding: 12px 12px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.add-result.running { gap: 2px; padding: 0; border: 0; background: none; }
+.add-result .result-head { display: flex; align-items: center; gap: 8px; margin: 0; font: 600 calc(15px * var(--scale)) var(--ui); color: var(--text); }
+.add-result .result-head .icon { flex: none; width: 18px; height: 18px; color: var(--accent); }
+.add-result.skipped .result-head .icon { color: var(--muted); }
+.add-result.failed .result-head, .add-result.failed .result-head .icon { color: var(--error); }
+.add-result .paper-row { min-height: 0; padding: 2px 0; border-bottom: 0; border-radius: 8px; content-visibility: visible; }
+.add-result .paper-row .summary { -webkit-line-clamp: 3; }
+.add-result .result-reason { margin: 0; font-size: calc(14.5px * var(--scale)); line-height: 1.45; color: var(--text); overflow-wrap: anywhere; }
+.add-result .result-hint { margin: 0; font-size: calc(13px * var(--scale)); color: var(--muted); }
+.add-result .result-buttons { display: flex; align-items: center; gap: 16px; }
+#add-sheet .add-result .result-buttons .plain { justify-self: auto; }
+.add-result .result-output summary { cursor: pointer; width: fit-content; font-size: calc(13px * var(--scale)); color: var(--muted); }
+.add-result .result-output .lines { margin: 6px 0 0; max-height: 180px; overflow: auto; padding: 8px 10px; border-radius: 8px; background: var(--surface); font: calc(12px * var(--scale))/1.45 var(--mono); color: var(--muted); white-space: pre-wrap; word-break: break-word; }
+.add-result .result-latest { margin: 0; font: calc(12px * var(--scale))/1.45 var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.add-result .result-latest:empty { display: none; }
+#add-sheet .hint[hidden] { display: none; }
 .confirm-remove { display: grid; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .confirm-remove .warning { margin: 0; font-size: calc(13.5px * var(--scale)); line-height: 1.4; color: var(--text); }
 .confirm-remove .buttons { display: flex; align-items: center; gap: 12px; }

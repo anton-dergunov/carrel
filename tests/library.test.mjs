@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   ancestry,
   areaCounts,
+  arxivId,
   chipsOn,
   defaultLibraryState,
   emptyChips,
@@ -19,13 +20,14 @@ import {
   sortPapers,
   sortRanks,
   topicTree,
+  words,
   yearCounts,
 } from '../src/carrel/static/library.js';
 
 const doc = () =>
   prepare({
     papers: [
-      { pdf: 'llm/eval/a.pdf', text: 'library/llm/eval/a.txt', title: 'Judging judges', authors: ['Lin Shi'], published: '2024-06-01', added: '2026-10-01', summary: 'Position bias in judges.', topic: 'llm/eval', type: 'study', reviews: ['llm/eval'] },
+      { pdf: 'llm/eval/a.pdf', text: 'library/llm/eval/a.txt', title: 'Judging judges', authors: ['Lin Shi'], published: '2024-06-01', added: '2026-10-01', summary: 'Position bias in judges.', topic: 'llm/eval', type: 'study', reviews: ['llm/eval'], arxiv: '2406.07791' },
       { pdf: 'llm/eval/b.pdf', text: 'library/llm/eval/b.txt', title: '$\\tau$-bench', published: '2024-02-01', added: '2026-10-16', topic: 'llm/eval', type: 'benchmark', chats: 3 },
       { pdf: 'llm/c.pdf', text: 'library/llm/c.txt', title: 'Attention', published: '2017-06-12', added: '2026-09-30', topic: 'llm', overview: true, tags: ['carrel', 'memory-talk'], highlights: 4 },
       { pdf: 'recsys/d.pdf', text: 'library/recsys/d.txt', title: 'Wide & Deep', topic: 'recsys', type: 'method', starred: '2026-10-31', tags: ['carrel'] },
@@ -47,6 +49,21 @@ test('every word must match, in the title, authors, summary, topic or type', () 
   assert.deepEqual(titles(filterPapers(papers, 'eval benchmark')), ['τ-bench']);
   assert.deepEqual(titles(filterPapers(papers, 'nothing here')), []);
   assert.equal(filterPapers(papers, '').length, 4);
+});
+
+test('a paper is found by its arXiv id, or an arXiv address pasted whole', () => {
+  const { papers } = doc();
+  assert.equal(arxivId('2505.12540'), '2505.12540');
+  assert.equal(arxivId(' https://arxiv.org/abs/2505.12540v2 '), '2505.12540');
+  assert.equal(arxivId('arxiv.org/pdf/2505.12540.pdf'), '2505.12540');
+  assert.equal(arxivId('https://example.org/abs/2505.12540'), null);
+  assert.equal(arxivId('2505'), null);
+  assert.deepEqual(words('Judges https://arxiv.org/abs/2406.07791v3'), ['judges', '2406.07791']);
+  assert.deepEqual(titles(filterPapers(papers, '2406.07791')), ['Judging judges']);
+  assert.deepEqual(titles(filterPapers(papers, 'https://export.arxiv.org/abs/2406.07791')), ['Judging judges']);
+  assert.deepEqual(titles(filterPapers(papers, '2406.07')), ['Judging judges']); // a part of it, as it is typed
+  const judges = papers.find((paper) => paper.title === 'Judging judges');
+  assert.deepEqual(foundOutsideTitle(judges, ['2406.07791']), [{ field: 'arxiv', text: '2406.07791', ranges: [[0, 10]] }]);
 });
 
 test('chips: areas, types, years and what was touched', () => {

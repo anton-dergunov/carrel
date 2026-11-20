@@ -333,7 +333,11 @@ def make_app(
                     str(asked.get("source") or ""), asked.get("topic"), asked.get("title")
                 )
             before = await asyncio.to_thread(edits.papers_now)
-            lines = await edits.run(args, cleanup=upload, outcome=lambda: edits.added_since(before))
+            lines = await edits.run(
+                args,
+                cleanup=upload,
+                outcome=lambda printed: edits.read_outcome(args, printed, before),
+            )
         except EditError as error:
             discard_upload(upload)
             return JSONResponse({"error": str(error)}, status_code=error.status)
@@ -350,7 +354,7 @@ def make_app(
             if not isinstance(asked, dict) or not isinstance(asked.get("pdf"), str):
                 raise EditError("Say which paper.")
             args = edits.remove_args(asked["pdf"], asked.get("reason"))
-            lines = await edits.run(args, outcome=lambda: edits.gone(args))
+            lines = await edits.run(args, outcome=lambda printed: edits.gone(args))
         except EditError as error:
             return JSONResponse({"error": str(error)}, status_code=error.status)
         log.info("removing: paperlib %s", " ".join(args))

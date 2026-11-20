@@ -10,10 +10,15 @@ run one at a time, their output streamed back as they print it.
 Each answer is a stream of JSON lines: {"line": text} as the command prints, then {"done":
 true, "code": n, …what happened}. What happened is read from the library, not the exit code:
 `paperlib add` exits 0 for a paper it already has, and `remove` exits 1 when the library's
-check afterwards finds a review still linking the paper it removed. So an add says which
-papers appeared ({"added": [{pdf, title}]}), and a remove whether the paper is gone
-({"removed": bool}). The engine rebuilds the indexes after each, and the library's document
-follows (catalog.py notices the change).
+check afterwards finds a review still linking the paper it removed. So a remove says whether
+the paper is gone ({"removed": bool}), and an add how it went (`Edits.read_outcome`):
+
+    {"outcome": "added" | "exists" | "skipped" | "failed",
+     "papers": [{pdf, text, title, topic, …}],   the papers added, or the one already there
+     "reason": text}                             why not, for "skipped" and "failed"
+
+The engine rebuilds the indexes after each, and the library's document follows (catalog.py
+notices the change).
 """
 
 import asyncio
@@ -24,6 +29,7 @@ import tempfile
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 
+from .catalog import FIELDS, field_value
 from .engine import Library
 
 ARXIV = re.compile(
@@ -98,16 +104,66 @@ class Edits:
     def papers_now(self) -> set[Path]:
         return set(self.library.lib.paper_files())
 
-    def added_since(self, before: set[Path]) -> dict:
-        """The papers that appeared since `before`, with their PDFs."""
-        added = []
-        for path in sorted(self.papers_now() - before):
-            pdf = Path(self.library.lib.pdf_path_for(path))
-            if pdf.is_file():
-                meta, _ = self.library.lib.read_paper(path)
-                rel = pdf.relative_to(self.library.lib.PDF_ROOT).as_posix()
-                added.append({"pdf": rel, "title": str(meta.get("title") or path.stem)})
-        return {"added": added}
+    def card(self, path: Path) -> dict | None:
+        """A paper, from its file, with the fields the library's document gives it (those a
+        row shows), or None when it has no PDF to open."""
+        found = self.library.entry(path)
+        if not found:
+            return None
+        paper, meta = found
+        card = {"pdf": paper.pdf, "text": paper.text}
+        for field in (*FIELDS, "type"):
+            value = field_value(meta.get(field))
+            if value:
+                card[field] = value
+        card.setdefault("title", paper.title)
+        card["topic"] = paper.topic
+        return card
+
+    def read_outcome(self, args: list[str], lines: list[str], before: set[Path]) -> dict:
+        """How an add went: the papers that appeared since `before`; else the paper already in
+        the library, the reader's earlier skip, or why it failed, from the engine's lines:
+
+            <id>: not found on arXiv                       (add-paper.py)
+              already in library: <paper file>             (add-paper.py; the id is looked up)
+              skipped earlier (<date>): <reason>           (add-paper.py)
+              not added: no declared folder fits (<why>)   (add-paper.py)
+              not added: <why>                             (add-paper.py)
+            skip (exists): <paper file or PDF>             (add-web-article.py, add-pdf-paper.sh)
+            error: <why>                                   (each of them)
+        """
+        added = [card for path in sorted(self.papers_now() - before) if (card := self.card(path))]
+        if added:
+            return {"outcome": "added", "papers": added}
+        lib = self.library.lib
+        if args[0] == "add":
+            path = lib.library_arxiv_ids().get(args[1])
+            if path and (card := self.card(path)):
+                return {"outcome": "exists", "papers": [card]}
+        for line in lines:
+            found = re.match(r"\s*skip \(exists\): (.+)$", line)
+            if found and (card := self._existing(Path(found[1]))):
+                return {"outcome": "exists", "papers": [card]}
+        for line in lines:
+            found = re.match(r"\s*skipped earlier \(([^)]*)\): (.+)$", line)
+            if found:
+                when = f" on {found[1]}" if found[1] else ""
+                return {"outcome": "skipped", "reason": f"You skipped it{when}: {found[2]}"}
+        return {"outcome": "failed", "reason": _failure(lines)}
+
+    def _existing(self, path: Path) -> dict | None:
+        """The paper a path the engine printed names: its paper file, or its PDF."""
+        lib = self.library.lib
+        try:
+            if path.suffix == ".pdf":
+                rel = path.resolve().relative_to(Path(lib.PDF_ROOT).resolve())
+                paper = self.library.paper_for_pdf(rel.as_posix())
+                return self.card(self.library.root / paper.text) if paper else None
+            if path.resolve().is_relative_to(self.library.papers_dir) and path.is_file():
+                return self.card(path.resolve())
+        except (ValueError, LookupError, OSError):
+            return None
+        return None
 
     def gone(self, args: list[str]) -> dict:
         """Whether the paper a remove named is no longer in the library."""
@@ -117,10 +173,11 @@ class Edits:
         self,
         args: list[str],
         cleanup: Path | None = None,
-        outcome: Callable[[], dict] | None = None,
+        outcome: Callable[[list[str]], dict] | None = None,
     ) -> AsyncIterator[bytes]:
         """Runs `paperlib <args>`, yielding its output as JSON lines, then the exit code and
-        `outcome()`, what the library says happened; refused while another runs."""
+        `outcome(lines)`, what the library (and the lines printed) say happened; refused while
+        another runs."""
         if self.running.locked():
             raise EditError("Another paper is being added or removed; wait for it.", 409)
         await self.running.acquire()
@@ -138,11 +195,13 @@ class Edits:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.STDOUT,
                 )
+                printed = []
                 async for raw in process.stdout:
-                    yield _line({"line": _plain(raw.decode("utf-8", "replace").rstrip("\n"))})
+                    printed.append(_uncoloured(raw.decode("utf-8", "replace").rstrip("\n")))
+                    yield _line({"line": printed[-1]})
                 code = await process.wait()
                 ended = True
-                happened = await asyncio.to_thread(outcome) if outcome else {}
+                happened = await asyncio.to_thread(outcome, printed) if outcome else {}
                 yield _line({"done": True, "code": code, **happened})
             finally:
                 if process and not ended:
@@ -201,10 +260,23 @@ def _one_line(text: str, longest: int) -> str:
     return " ".join(str(text).split())[:longest]
 
 
+def _failure(lines: list[str]) -> str:
+    """Why an add failed, in a sentence, from the last line of the engine's that says so."""
+    for line in reversed(lines):
+        line = line.strip()
+        if found := re.match(r"(\d{4}\.\d{4,5}): not found on arXiv$", line):
+            return f"arXiv has no paper {found[1]}."
+        if found := re.match(r"not added: no declared folder fits \((.*)\)$", line):
+            return f"No area of the library fits it: {found[1]}"
+        if found := re.match(r"(?:not added|error): (.+)$", line):
+            return found[1].strip()  # as the engine says it: it may begin with a command's name
+    return "The library's command ended without adding it."
+
+
 _ESCAPES = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 
-def _plain(text: str) -> str:
+def _uncoloured(text: str) -> str:
     """A line as the page shows it: without the terminal's colours."""
     return _ESCAPES.sub("", text)
 

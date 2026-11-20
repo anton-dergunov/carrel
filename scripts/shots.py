@@ -5,7 +5,7 @@
         [--layout PLACE] [--tabs] [--find QUERY] [--highlight] [--settings] [--note TEXT]
         [--info] [--overview] [--type TEXT] [--chat ID] [--ask QUESTION] [--model M]
         [--view areas|all|map] [--area TOPIC] [--more] [--rich] [--search Q [--text | --meaning]]
-        [--review SCOPE [--peek]]
+        [--review SCOPE [--peek]] [--add SOURCE [--add-run]]
 
 URL is a page of a running carrel: a reading page, e.g. http://127.0.0.1:8517/read/<pdf>, or
 the library, http://127.0.0.1:8517/. Takes a shot once the PDF, or the library, is drawn.
@@ -42,7 +42,11 @@ library. The browser's chats run on Haiku (--model), as testing the page needs n
 (this runs a real Claude Code turn, which costs; --allow taps Allow on each permission
 request), opens the turn's fold, taps the answer's first citation, reloads the page to see
 the chat come back, and takes a shot after each step. Prints the page the PDF is on at each
-step. Each run starts a new chat: the browser remembers none.
+step. Each run starts a new chat: the browser remembers none. --add types SOURCE into the
+library's Add sheet (a PDF's path is chosen as the file, into the first area) and shoots what
+it shows (a paper the library has is shown at once, and nothing runs); --add-run also presses
+Add and shoots the command running and the card its end draws, which adds the paper: a
+throwaway library only.
 """
 
 import argparse
@@ -627,6 +631,36 @@ def library_pass(page, args, out: Path) -> None:
         page.screenshot(path=out / "library-search-opened.png")
 
 
+def add_pass(page, source: str, run: bool, out: Path) -> None:
+    """The Add sheet with `source` typed in: what it says before anything runs (a paper the
+    library has is shown at once), and with `run`, the card the command's end draws."""
+    page.click("#library-add")
+    page.wait_for_selector("#add-sheet:not([hidden])")
+    if source.endswith(".pdf") and Path(source).is_file():  # a PDF, into the first area
+        page.set_input_files('#add-sheet input[type="file"]', source)
+        page.select_option("#add-sheet .add-where select", index=1)
+    else:
+        page.type("#add-sheet .add-row input", source, delay=20)
+    page.wait_for_timeout(300)
+    button = page.inner_text("#add-sheet .add-row button")
+    print(
+        "add:", source, "| button:", button, "|", page.inner_text("#add-sheet .add-results") or "-"
+    )
+    page.screenshot(path=out / "add-typed.png")
+    if not run or button != "Add":
+        return
+    page.click("#add-sheet .add-row button")
+    page.wait_for_timeout(400)
+    page.screenshot(path=out / "add-running.png")
+    page.wait_for_selector("#add-sheet .add-result:not(.running)", timeout=180_000)
+    page.wait_for_timeout(300)
+    print("added:", " | ".join(page.inner_text("#add-sheet .add-result").split("\n")[:4]))
+    page.screenshot(path=out / "add-result.png")
+    page.click("#add-sheet .result-output summary")
+    page.wait_for_timeout(200)
+    page.screenshot(path=out / "add-result-output.png")
+
+
 def review_pass(page, peek: bool, out: Path) -> None:
     """A review in its tab, and the peek at a paper it cites."""
     page.wait_for_selector(".review-body", timeout=30_000)
@@ -752,6 +786,12 @@ def main() -> None:
     parser.add_argument(
         "--meaning", action="store_true", help="with --search, search the papers by meaning"
     )
+    parser.add_argument(
+        "--add", help="type this into the Add sheet (a PDF's path: choose it, into the first area)"
+    )
+    parser.add_argument(
+        "--add-run", action="store_true", help="with --add, press Add: a throwaway library only"
+    )
     parser.add_argument("--review", help="open the review of this scope")
     parser.add_argument("--peek", action="store_true", help="with --review, peek at a cited paper")
     parser.add_argument("--timeout", type=int, default=240, help="seconds to wait for an answer")
@@ -810,6 +850,8 @@ def main() -> None:
             page.screenshot(path=args.out / f"1-open{'-' + args.layout if args.layout else ''}.png")
         else:
             library_pass(page, args, args.out)
+            if args.add:
+                add_pass(page, args.add, args.add_run, args.out)
 
         if args.tabs:
             tabs_pass(page, args.out)

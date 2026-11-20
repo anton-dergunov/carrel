@@ -64,7 +64,8 @@ def _stamp(path: Path, deep: bool = True, suffix: str = "") -> tuple[int, int]:
     return count, latest
 
 
-def _plain(value: object) -> object:
+def field_value(value: object) -> object:
+    """A frontmatter value as the document holds it: text or a list of texts, None when empty."""
     if isinstance(value, list):
         return [str(item) for item in value if item not in (None, "")]
     return str(value) if value not in (None, "") else None
@@ -133,7 +134,7 @@ class Catalog:
         for paper, meta in library.entries():
             entry = {"pdf": paper.pdf, "text": paper.text}
             for field in FIELDS:
-                value = _plain(meta.get(field))
+                value = field_value(meta.get(field))
                 if value:
                     entry[field] = value
             entry.setdefault("title", paper.title)

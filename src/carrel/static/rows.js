@@ -113,7 +113,7 @@ export function groupHeading(text, count) {
   return heading;
 }
 
-const FOUND_LABELS = { summary: 'summary', authors: 'by', area: 'area', type: 'type', year: 'published', tags: 'tagged' };
+const FOUND_LABELS = { summary: 'summary', authors: 'by', area: 'area', type: 'type', year: 'published', tags: 'tagged', arxiv: 'arXiv' };
 
 /**
  * Marks the `words` (lower-case) of a title search in a row from `paperRow`, and adds the line

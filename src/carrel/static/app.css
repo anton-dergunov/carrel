@@ -967,7 +967,7 @@ article.review[hidden] { display: none; }
 .review-body a { color: var(--text); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 55%, transparent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .review-body a[data-kind="page"] { color: var(--accent); text-decoration: none; font: 0.82em var(--ui); font-variant-numeric: tabular-nums; }
 .review-body a[data-kind="review"] { color: var(--accent); }
-.review-body a.peeked { background: var(--accent-soft); border-radius: 3px; }
+.answer a.peeked { background: var(--accent-soft); border-radius: 3px; }
 .review-body .diagram { margin: 1em 0 1.4em; }
 #review-pane { container-type: inline-size; }
 

@@ -157,7 +157,7 @@ Meaning search embeds each paper's title, summary and abstract with the encoder 
 
 ## Reviews
 
-When an area has a literature review, it shows on Desk and on the area's page. A review opens in a tab of its own. Tap a paper it cites for a peek with its summary, then open it, or open it at the page the review cites. The chat beside a review is asked about the review.
+When an area has a literature review, it shows on Desk and on the area's page. A review opens in a tab of its own. Tap a paper it cites for a peek with its summary, then open it, or open it at the page the review cites. A paper the chat names from the library opens the same peek. The chat beside a review is asked about the review.
 
 ## Chats
 

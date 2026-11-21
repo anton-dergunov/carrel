@@ -36,7 +36,8 @@ opens every section and opens the sheet out over the pane (on a phone it is over
 which moves the note to the Trash: a throwaway library again, with a note put in its
 overview_dir by hand (no model is asked). --type types TEXT into the question box and takes a
 shot without sending it, for the slash commands' list. --chat opens the chat with that id and
-takes a shot of each of a few of its formulas, code blocks and tables: an earlier chat, VS Code's or
+takes a shot of each of a few of its formulas, code blocks and tables, then taps its last link to a
+paper's text file, shoots the peek and opens the paper: an earlier chat, VS Code's or
 carrel's, is drawn from its transcript, and no question is asked, so it can be the reader's
 library. The browser's chats run on Haiku (--model), as testing the page needs no more. With --ask, it also types the question, waits for the answer
 (this runs a real Claude Code turn, which costs; --allow taps Allow on each permission
@@ -54,6 +55,7 @@ import json
 import time
 from pathlib import Path
 
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import sync_playwright
 
 IPAD = {"width": 820, "height": 1180}
@@ -423,6 +425,29 @@ def chat_pass(page, chat: str, out: Path) -> None:
             page.screenshot(path=out / f"chat-{chat[:8]}-{shown:02}.png")
     if not shown:
         page.screenshot(path=out / f"chat-{chat[:8]}-01.png")
+    # A link to a library paper's text file, as answers copy them from reviews: its peek, then Open.
+    links = page.locator('.answer a[href$=".txt"]')
+    print("  links to papers' text files:", links.count())
+    if not links.count():
+        return
+    link = links.last
+    link.scroll_into_view_if_needed()
+    page.wait_for_timeout(300)
+    link.click()
+    try:
+        page.wait_for_selector("#peek:not([hidden])", timeout=3000)
+    except PlaywrightError:
+        print("  peek: none")
+        page.screenshot(path=out / f"chat-{chat[:8]}-peek.png")
+        return
+    page.wait_for_timeout(200)
+    print("  peek:", " | ".join(page.inner_text("#peek").splitlines()))
+    page.screenshot(path=out / f"chat-{chat[:8]}-peek.png")
+    page.click("#peek .primary")
+    page.wait_for_selector(".pdfViewer .page canvas", timeout=30_000)
+    page.wait_for_timeout(1500)
+    print("  opened:", page.locator(".tab.paper[aria-selected=true]").first.inner_text())
+    page.screenshot(path=out / f"chat-{chat[:8]}-opened.png")
 
 
 def map_pass(page, args, out: Path) -> None:

@@ -11,7 +11,8 @@
 // A question that starts with `/` is a slash command, run by Claude Code as in the terminal; the
 // box lists the commands that match while one is typed.
 
-import { parsePaperLink } from './links.js';
+import { loadLibrary } from './library.js';
+import { libraryPath, namesFile, paperOfLink, parsePaperLink } from './links.js';
 import { drawMarkdown } from './markdown.js';
 import { linkPages } from './page-links.js';
 import { startOverview } from './overview.js';
@@ -41,8 +42,9 @@ export function wholeParagraphs(text) {
  * `currentPaper()` and `currentPage()` say what a question is about, or `currentReview()` the
  * review's scope when one is in view; `openTarget` follows a citation, `openReview(scope)`
  * opens a review, and `reviewNamed(file)` says which review a file is ({scope, title}, or null);
- * `papers()` lists the library's papers ({title, pdf}), so a plain "p. 7" in an answer can be
- * linked to the paper it is about (page-links.js); `layout` is layout.js's control, for the
+ * `papers()` lists the library's papers ({title, pdf, text, …}), so a plain "p. 7" in an answer
+ * can be linked to the paper it is about (page-links.js); `peek` is peek.js's card, for a link to
+ * a paper's text file; `layout` is layout.js's control, for the
  * settings' choice of where the chat sits; `reveal()` brings the chat into view; `onActivity()` says an answer ended or a question for
  * the reader came, so a chat out of sight can say so. Returns `quote(passage)`, which sets the passage the next question
  * carries ({pdf, page, text}, or null for none), `quoted()`, the one it would carry, `focus()`,
@@ -56,6 +58,7 @@ export function startChat({
   openReview = () => {},
   reviewNamed = () => null,
   papers = () => [],
+  peek = null,
   reveal,
   onActivity = () => {},
   layout = null,
@@ -687,21 +690,40 @@ export function startChat({
     return header;
   }
 
-  // Citations move the PDF, and a link to a paper's overview note opens it, with its paper; any
-  // other link opens in a new tab.
+  // Citations move the PDF; a link to a paper's text file (as reviews link papers, and an answer
+  // copies) opens a peek at the paper, and one to a review opens it; a link to a paper's overview
+  // note opens it, with its paper; any other link opens in a new tab. A path is read from the
+  // link as written: the page's address would resolve it to nothing.
   log.addEventListener('click', (event) => {
     const link = event.target.closest('a[href]');
     if (!link || link.classList.contains('about')) return;
     event.preventDefault();
+    void follow(link);
+  });
+
+  async function follow(link) {
     const target = parsePaperLink(link.href);
     if (target) {
       openTarget(target);
+      return;
+    }
+    const href = link.getAttribute('href');
+    const path = libraryPath(href);
+    // The library's document, loaded once for the page (at once when it is already there).
+    const library = path ? await loadLibrary().catch(() => null) : null;
+    const paper = library && paperOfLink(href, library.papers);
+    const review = library?.reviews.find((each) => namesFile(path, each.path));
+    if (paper) {
+      peek?.toggle(link, paper, log);
+    } else if (review) {
+      openReview(review.scope, review.title);
     } else if (overview.opensLink(new URL(link.href))) {
       // shown over the chat
     } else {
       window.open(link.href, '_blank', 'noopener');
     }
-  });
+  }
+  log.addEventListener('scroll', () => peek?.close(), { passive: true });
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();

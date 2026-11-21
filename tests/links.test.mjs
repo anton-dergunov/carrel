@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { formatRects, parsePaperLink, parseRects, parseTargetParts, sameFile } from '../src/carrel/static/links.js';
+import { formatRects, libraryPath, namesFile, paperOfLink, parsePaperLink, parseRects, parseTargetParts, sameFile } from '../src/carrel/static/links.js';
 
 // parseTargetParts: the cases of vscode-pdf-viewer's test/linkFormat.test.ts. The inputs are
 // already percent-decoded.
@@ -107,4 +107,41 @@ test('other links are not paper links', () => {
 
 test('the same file in two Unicode forms', () => {
   assert.ok(sameFile('Précis.pdf', 'Précis.pdf'));
+});
+
+// A link to a library file, as an answer copies a review's: relative to the library's root.
+
+const papers = [
+  { text: 'library/representation-learning/embeddings/GloVe. Global Vectors for Word Representation.txt', pdf: 'representation-learning/embeddings/GloVe. Global Vectors for Word Representation.pdf' },
+  { text: 'library/representation-learning/embeddings/Text Embeddings Reveal (Almost) As Much As Text.txt', pdf: 'representation-learning/embeddings/Text Embeddings Reveal (Almost) As Much As Text.pdf' },
+  { text: 'library/nlp/Café au lait.txt', pdf: 'nlp/Café au lait.pdf' },
+];
+
+test('a paper by its text file, percent-encoded as an answer writes it', () => {
+  assert.equal(paperOfLink('library/representation-learning/embeddings/GloVe.%20Global%20Vectors%20for%20Word%20Representation.txt', papers), papers[0]);
+  assert.equal(paperOfLink('library/representation-learning/embeddings/Text%20Embeddings%20Reveal%20(Almost)%20As%20Much%20As%20Text.txt', papers), papers[1]);
+});
+
+test('a paper by "./", by an absolute path, or in another Unicode form', () => {
+  assert.equal(paperOfLink('./library/nlp/Caf%C3%A9%20au%20lait.txt', papers), papers[2]);
+  assert.equal(paperOfLink('/Users/someone/papers/library/nlp/Café au lait.txt', papers), papers[2]);
+  assert.equal(paperOfLink('library/nlp/Café au lait.txt', papers), papers[2]);
+  assert.equal(paperOfLink('library/nlp/Café au lait.txt#L3', papers), papers[2]);
+});
+
+test('no paper for another file, a web link, a page link or an anchor', () => {
+  assert.equal(paperOfLink('library/nlp/Thé.txt', papers), undefined);
+  assert.equal(paperOfLink('nlp/Café au lait.txt', papers), undefined); // not a path from the root
+  assert.equal(paperOfLink('https://arxiv.org/abs/1310.4546', papers), undefined);
+  assert.equal(paperOfLink('http://pdf.invalid/nlp/Caf%C3%A9%20au%20lait.pdf?page=2', papers), undefined);
+  assert.equal(paperOfLink('#notes', papers), undefined);
+  assert.equal(paperOfLink(null, papers), undefined);
+});
+
+test('a review by its path', () => {
+  assert.equal(libraryPath('reviews/representation-learning.md'), 'reviews/representation-learning.md');
+  assert.ok(namesFile(libraryPath('./reviews/representation-learning.md'), 'reviews/representation-learning.md'));
+  assert.ok(namesFile('/Users/someone/papers/reviews/llm.md', 'reviews/llm.md'));
+  assert.ok(!namesFile('/Users/someone/papers/reviews/other-llm.md', 'reviews/llm.md'));
+  assert.ok(!namesFile('old/reviews/llm.md', 'reviews/llm.md'));
 });

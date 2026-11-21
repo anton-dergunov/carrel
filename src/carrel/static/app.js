@@ -7,10 +7,11 @@ import { startChat } from './chat.js';
 import { startCommands, stepTab } from './commands.js';
 import { startHighlights } from './highlight.js';
 import { restoreLayout, shareOf, startLayout } from './layout.js';
-import { sameFile } from './links.js';
+import { namesFile, sameFile } from './links.js';
 import { startPaperTools } from './paper-tools.js';
 import { loadLibrary } from './library.js';
 import { startPaging } from './pager.js';
+import { startPeek } from './peek.js';
 import { startLibrary } from './papers.js';
 import { createReader } from './read.js';
 import { startReviews } from './review.js';
@@ -143,11 +144,16 @@ const library = startLibrary({
   tabs: () => state.papers,
 });
 
-const reviews = startReviews({
+const peek = startPeek({
   openPaper(paper) {
     state = openPaper(state, paper);
     go(paper.pdf);
   },
+  openTarget: (target) => void openTarget(target),
+});
+
+const reviews = startReviews({
+  peek,
   openTarget: (target) => void openTarget(target),
   openReview: (scope, title) => showReview(scope, title),
   onPlace(scope, place) {
@@ -165,12 +171,13 @@ const reviews = startReviews({
 });
 
 const chat = startChat({
+  peek,
   layout: layoutControl,
   currentPaper: () => paperInView(state)?.pdf ?? null,
   currentReview: () => itemInView(state)?.review ?? null,
   openReview: (scope, title) => showReview(scope, title),
   reviewNamed(file) {
-    const found = libraryDocument?.reviews.find((review) => review.path === file);
+    const found = libraryDocument?.reviews.find((review) => namesFile(file, review.path));
     return found ? { scope: found.scope, title: found.title } : null;
   },
   papers: () => libraryDocument?.papers ?? [],

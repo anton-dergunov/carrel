@@ -78,3 +78,29 @@ export function parsePaperLink(href) {
 export function sameFile(a, b) {
   return a.normalize('NFC') === b.normalize('NFC');
 }
+
+/**
+ * The file a link names as a path in the library, the way an agent in the library's folder links
+ * a paper's text or a review: the link as written, percent-decoded, in NFC, without a leading
+ * `./` or a `?…` or `#…`. Undefined for a link with a scheme (the web, `pdf.invalid`) or one
+ * within the page.
+ */
+export function libraryPath(href) {
+  if (!href || href.startsWith('#') || /^[a-z][a-z0-9+.-]*:/i.test(href)) return undefined;
+  const path = decode(href.replace(/[?#][^]*$/, ''))
+    .normalize('NFC')
+    .replace(/^(\.\/)+/, '');
+  return path || undefined;
+}
+
+/** Whether a library path names a file: the file's own path, or an absolute path ending in it. */
+export function namesFile(path, file) {
+  const own = file.normalize('NFC');
+  return path === own || (path.startsWith('/') && path.endsWith(`/${own}`));
+}
+
+/** The paper whose text file a link names, from the library's papers ({text, pdf, …}). */
+export function paperOfLink(href, papers) {
+  const path = libraryPath(href);
+  return path ? papers.find((paper) => paper.text && namesFile(path, paper.text)) : undefined;
+}

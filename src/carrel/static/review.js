@@ -1,32 +1,29 @@
 // A literature review, in a tab of its own: reading one is long work, with many trips to a cited
 // paper and back, and a tab keeps its place. Each open review is drawn once and kept.
 //
-// Its links: a paper's (to its text file) opens a peek, a small card with the paper's title,
-// year and summary, and Open, plus Open at p. N for each page of it the same paragraph cites, and
-// the reader's star;
-// a page link (`http://pdf.invalid/…`) opens the paper there, as in the chat; a link to another
-// review opens that review's tab; a web link opens a new tab.
+// Its links: a paper's (to its text file) opens a peek at it (peek.js); a page link
+// (`http://pdf.invalid/…`) opens the paper there, as in the chat; a link to another review opens
+// that review's tab; a web link opens a new tab.
 
-import { decode, parsePaperLink, sameFile } from './links.js';
+import { decode, parsePaperLink } from './links.js';
 import { loadLibrary, shortDate } from './library.js';
 import { drawCallouts, drawMarkdown } from './markdown.js';
-import { starButton } from './marks.js';
-import { element, marks, shortAuthors, typeIcon } from './rows.js';
+import { element } from './rows.js';
 
 const PLACE_MS = 400;
 
 /**
- * `openPaper({pdf, title})`, `openTarget({file, page})` and `openReview(scope, title)` open
- * tabs; `onPlace(scope, place)` follows the place in a review to come back to; `onTitle(scope,
- * title)` gives a review's title once it is known. Returns `show(scope, place)`, `close(scope)`.
+ * `peek` is peek.js's card, for a cited paper; `openTarget({file, page})` and
+ * `openReview(scope, title)` open tabs; `onPlace(scope, place)` follows the place in a review to
+ * come back to; `onTitle(scope, title)` gives a review's title once it is known. Returns
+ * `show(scope, place)`, `close(scope)`.
  */
-export function startReviews({ openPaper, openTarget, openReview, onPlace, onTitle = () => {} }) {
+export function startReviews({ peek, openTarget, openReview, onPlace, onTitle = () => {} }) {
   const pane = document.getElementById('review-pane');
-  const peek = document.getElementById('peek');
   const open = new Map(); // scope → {article, links, ready}
   let showing = null;
   let held = null; // the review whose place the pane's scroll holds
-  let peeked = null; // the link whose peek is open
+  const closePeek = () => peek.close();
 
   async function show(scope, place) {
     closePeek();
@@ -117,78 +114,6 @@ export function startReviews({ openPaper, openTarget, openReview, onPlace, onTit
     closePeek();
   }
 
-  // The peek at a cited paper.
-
-  function showPeek(link, value, review) {
-    closePeek();
-    const paper = review.library?.byText.get(value.text);
-    const title = paper?.title ?? link.textContent;
-    const card = [];
-    const kicker = element('p', 'peek-kicker');
-    if (paper?.type) kicker.append(typeIcon(paper.type));
-    kicker.append(element('span', '', [paper?.type, paper?.topic, paper?.year].filter(Boolean).join(' · ')));
-    if (paper) kicker.append(marks(paper));
-    card.push(kicker, element('p', 'peek-title', title));
-    const authors = shortAuthors(paper?.authors, 4);
-    if (authors) card.push(element('p', 'peek-authors', authors));
-    if (paper?.summary) card.push(element('p', 'peek-summary', paper.summary));
-    const actions = element('div', 'peek-actions');
-    const openButton = actions.appendChild(element('button', 'primary', 'Open'));
-    openButton.type = 'button';
-    openButton.addEventListener('click', () => {
-      closePeek();
-      openPaper({ pdf: value.pdf, title });
-    });
-    for (const page of citedPages(link, value.pdf)) {
-      const button = actions.appendChild(element('button', 'secondary', `p. ${page}`));
-      button.type = 'button';
-      button.title = `Open at page ${page}`;
-      button.addEventListener('click', () => {
-        closePeek();
-        openTarget({ file: value.pdf, page });
-      });
-    }
-    if (paper) actions.append(starButton(paper.pdf, paper.starred));
-    peek.replaceChildren(...card, actions);
-    peek.hidden = false;
-    peeked = link;
-    link.classList.add('peeked');
-    placePeek(link);
-  }
-
-  /** The pages of the same paper that the link's paragraph cites, in order. */
-  function citedPages(link, pdf) {
-    const block = link.closest('p, li, td, th, blockquote, .callout') ?? link.parentElement;
-    const pages = new Set();
-    for (const each of block.querySelectorAll('a[href^="http://pdf.invalid/"]')) {
-      const target = parsePaperLink(each.href);
-      if (target?.page && sameFile(target.file, pdf)) pages.add(target.page);
-    }
-    return [...pages].sort((a, b) => a - b);
-  }
-
-  /** Under the link when there is room, else over it; inside the pane's width. */
-  function placePeek(link) {
-    const box = link.getBoundingClientRect();
-    const area = pane.getBoundingClientRect();
-    const width = Math.min(380, area.width - 24);
-    peek.style.width = `${width}px`;
-    const left = Math.max(area.left + 12, Math.min(box.left + box.width / 2 - width / 2, area.right - width - 12));
-    peek.style.left = `${left}px`;
-    const height = peek.offsetHeight;
-    const below = box.bottom + 8;
-    const top = below + height <= area.bottom - 8 ? below : Math.max(area.top + 8, box.top - height - 8);
-    peek.style.top = `${top}px`;
-  }
-
-  function closePeek() {
-    if (peek.hidden) return;
-    peek.hidden = true;
-    peek.replaceChildren();
-    peeked?.classList.remove('peeked');
-    peeked = null;
-  }
-
   pane.addEventListener('click', (event) => {
     const link = event.target.closest('a[href]');
     if (!link) return;
@@ -199,8 +124,9 @@ export function startReviews({ openPaper, openTarget, openReview, onPlace, onTit
     if (kind === 'page') {
       openTarget(parsePaperLink(link.href));
     } else if (kind === 'paper') {
-      if (peeked === link) closePeek();
-      else showPeek(link, review.links.get(decode(link.getAttribute('href')).normalize('NFC')), review);
+      const value = review.links.get(decode(link.getAttribute('href')).normalize('NFC'));
+      const paper = review.library?.byText.get(value.text) ?? { pdf: value.pdf, title: link.textContent };
+      peek.toggle(link, paper, pane);
     } else if (kind === 'review') {
       const scope = review.links.get(decode(link.getAttribute('href')).normalize('NFC')).review;
       openReview(scope);
@@ -222,12 +148,5 @@ export function startReviews({ openPaper, openTarget, openReview, onPlace, onTit
     },
     { passive: true },
   );
-  document.addEventListener('pointerdown', (event) => {
-    if (!peek.hidden && !peek.contains(event.target) && event.target !== peeked && !peeked?.contains(event.target)) closePeek();
-  });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closePeek();
-  });
-
   return { show, close, leave, closePeek, showing: () => showing };
 }

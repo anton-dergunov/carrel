@@ -765,7 +765,7 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
     meaningMap.refresh();
   }
 
-  startAdding({ topics: () => doc?.topics ?? [], papers: () => doc?.papers ?? [], onAdded: () => void reload(), openPaper });
+  const adding = startAdding({ topics: () => doc?.topics ?? [], papers: () => doc?.papers ?? [], onAdded: () => void reload(), openPaper });
 
   // A star or a tag changed, here or in a paper's sheet: its rows are made again.
   onMarks((pdf) => {
@@ -803,6 +803,8 @@ export function startLibrary({ openPaper, openReview, openTarget, onAddress = ()
     zoom: (step) => state.view === 'map' && meaningMap.zoom(step),
     area: () => state.area,
     view: () => state.view,
+    /** Whether a paper is being added. */
+    busy: () => adding.busy(),
   };
 }
 

@@ -34,7 +34,22 @@ The agent keeps running the code it started with: after a change, or `uv sync`, 
 - **The setup, first found wins:** the app's Settings; the login agent's plist (its `carrel`, `--library`, `--engine`, `--port` and the rest of its options); the login shell (`carrel` on its PATH, `PAPER_LIBRARY`, `CARREL_ENGINE`). With the agent installed, nothing needs setting. An app opened from the Finder has launchd's bare PATH, as the agent does, so the app reads the login shell's environment once (`$SHELL -l -i -c 'env -0'`, 5 s at most) and passes on its PATH, `XDG_STATE_HOME`, `PAPER_LIBRARY` and `CARREL_ENGINE`.
 - **When it cannot start one**, the window says why, with the last lines of the log and buttons for Settings, Try Again and the log.
 
-**The window.** Its title is the page's. View → Developer Tools (⌥⌘I) inspects and profiles the page as the app draws it. Carrel's own addresses stay in it; any other web address opens in the browser, `window.open` included; a paper link (`pdf.invalid`) never navigates, since the page handles it. Adding a PDF opens the Mac's file panel. Closing the window hides it, so the page and its chats are there when it comes back. The page runs sandboxed, with no Node and no preload; it may write to the clipboard and go full screen, and nothing else is granted. Ctrl and the wheel, and a pinch, zoom the paper or the map (pinch.js), never the whole page.
+**The window.** Its title is the page's. View → Developer Tools (⌥⌘I) inspects and profiles the page as the app draws it. Carrel's own addresses stay in it; any other web address opens in the browser, `window.open` included; a paper link (`pdf.invalid`) never navigates, since the page handles it. Adding a PDF opens the Mac's file panel. The page runs sandboxed, with no Node and no preload; it may write to the clipboard and go full screen, and nothing else is granted. Ctrl and the wheel, and a pinch, zoom the paper or the map (pinch.js), never the whole page.
+
+**Memory: the window only while it is wanted.** The app usually sits in the menu bar with its window closed, so a closed window gives its memory back. Before 2026-11-25 it held about 1.7 GB on a 16 GB Mac deep in swap.
+- **Closing hides the window**, and coming back within 5 minutes is instant. After 5 minutes hidden, the window is destroyed: its page's process and the GPU process's canvases go with it. It is built again when next opened, and the paper takes a second or two to draw. The tabs, each paper's place, the layout and the chat's draft come back from the page's `localStorage`, and the chats from the server. The snapshots, the library's search text and an open find bar, peek or dialog do not.
+- **The page is asked first** (`window.carrel.command('release')`). It says no while a highlight is being saved or waits to be, since until then it exists only in the page, or while a paper's PDF is being added. The app asks again a minute later. A command that is running carries on in the server either way.
+- **A launch at login builds no window** until it is first opened.
+- **Measured** with `bench.py mem` (each process's physical footprint, swapped pages included), driving the app over Chromium's debugging port: three long papers read and scrolled, one zoomed, each tab shown again, then the window closed.
+
+| The app (its own processes, not the server) | Before | After |
+|---|---|---|
+| At login, never opened | 433 MB | 70 MB |
+| Reading three papers | 1,041–1,651 MB | 1,032 MB (unchanged by design) |
+| Closed 5 s | 1,056 MB | 662 MB |
+| Closed 5½ min | 728 MB (GPU 291, page 383) | 101 MB (GPU 46, no page) |
+
+- **Open, nothing was trimmed**, so tab switches stay as fast. The snapshots (6 papers on the Mac) and the kept papers (3) stay. PDF.js keeps about ten pages drawn, which is most of the GPU process while reading.
 
 **Menus call the page.** Each menu item that acts on the library runs one of the page's commands, `window.carrel.command(name)` (`commands.js`), and gets back whether it did anything: Add Paper (⌘N), Close Tab (⌘W, which closes the window on the library), Find (⌘F: the paper's find, or the library's search box), Library (⌘1), Next and Previous Tab (⇧⌘] and ⇧⌘[), Ask (⌘L), Show or Hide Chat (⇧⌘L), Page Settings (⌥⌘,). Zoom (⌘0, ⌘=, ⌘−) is the paper's, or the meaning map's, and the whole page's only when neither is showing. The page takes a few keys itself, in a browser too: ⌘F (Ctrl+F), since the browser's find cannot search the pages PDF.js has not drawn; and ⌘= ⌘− ⌘0, and + − 0 alone, which zoom the paper as they zoom the map. Where there is nothing of the page's to zoom, ⌘= and the rest are left to the browser.
 
@@ -154,6 +169,7 @@ Measured on the Mac app and kept here so it is not measured again. `scripts/mac-
 - **Nothing on a scroll's path that vscode-pdf-viewer's viewer lacks.** It runs the same PDF.js with the same options, and is sharp the moment a wheel spun at full speed stops. Carrel's two additions there made it worse (Removed, below).
 - **No listener on the pane that may cancel a wheel or touch event**, but while a pinch or a sideways pan needs one (Pinch zooms the PDF, One finger keeps to an axis).
 - On e-ink each page is drawn once, whole and sharp (`maxCanvasPixels` 16.7 MP): PDF.js's capped first drawing plus a detail canvas made the text jump up on every turn there.
+- On the Mac, PDF.js's own cap (`maxCanvasPixels` 2^25, and at most three screens' pixels). A page over the cap is drawn whole at half resolution, with a sharp detail canvas over the part in view, so a fast scroll shows the half-resolution drawing until the detail lands. 2^24 was measured against it on 2026-11-25 on the Crisp screen (2 pixels a point). A 720 pt pane at its width, at 147% and at 238%, drew every page whole at full resolution under both caps (15.2 MP at 238%), with the same memory (801 against 811 MB). 2^24 engages only once a page is wider than about 1,800 pt on screen (2^25, about 2,540 pt), where it would only blur. It was left.
 - Settings → Pages' adjustments on every canvas the reader sees, once each (a page struck twice is bolder), and the filters on the canvases alone.
 - The place each tab keeps, and the pages drawn at the screen's own resolution.
 
@@ -359,8 +375,9 @@ The library tab is the reader's view of the whole collection: five views of one 
 - **The encoder** is Qwen3-Embedding-0.6B, chosen on this library ([experiments/meaning-search](../../agentic-paper-library/experiments/meaning-search/README.md)). On 32 reader-style queries graded by a model, its nDCG@10 was 0.752, against 0.628 for the best small encoder (bge-base) and 0.504 for BM25 over the same text.
 - **What is embedded**: each paper's title, summary and abstract, the abstract taken from the head of its own text. Title and abstract alone scored about the same; title and summary alone, much lower. The opening of the body is being measured.
 - **The cache** is the engine's: one vector a text, named by the digest of the model and the text, so only a new or changed paper is embedded again. The server keeps the vectors in memory (about 9 MB), built in a thread when it starts and built again when the library's document changes.
-- **The model is loaded only to embed a question or a new paper**, and freed after 10 minutes without a question. It holds about 1.2 GB, and most visits ask nothing.
-  - The server holds 150 MB at rest.
+- **The model is loaded only to embed a question or a new paper**, and freed after 10 minutes without a question. It holds about 1.6 GB, and most visits ask nothing.
+  - **It runs in a child process** (the engine's `ChildEncoder`), which the release ends. Freed inside the server, the model left torch imported: in one process, 15 MB became 1,636 MB for a question and fell back only to 423 MB, and the server held 533 MB after four days. With the child, the server never imports torch; its process stays at 22 MB through a question and a release.
+  - The server holds 150–190 MB at rest.
   - The first Meaning search after a rest waits about 7 s while torch and the model load; later ones answer in about 80 ms.
 - **The agent's `paperlib meaning`** loads its own copy for each call, in Claude Code's sandbox, which hides the GPU. On the CPU in float32 a call takes 8–9 s, as it does on the GPU: most of it is importing torch and loading the model, and a query itself is 174 ms against 65 ms.
 - **Similar papers**: the paper's sheet lists the eight nearest papers in a section of its own (`GET /api/similar/<pdf>`), and a tap opens one in its tab.

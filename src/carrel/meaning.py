@@ -5,9 +5,11 @@ memory (their vectors, about 9 MB), and builds it again when the library's docum
 (its ETag), which embeds only the papers that are new or changed. The space is built in a thread
 when the server starts. Only the papers in the library's document (those with a PDF) are found.
 
-The model (about 1.2 GB) is needed only to embed a question or a new paper; a paper's similar papers
-are found from the vectors alone. So it is loaded when first needed, about 4 s, and freed after
-IDLE_S without a question.
+The model (about 1.6 GB in memory) is needed only to embed a question or a new paper; a paper's
+similar papers are found from the vectors alone. So it is loaded when first needed, about 4 s, and
+freed after IDLE_S without a question. It runs in a child process (the engine's ChildEncoder), which
+the release ends: freed in the server itself, the model left torch imported, some 400 MB the server
+then held for as long as it ran.
 """
 
 import logging
@@ -36,7 +38,7 @@ class Meaning:
         self.library = library
         self.catalog = catalog
         self.engine = library.meaning()
-        self.encoder = encoder or self.engine.SentenceEncoder()
+        self.encoder = encoder or self.engine.ChildEncoder()
         # One build or question at a time: the model is not shared between threads.
         self._lock = threading.Lock()
         self._etag: str | None = None

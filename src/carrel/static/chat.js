@@ -22,6 +22,9 @@ const RESULT_PREVIEW = 4000;
 // System messages that say nothing to the reader.
 const QUIET_SYSTEM = new Set(['thinking_tokens', 'status']);
 const CHAT_KEY = 'carrel.chat';
+// What is typed in the box and not yet asked: kept on the device, so a page loaded again (iPad
+// Safari drops one in the background; the Mac app lets a window closed for a while go) keeps it.
+const DRAFT_KEY = 'carrel.draft';
 const RECONNECT_MAX_MS = 15_000;
 // A chat changed this recently may still be open in VS Code or the terminal.
 const RECENT_S = 300;
@@ -739,6 +742,7 @@ export function startChat({
     }
   });
   function grow() {
+    keepDraft(question.value);
     // An empty box takes its natural height, which is smaller while it is not being typed in.
     if (!question.value) {
       question.style.height = '';
@@ -751,6 +755,8 @@ export function startChat({
     grow();
     void listCommands();
   });
+  question.value = draft();
+  grow();
 
   // The slash commands that match what is typed, while the box holds just one being typed.
 
@@ -852,6 +858,23 @@ function span(className, text) {
   element.className = className;
   element.textContent = text;
   return element;
+}
+
+function draft() {
+  try {
+    return localStorage.getItem(DRAFT_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function keepDraft(text) {
+  try {
+    if (text) localStorage.setItem(DRAFT_KEY, text);
+    else localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // Private browsing: the draft lasts as long as the page.
+  }
 }
 
 function remembered() {

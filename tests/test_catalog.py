@@ -315,3 +315,11 @@ def test_meaning_frees_its_model_when_idle(library, transcripts, words):
     assert meaning.release_idle(idle_s=0) and freed == [True]
     words.unload = lambda: False  # nothing loaded: nothing to free
     assert not meaning.release_idle(idle_s=0)
+
+
+def test_the_model_runs_in_a_child(library, transcripts):
+    """By default the model is the engine's ChildEncoder's, so the server never imports torch,
+    which stays imported once a model in the server is freed. Nothing starts until a question."""
+    meaning = Meaning(library, Catalog(library, transcripts))
+    assert type(meaning.encoder).__name__ == "ChildEncoder"
+    assert not meaning.encoder.loaded

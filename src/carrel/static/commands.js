@@ -1,6 +1,7 @@
 // What the page can be asked to do from outside it: the Mac app's menus call
 // `window.carrel.command(name)`, and get back whether it did anything (Close Tab on the library
 // closes the window instead). The actions themselves are the page's own; this only names them.
+// One is a question, not an action: `release`, whether the app may let its closed window go.
 //
 // The page takes a few keys for itself, in a browser too: ⌘F (Ctrl+F elsewhere), since find in the
 // paper finds on pages PDF.js has not drawn, which the browser's own find cannot; and ⌘= ⌘− ⌘0, and

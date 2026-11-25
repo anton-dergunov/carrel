@@ -295,4 +295,6 @@ export function startAdding({ topics, papers = () => [], onAdded, openPaper }) {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !sheet.hidden) close();
   });
+  /** Whether a paper is being added: its PDF may still be on its way to the laptop. */
+  return { busy: () => running };
 }

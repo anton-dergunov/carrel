@@ -86,6 +86,8 @@ The Mac app shows carrel's pages in a window of its own. It draws them with Chro
 
 **In the menu bar.** Settings can put carrel in the menu bar, with the tablet's address to copy and the server to start or stop, and open it at login.
 
+**A closed window gives its memory back.** Reopened within five minutes, the window is just as you left it. After that, carrel frees what the window held, and reopening it takes a second or two to draw the paper again. Your tabs, your place in each paper, the chat and a question you had started typing are all still there.
+
 ## Reading a paper
 
 Tap a paper and it opens in a tab, with a chat beside it. The library has its tab at the left, and each paper and review you open gets one of its own. A tab comes back at the page it was on, and the tabs come back after a reload. Each device remembers its own tabs.

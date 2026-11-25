@@ -370,6 +370,9 @@ function zoom(step) {
 }
 
 const commands = {
+  // The Mac app lets a window closed for a while go, and asks first: not while the page holds
+  // something it has not yet sent to the laptop.
+  release: () => !reader.busy() && !library.busy(),
   'zoom-in': () => zoom(1),
   'zoom-out': () => zoom(-1),
   'zoom-reset': () => zoom(0),

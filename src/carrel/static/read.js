@@ -34,6 +34,7 @@ const DEST_CONTEXT_PX = 72;
 // in further, the two drawings come back. PDF.js keeps about ten pages drawn: some 300 MB of
 // canvases at most, against 80 under its cap.
 const EINK_CANVAS_PIXELS = 2 ** 24;
+// The Mac keeps PDF.js's own cap (2^25), measured against 2^24 on 2026-11-25 (architecture.md).
 const canvasPixels = () => (window.carrelLook.eink() ? EINK_CANVAS_PIXELS : undefined);
 // The papers kept loaded (PDF.js's documents), the one showing among them: coming back to a tab
 // skips fetching and parsing its paper again. Each holds its worker's memory, tens of MB.
@@ -665,6 +666,8 @@ export function createReader({ onPage, onPlace, onFound, onSaved }) {
     goToDestination: (dest) => scrollToDestination(dest),
     clearMark: () => citeMark.clear(true),
     file: () => file,
+    /** Whether a highlight is being saved, or waits to be: it is only in the page until it is. */
+    busy: () => running || dirty || unsaved,
     pagesCount: () => (pdfDocument ? viewer.pagesCount : 0),
     currentPage: () => (pdfDocument ? viewer.currentPageNumber || null : null),
     selected,

@@ -30,6 +30,13 @@ let showingStatus = false;
 let quitting = false;
 /** Settings opens by itself once, when nothing is known to start a carrel with. */
 let askedForSetup = false;
+// A window closed is hidden, so coming back to it within a few minutes is instant; after
+// RELEASE_MS hidden it is let go, page, canvases and all (about 1 GB after reading), and built
+// again when next opened: the tabs and places come back from the page's storage, the chats from the
+// server. A page busy with a save or an add is asked again after RETRY_MS.
+const RELEASE_MS = 5 * 60_000;
+const RETRY_MS = 60_000;
+let releaseTimer = null;
 
 app.whenReady().then(() => {
   settings = loadSettings();
@@ -43,10 +50,10 @@ app.whenReady().then(() => {
   );
   ipcSettings();
 
-  makeWindow();
   server.on('change', show);
   setMenuBarItem(settings.showInMenuBar);
-  // Opened at login with the menu bar item, Carrel waits there; opened by hand, it shows itself.
+  // Opened at login with the menu bar item, Carrel waits there, with no window until one is asked
+  // for; opened by hand, it shows itself.
   if (settings.showInMenuBar && launchedAtLogin()) app.setActivationPolicy('accessory');
   else openWindow();
   void server.connect();
@@ -109,7 +116,8 @@ function makeWindow() {
   contents.on('render-process-gone', () => {
     if (!showingStatus) contents.reload();
   });
-  // Closing the window hides it, so the page and its chats are there when it comes back.
+  // Closing the window hides it, so the page and its chats are there when it comes back, until
+  // it is let go (RELEASE_MS).
   window.on('close', (event) => {
     saveBounds();
     if (quitting) return;
@@ -118,8 +126,37 @@ function makeWindow() {
     if (settings.showInMenuBar) returnToMenuBarIfAlone();
     else app.quit();
   });
+  window.on('hide', () => releaseLater(RELEASE_MS));
+  window.on('show', cancelRelease);
+  window.on('closed', () => {
+    cancelRelease();
+    window = null;
+  });
   window.on('resized', saveBounds);
   window.on('moved', saveBounds);
+  showingStatus = false;
+  if (server.state) show(server.state);
+}
+
+function releaseLater(delay) {
+  cancelRelease();
+  releaseTimer = setTimeout(() => void release(), delay);
+}
+
+function cancelRelease() {
+  clearTimeout(releaseTimer);
+  releaseTimer = null;
+}
+
+/** Lets the hidden window go, unless its page is in the middle of something it would lose. */
+async function release() {
+  releaseTimer = null;
+  if (!window || window.isVisible()) return;
+  const ready = showingStatus || (await command('release'));
+  if (!window || window.isVisible()) return;
+  if (!ready) return releaseLater(RETRY_MS);
+  saveBounds();
+  window.destroy();
 }
 
 const origin = () => originOf(server.setup);
@@ -139,6 +176,8 @@ function showStatus(heading, text, options) {
 }
 
 function show(state) {
+  sendSettings();
+  if (!window) return; // drawn when the window is next built
   const { setup } = server;
   if (state === 'probing') showStatus('Looking for carrel…', `On port ${setup.port}.`);
   else if (state === 'starting') {
@@ -161,7 +200,6 @@ function show(state) {
       buttons: [['Try Again', 'retry'], ['Settings', 'settings'], ['Show Log', 'log']],
     });
   }
-  sendSettings();
 }
 
 function statusAction(action) {
@@ -208,11 +246,12 @@ function bringForward(target) {
 }
 
 function openWindow() {
-  if (window) bringForward(window);
+  if (!window) makeWindow();
+  bringForward(window);
 }
 
 function toggleWindow() {
-  if (window.isVisible() && window.isFocused()) {
+  if (window?.isVisible() && window.isFocused()) {
     window.hide();
     returnToMenuBarIfAlone();
   } else openWindow();
@@ -265,7 +304,7 @@ function statusLine() {
 
 /** Runs one of the page's commands (`commands.js`): whether it did anything. */
 async function command(name) {
-  if (showingStatus) return false;
+  if (!window || showingStatus) return false;
   try {
     return Boolean(await window.webContents.executeJavaScript(`window.carrel ? window.carrel.command(${JSON.stringify(name)}) : false`, true));
   } catch {
@@ -282,13 +321,13 @@ function pageCommand(name) {
 async function closeTab() {
   const focused = BrowserWindow.getFocusedWindow();
   if (focused && focused !== window) return focused.close();
-  if (!(await command('close-tab'))) window.close();
+  if (!(await command('close-tab'))) window?.close();
 }
 
 /** Zoom is the paper's or the meaning map's, as the page decides; with neither showing, the whole
  * page's. */
 async function zoom(name) {
-  if (await command(name)) return;
+  if ((await command(name)) || !window) return;
   const contents = window.webContents;
   const factor = contents.getZoomFactor();
   if (name === 'zoom-reset') contents.setZoomFactor(1);
@@ -297,6 +336,7 @@ async function zoom(name) {
 }
 
 function reload() {
+  if (!window) return;
   if (!server.pageURL) void server.connect();
   else if (showingStatus) load(server.pageURL);
   else window.webContents.reload();

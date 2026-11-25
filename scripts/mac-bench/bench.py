@@ -5,6 +5,7 @@ recorded at 60 fps, and each frame of the PDF's pane classified.
     uv run --with numpy python scripts/mac-bench/bench.py clicks X,Y X,Y ... [--runs N]
     uv run --with numpy python scripts/mac-bench/bench.py video RECORDING.mov [--rect X,Y,W,H]
     uv run --with numpy python scripts/mac-bench/bench.py frames DIR ...
+    uv run --with numpy python scripts/mac-bench/bench.py mem
 
 `spin` flicks a free-spinning wheel violently over the paper in view: to the start, down, and to
 the start again (from the middle of a long paper, so that the pages crossed are not all drawn). It
@@ -16,6 +17,10 @@ the pane changed and whether any frame after that differed from where it settled
 preview, a redraw). `video` sorts the frames of a screen recording made elsewhere (the iPad's,
 flicked by hand) the same way, with ffmpeg. `frames` sorts again the frames an earlier spin kept
 (each folder under --out holding a frames.csv), after a change to how frames are sorted.
+`mem` prints the memory the Mac app's processes hold, by role (the app, the GPU process, the
+page's renderer, the other helpers), and `carrel serve`'s and `lectern serve`'s: each process's
+physical footprint, as Activity Monitor's Memory column counts it, swapped and compressed pages
+included (`ps`'s RSS leaves them out). It needs no window.
 
 The app must be on screen with a paper open; the terminal needs Screen Recording and
 Accessibility. `--app` measures another app's window (com.apple.Safari), `--rect X,Y,W,H` the
@@ -295,6 +300,60 @@ def keep(args, result):
             out.write(json.dumps({**record, **result}) + "\n")
 
 
+def processes(pattern):
+    """The running processes whose command line holds `pattern`: [(pid, command)]."""
+    out = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True).stdout
+    found = []
+    for line in out.splitlines():
+        pid, _, command = line.strip().partition(" ")
+        if pattern in command and "bench.py" not in command:
+            found.append((int(pid), command))
+    return found
+
+
+def footprint(pid):
+    """A process's physical footprint, in bytes (None for one that has gone)."""
+    out = subprocess.run(
+        ["footprint", "-f", "bytes", "--noCategories", "-p", str(pid)],
+        capture_output=True,
+        text=True,
+    ).stdout
+    for line in out.splitlines():
+        if line.strip().startswith("phys_footprint:"):
+            return int(line.split()[1])
+    return None
+
+
+def role(command):
+    """What a process of the app is: main, gpu, renderer, or the helper's sub-type."""
+    if "--type=gpu-process" in command:
+        return "gpu"
+    if "--type=renderer" in command:
+        return "renderer"
+    if "--utility-sub-type=" in command:
+        return command.split("--utility-sub-type=")[1].split()[0].split(".")[0]
+    if "--type=" in command:
+        return command.split("--type=")[1].split()[0]
+    return "main"
+
+
+def mem(args):
+    """The memory each of the app's processes, and the servers, hold now."""
+    rows = [(role(c), pid, footprint(pid)) for pid, c in processes(args.match)]
+    for name in ("carrel serve", "lectern serve"):
+        rows += [(name, pid, footprint(pid)) for pid, _ in processes(name)]
+    rows = [row for row in rows if row[2] is not None]
+    mb = lambda b: round(b / 2**20)  # noqa: E731
+    app = sum(b for name, _, b in rows if not name.endswith(" serve"))
+    for name, pid, b in rows:
+        print(f"{name:>16} {pid:>7} {mb(b):>6} MB")
+    print(f"{'the app':>16} {'':>7} {mb(app):>6} MB")
+    result = {"app": mb(app)}
+    for name, _, b in rows:
+        result[name] = result.get(name, 0) + mb(b)
+    keep(args, result)
+
+
 def video(args, path):
     """A recording's frames, as it has them (a phone's are variable: a frame only when the screen
     changed), each shown until the next; the time each kind was on screen, in all and while the
@@ -422,7 +481,7 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("what", choices=["spin", "clicks", "video", "frames"])
+    parser.add_argument("what", choices=["spin", "clicks", "video", "frames", "mem"])
     parser.add_argument(
         "points",
         nargs="*",
@@ -431,6 +490,9 @@ def main():
     parser.add_argument("--at", help="spin: the screen point to spin over (by default the pane)")
     parser.add_argument("--runs", type=int, default=2)
     parser.add_argument("--app", default="com.anton.carrel.app")
+    parser.add_argument(
+        "--match", default="Carrel.app/Contents/", help="mem: what the app's command lines hold"
+    )
     parser.add_argument(
         "--rect", help="the pane, X,Y,W,H in the window's points (video: in the recording's pixels)"
     )
@@ -444,6 +506,9 @@ def main():
     if args.what == "video":
         for path in args.points:
             video(args, path)
+        return
+    if args.what == "mem":
+        mem(args)
         return
     if args.what == "frames":
         for folder in args.points:
